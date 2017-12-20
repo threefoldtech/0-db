@@ -281,22 +281,22 @@ int redis_listen(char *listenaddr, int port) {
     addr_client_len = sizeof(addr_client);
 
     if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-        diep("[-] socket");
+        diep("socket");
 
     if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
-        diep("[-] setsockopt");
+        diep("setsockopt");
 
     if(bind(sockfd, (struct sockaddr*) &addr_listen, sizeof(addr_listen)) == -1)
-        diep("[-] bind");
+        diep("bind");
 
     if(listen(sockfd, 32) == -1)
-        diep("[-] listen");
+        diep("listen");
 
     while(1) {
         printf("[+] waiting new connection...\n");
 
         if((cfd = accept(sockfd, (struct sockaddr *)&addr_client, &addr_client_len)) == -1)
-            perror("[-] accept");
+            warnp("accept");
 
         client_ip = inet_ntoa(addr_client.sin_addr);
         printf("[+] connection from %s\n", client_ip);
