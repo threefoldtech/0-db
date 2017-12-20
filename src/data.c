@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <openssl/sha.h>
 #include "rkv.h"
@@ -12,6 +13,8 @@
 
 static data_t *rootdata = NULL;
 
+//
+// hash functions
 char *sha256_hex(unsigned char *hash) {
     char *buffer = calloc((SHA256_DIGEST_LENGTH * 2) + 1, sizeof(char));
 
@@ -43,28 +46,86 @@ unsigned char *sha256_parse(char *buffer, unsigned char *target) {
     return target;
 }
 
-void data_init() {
-   data_t *lroot = (data_t *) malloc(sizeof(data_t));
+//
+// data management
+//
+void data_initialize(char *filename) {
+    int fd;
 
-   lroot->datafile = "/tmp/rkv-data";
-   // if((lroot->datafd = open(lroot->datafile, O_CREAT | O_SYNC | O_RDWR, 0600)) < 0)
-   if((lroot->datafd = open(lroot->datafile, O_CREAT | O_RDWR, 0600)) < 0)
-        diep(lroot->datafile);
+    if((fd = open(filename, O_CREAT | O_RDWR, 0600)) < 0)
+        diep(filename);
 
-   if(write(lroot->datafd, "X", 1) != 1)
-       diep(lroot->datafile);
+    // writing initial header
+    if(write(fd, "X", 1) != 1)
+        diep(filename);
 
-   rootdata = lroot;
+    close(fd);
 }
 
-char *data_get(size_t offset, size_t length) {
-    char *buffer = malloc(length);
+static void data_set_id(data_t *root) {
+    sprintf(root->datafile, "%s/rkv-data-%04u", root->datadir, root->dataid);
+}
 
-    lseek(rootdata->datafd, offset + sizeof(data_header_t), SEEK_SET);
-    if(read(rootdata->datafd, buffer, length) != (ssize_t) length) {
-        fprintf(stderr, "[-] cannot read data\n");
+static int data_open_id(data_t *root, uint16_t id) {
+    char temp[PATH_MAX];
+    int fd;
+
+    sprintf(temp, "%s/rkv-data-%04u", root->datadir, id);
+
+    if((fd = open(temp, O_RDONLY, 0600)) < 0)
+        diep(temp);
+
+    return fd;
+}
+
+static void data_open_final(data_t *root) {
+    if((root->datafd = open(root->datafile, O_CREAT | O_RDWR | O_APPEND, 0600)) < 0)
+        diep(root->datafile);
+
+    // skipping header
+    lseek(root->datafd, 0, SEEK_END);
+
+    printf("[+] active data file: %s\n", root->datafile);
+}
+
+size_t data_jump_next() {
+    printf("[+] jumping to the next data file\n");
+
+    // closing current file descriptor
+    close(rootdata->datafd);
+
+    // moving to the next file
+    rootdata->dataid += 1;
+    data_set_id(rootdata);
+
+    data_initialize(rootdata->datafile);
+    data_open_final(rootdata);
+
+    return rootdata->dataid;
+}
+
+char *data_get(size_t offset, size_t length, uint16_t dataid) {
+    char *buffer = malloc(length);
+    int fd = rootdata->datafd;
+
+    if(rootdata->dataid != dataid) {
+        printf("not on same data id, %d <> %d\n", rootdata->dataid, dataid);
+        fd = data_open_id(rootdata, dataid);
+    }
+
+    lseek(fd, offset + sizeof(data_header_t), SEEK_SET);
+    if(read(fd, buffer, length) != (ssize_t) length) {
+        warnp("data_get: read");
+
         free(buffer);
-        return NULL;
+        buffer = NULL;
+
+        goto cleanup;
+    }
+
+cleanup:
+    if(rootdata->dataid != dataid) {
+        close(fd);
     }
 
     return buffer;
@@ -93,6 +154,30 @@ size_t data_insert(char *data, unsigned char *hash, uint32_t length) {
     return offset;
 }
 
+//
+// data constructor and destructor
+//
 void data_destroy() {
+    free(rootdata->datafile);
     free(rootdata);
 }
+
+void data_init(uint16_t dataid) {
+    data_t *lroot = (data_t *) malloc(sizeof(data_t));
+
+    lroot->datadir = "/mnt/storage/tmp/rkv";
+    lroot->datafile = malloc(sizeof(char) * (PATH_MAX + 1));
+    lroot->dataid = dataid;
+
+    data_set_id(lroot);
+
+    // opening the file and creating it if needed
+    data_initialize(lroot->datafile);
+
+    // opening the final file for appending only
+    data_open_final(lroot);
+
+    // commit variable
+    rootdata = lroot;
+}
+

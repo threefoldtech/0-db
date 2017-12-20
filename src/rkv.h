@@ -7,4 +7,5 @@
     #define HASHSIZE 32  // sha-256
     
     void diep(char *str);
+    void warnp(char *str);
 #endif

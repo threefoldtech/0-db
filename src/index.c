@@ -7,11 +7,28 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
+#include <dirent.h>
+#include <sys/stat.h>
 #include "rkv.h"
 #include "index.h"
 #include "data.h"
 
 static index_root_t *rootindex = NULL;
+
+//
+// index initialized
+//
+static char *index_date(uint32_t epoch, char *target, size_t length) {
+    struct tm *timeval;
+    time_t unixtime;
+
+    unixtime = epoch;
+
+    timeval = localtime(&unixtime);
+    strftime(target, length, "%F %T", timeval);
+
+    return target;
+}
 
 static void index_dump(int fulldump) {
     size_t size = 0;
@@ -41,11 +58,32 @@ static void index_dump(int fulldump) {
     printf("[+] dataindex overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
 }
 
+static index_t index_initialize(int fd, uint16_t indexid) {
+    index_t header;
 
-static void index_load(index_root_t *root) {
+    memcpy(header.magic, "IDX0", 4);
+    header.version = 1;
+    header.created = time(NULL);
+    header.fileid = indexid;
+    header.opened = time(NULL);
+
+    if(write(fd, &header, sizeof(index_t)) != sizeof(index_t))
+        diep("index_initialize: write");
+
+    return header;
+}
+
+// opening, reading then closing the index file
+// if the index was created, 0 is returned
+static size_t index_load_file(index_root_t *root) {
     index_t header;
     size_t length;
     index_entry_t entry;
+
+    printf("[+] loading index file: %s\n", root->indexfile);
+
+    if((root->indexfd = open(root->indexfile, O_CREAT | O_RDWR, 0600)) < 0)
+        diep(root->indexfile);
 
     if((length = read(root->indexfd, &header, sizeof(index_t))) != sizeof(index_t)) {
         if(length > 0) {
@@ -53,12 +91,18 @@ static void index_load(index_root_t *root) {
             exit(EXIT_FAILURE);
         }
 
+        // this is not the first file, it was not existing
+        // no need to create or prepare it, we will discard it
+        if(root->indexid > 0) {
+            printf("[+] discarding index file\n");
+            close(root->indexfd);
+            return 0;
+        }
+
         printf("[+] creating empty index file\n");
 
         // creating new index
-        memcpy(header.magic, "IDX0", 4);
-        header.version = 1;
-        header.created = time(NULL);
+        header = index_initialize(root->indexfd, root->indexid);
     }
 
     // updating index
@@ -68,40 +112,74 @@ static void index_load(index_root_t *root) {
     if(write(root->indexfd, &header, sizeof(index_t)) != sizeof(index_t))
         diep(root->indexfile);
 
-    printf("[+] index created at: %u\n", header.created);
-    printf("[+] index last open: %u\n", header.opened);
+    char date[256];
+    printf("[+] index created at: %s\n", index_date(header.created, date, sizeof(date)));
+    printf("[+] index last open: %s\n", index_date(header.opened, date, sizeof(date)));
 
     // reading the index, populating memory
     while(read(root->indexfd, &entry, sizeof(index_entry_t)) == sizeof(index_entry_t))
         index_entry_insert_memory(entry.hash, entry.offset, entry.length);
 
-    index_dump(1);
+    close(root->indexfd);
+
+    // if length is greater than 0, the index was existing
+    // if length is 0, index just has been created
+    return length;
 }
 
-void index_init() {
-    index_root_t *lroot = malloc(sizeof(index_root_t));
+static void index_set_id(index_root_t *root) {
+    sprintf(root->indexfile, "%s/rkv-index-%04u", root->indexdir, root->indexid);
+}
 
-    printf("[+] initializing index\n");
-    for(int i = 0; i < 256; i++) {
-        lroot->branches[i] = malloc(sizeof(index_branch_t));
-        index_branch_t *branch = lroot->branches[i];
+static void index_open_final(index_root_t *root) {
+    if((root->indexfd = open(root->indexfile, O_CREAT | O_RDWR | O_APPEND, 0600)) < 0)
+        diep(root->indexfile);
 
-        branch->length = 32;
-        branch->next = 0;
-        branch->entries = (index_entry_t **) malloc(sizeof(index_entry_t *) * branch->length);
+    printf("[+] active index file: %s\n", root->indexfile);
+}
+
+static void index_load(index_root_t *root) {
+    for(root->indexid = 0; root->indexid < 10000; root->indexid++) {
+        index_set_id(root);
+
+        if(index_load_file(root) == 0) {
+            // if the index was not the first one
+            // we created a new index, we need to remove it
+            // and fallback to the previous one
+            if(root->indexid > 0) {
+                unlink(root->indexfile);
+                root->indexid -= 1;
+            }
+
+            // writing the final filename
+            index_set_id(root);
+            break;
+        }
     }
 
-    lroot->indexfile = "/tmp/rkv-index";
-    rootindex = lroot;
-
-    // if((lroot->indexfd = open(lroot->indexfile, O_CREAT | O_SYNC | O_RDWR, 0600)) < 0)
-    if((lroot->indexfd = open(lroot->indexfile, O_CREAT | O_RDWR, 0600)) < 0)
-    // if((lroot->indexfd = open(lroot->indexfile, O_CREAT | O_DSYNC | O_RDWR, 0600)) < 0)
-        diep(lroot->indexfile);
-
-    index_load(lroot);
+    // opening the real active index file in append mode
+    index_open_final(root);
 }
 
+size_t index_jump_next() {
+    printf("[+] jumping to the next index file\n");
+
+    // closing current file descriptor
+    close(rootindex->indexfd);
+
+    // moving to the next file
+    rootindex->indexid += 1;
+    index_set_id(rootindex);
+
+    index_open_final(rootindex);
+    index_initialize(rootindex->indexfd, rootindex->indexid);
+
+    return rootindex->indexid;
+}
+
+//
+// index manipulation
+//
 index_entry_t *index_entry_get(unsigned char *hash) {
     index_branch_t *branch = rootindex->branches[hash[0]];
 
@@ -123,6 +201,7 @@ index_entry_t *index_entry_insert_memory(unsigned char *hash, size_t offset, siz
     memcpy(entry->hash, hash, HASHSIZE);
     entry->offset = offset;
     entry->length = length;
+    entry->dataid = rootindex->indexid;
 
     // maybe resize
     index_branch_t *branch = rootindex->branches[hash[0]];
@@ -151,6 +230,11 @@ index_entry_t *index_entry_insert(unsigned char *hash, size_t offset, size_t len
     return entry;
 }
 
+//
+// index constructor and destructor
+//
+
+// clean all opened index related stuff
 void index_destroy() {
     for(int b = 0; b < 256; b++) {
         index_branch_t *branch = rootindex->branches[b];
@@ -165,5 +249,35 @@ void index_destroy() {
     }
 
     // delete root object
+    free(rootindex->indexfile);
     free(rootindex);
 }
+
+// create an index and load files
+uint16_t index_init() {
+    index_root_t *lroot = malloc(sizeof(index_root_t));
+
+    printf("[+] initializing index\n");
+    for(int i = 0; i < 256; i++) {
+        lroot->branches[i] = malloc(sizeof(index_branch_t));
+        index_branch_t *branch = lroot->branches[i];
+
+        branch->length = 32;
+        branch->next = 0;
+        branch->entries = (index_entry_t **) malloc(sizeof(index_entry_t *) * branch->length);
+    }
+
+    lroot->indexdir = "/mnt/storage/tmp/rkv";
+    lroot->indexid = 0;
+    lroot->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
+
+    // commit variable
+    rootindex = lroot;
+
+    index_load(lroot);
+    index_dump(1);
+
+    return lroot->indexid;
+}
+
+

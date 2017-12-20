@@ -70,6 +70,13 @@ static int dispatcher(resp_request_t *request) {
         send(request->fd, response, strlen(response), 0);
 
         free(hashex);
+
+        // checking if we need to jump to the next files
+        if(offset + request->argv[2]->length > 100 * 1024 * 1024) { // 100 MB
+            size_t newid = index_jump_next();
+            data_jump_next(newid);
+        }
+
         return 0;
     }
 
@@ -97,7 +104,15 @@ static int dispatcher(resp_request_t *request) {
 
         // $xx\r\n + payload + \r\n
         size_t total = 1 + stroffset + 2 + entry->length + 2;
-        char *payload = data_get(entry->offset, entry->length);
+        char *payload = data_get(entry->offset, entry->length, entry->dataid);
+
+        if(!payload) {
+            printf("[-] cannot read payload\n");
+            send(request->fd, "-Internal Error\r\n", 17, 0);
+            free(payload);
+            return 0;
+        }
+
         char *response = malloc(total);
 
         strcpy(response, "$");
@@ -171,7 +186,7 @@ static int resp(int fd) {
         }
 
         command.argc = atoi(buffer + 1);
-        printf("[+] resp: %d arguments\n", command.argc);
+        // printf("[+] resp: %d arguments\n", command.argc);
 
         if(!(reader = strchr(buffer, '\n')))
             return 0;
@@ -192,7 +207,7 @@ static int resp(int fd) {
 
             argument->type = STRING;
             argument->length = atoi(reader + 1);
-            printf("[+] string len: %d\n", argument->length);
+            // printf("[+] string len: %d\n", argument->length);
 
             // going to the next line for the payload
             if(!(reader = strchr(reader, '\n'))) {
