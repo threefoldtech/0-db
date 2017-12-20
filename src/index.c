@@ -13,7 +13,10 @@
 
 static index_root_t *rootindex = NULL;
 
-static void index_dump() {
+static void index_dump(int fulldump) {
+    size_t size = 0;
+    size_t entries = 0;
+
     for(int b = 0; b < 256; b++) {
         index_branch_t *branch = rootindex->branches[b];
 
@@ -21,11 +24,21 @@ static void index_dump() {
             index_entry_t *entry = branch->entries[i];
             char *hex = sha256_hex((unsigned char *) entry->hash);
 
-            printf("[+] %s: offset %lu, length: %lu\n", hex, entry->offset, entry->length);
+            if(fulldump)
+                printf("[+] %s: offset %lu, length: %lu\n", hex, entry->offset, entry->length);
+
+            size += entry->length;
+            entries += 1;
 
             free(hex);
         }
     }
+
+    size_t overhead = sizeof(data_header_t) * entries;
+
+    printf("[+] index load: %lu entries\n", entries);
+    printf("[+] datasize expected: %.2f MB (%lu bytes)\n", (size / (1024.0 * 1024)), size);
+    printf("[+] dataindex overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
 }
 
 
@@ -62,15 +75,7 @@ static void index_load(index_root_t *root) {
     while(read(root->indexfd, &entry, sizeof(index_entry_t)) == sizeof(index_entry_t))
         index_entry_insert_memory(entry.hash, entry.offset, entry.length);
 
-    index_dump();
-
-    // statistics
-    size_t total = 0;
-    for(int b = 0; b < 256; b++)
-        total += rootindex->branches[b]->next;
-
-    printf("[+] index loaded: %lu entries\n", total);
-
+    index_dump(1);
 }
 
 void index_init() {
