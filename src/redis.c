@@ -269,37 +269,37 @@ cleanup:
 }
 
 int redis_listen(char *listenaddr, int port) {
-	int sockfd, cfd;
-	struct sockaddr_in addr_listen, addr_client;
-	socklen_t addr_client_len;
-	char *client_ip;
+    int sockfd, cfd;
+    struct sockaddr_in addr_listen, addr_client;
+    socklen_t addr_client_len;
+    char *client_ip;
 
-	addr_listen.sin_family = AF_INET;
-	addr_listen.sin_port = htons(port);
-	addr_listen.sin_addr.s_addr = inet_addr(listenaddr);
+    addr_listen.sin_family = AF_INET;
+    addr_listen.sin_port = htons(port);
+    addr_listen.sin_addr.s_addr = inet_addr(listenaddr);
 
-	addr_client_len = sizeof(addr_client);
+    addr_client_len = sizeof(addr_client);
 
-	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-		diep("[-] socket");
+    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+        diep("[-] socket");
 
-	if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
-		diep("[-] setsockopt");
+    if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
+        diep("[-] setsockopt");
 
-	if(bind(sockfd, (struct sockaddr*) &addr_listen, sizeof(addr_listen)) == -1)
-		diep("[-] bind");
+    if(bind(sockfd, (struct sockaddr*) &addr_listen, sizeof(addr_listen)) == -1)
+        diep("[-] bind");
 
-	if(listen(sockfd, 32) == -1)
-		diep("[-] listen");
+    if(listen(sockfd, 32) == -1)
+        diep("[-] listen");
 
-	while(1) {
-		printf("[+] waiting new connection...\n");
+    while(1) {
+        printf("[+] waiting new connection...\n");
 
-		if((cfd = accept(sockfd, (struct sockaddr *)&addr_client, &addr_client_len)) == -1)
-			perror("[-] accept");
+        if((cfd = accept(sockfd, (struct sockaddr *)&addr_client, &addr_client_len)) == -1)
+            perror("[-] accept");
 
-		client_ip = inet_ntoa(addr_client.sin_addr);
-		printf("[+] connection from %s\n", client_ip);
+        client_ip = inet_ntoa(addr_client.sin_addr);
+        printf("[+] connection from %s\n", client_ip);
 
         int ctrl = resp(cfd);
         close(cfd);
@@ -309,7 +309,7 @@ int redis_listen(char *listenaddr, int port) {
             close(sockfd);
             return 1;
         }
-	}
+    }
 
-	return 0;
+    return 0;
 }

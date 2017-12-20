@@ -10,12 +10,12 @@
 #include "data.h"
 
 void warnp(char *str) {
-	fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
+    fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
 }
 
 void diep(char *str) {
     warnp(str);
-	exit(EXIT_FAILURE);
+    exit(EXIT_FAILURE);
 }
 
 int main(void) {
@@ -27,5 +27,5 @@ int main(void) {
     index_destroy();
     data_destroy();
 
-	return 0;
+    return 0;
 }
