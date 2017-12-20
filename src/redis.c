@@ -126,42 +126,47 @@ static int dispatcher(resp_request_t *request) {
     return 1;
 }
 
-char *mkobject(char *buffer, resp_object_t *argument) {
-    if(*buffer == '$') {
-        argument->type = STRING;
-        argument->length = atoi(buffer + 1);
-        printf("[+] string len: %d\n", argument->length);
+static size_t recvto(int fd, char *buffer, size_t length) {
+    size_t remain = length;
+    size_t shot = 0;
+    char *writer = buffer;
 
-        if(!(buffer = strchr(buffer, '\n')))
-            return NULL;
-
-        argument->buffer = buffer + 1;
-
-        // buffer + length + \r\n
-        return argument->buffer + argument->length + 2;
+    while(remain && (shot = recv(fd, writer, remain, 0)) > 0) {
+        remain -= shot;
+        writer += shot;
     }
 
-    printf("[-] unknown type: %d, malformed\n", (char) *buffer);
-
-    return NULL;
+    return length;
 }
 
-int resp(int fd) {
+static void resp_discard(int fd, char *message) {
+    char response[512];
+
+    sprintf(response, "-%s\r\n", message);
+    fprintf(stderr, "[-] error: %s\n", message);
+
+    if(send(fd, response, strlen(response), 0) < 0)
+        fprintf(stderr, "[-] send failed for error message\n");
+}
+
+static int resp(int fd) {
     resp_request_t command;
 
-    char buffer[131072], *reader = NULL;
+    char buffer[8192], *reader = NULL;
     int length;
     int dvalue = 0;
 
     command.fd = fd;
 
     while((length = recv(fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
-        buffer[length] = '\0';
-        // printf("<%s>\n", buffer);
-
         // array
         if(buffer[0] != '*') {
             printf("[-] not an array\n");
+            return 0;
+        }
+
+        if(!(reader = strchr(buffer, '\n'))) {
+            // error.
             return 0;
         }
 
@@ -172,19 +177,70 @@ int resp(int fd) {
             return 0;
 
         reader += 1;
-        command.argv = (resp_object_t **) malloc(sizeof(resp_type_t *) * command.argc);
+        command.argv = (resp_object_t **) calloc(sizeof(resp_type_t *), command.argc);
 
         for(int i = 0; i < command.argc; i++) {
             command.argv[i] = malloc(sizeof(resp_object_t));
-            if(!(reader = mkobject(reader, command.argv[i]))) {
-                printf("argv error\n");
-                return 0;
+            resp_object_t *argument = command.argv[i];
+
+            // reading next chunk
+            // verifiying it's a string command
+            if(*reader != '$') {
+                resp_discard(command.fd, "Malformed request (string)");
+                goto cleanup;
+            }
+
+            argument->type = STRING;
+            argument->length = atoi(reader + 1);
+            printf("[+] string len: %d\n", argument->length);
+
+            // going to the next line for the payload
+            if(!(reader = strchr(reader, '\n'))) {
+                resp_discard(command.fd, "Malformed request (payload)");
+                goto cleanup;
+            }
+
+            if(argument->length > 8 * 1024 * 1024) {
+                resp_discard(command.fd, "Payload too big");
+                goto cleanup;
+            }
+
+            if(!(argument->buffer = malloc(argument->length)))
+                diep("malloc");
+
+            size_t remain = length - (reader + 1 - buffer);
+
+            // reading the payload
+            if(remain >= (size_t) argument->length) {
+                // we have enough data on the buffer, we can just take
+                // what we needs
+                memcpy(argument->buffer, reader + 1, argument->length);
+                reader += argument->length + 3; // previous \n + \r\n at the end
+                continue;
+            }
+
+            // the buffer doesn't contains enough data, let's read again to fill in the data
+            memcpy(argument->buffer, reader + 1, remain);
+            recvto(command.fd, argument->buffer + remain, argument->length - remain);
+
+            if(recv(command.fd, buffer, 2, 0) != 2) {
+                fprintf(stderr, "[-] recv failed, ignoring\n");
+                goto cleanup;
+            }
+
+            // we read the rest of the payload, the rest on the socket should
+            // be the end-of-line of the redis protocol
+            if(strncmp(buffer, "\r\n", 2)) {
+                resp_discard(command.fd, "Protocol malformed");
+                goto cleanup;
             }
         }
 
         dvalue = dispatcher(&command);
 
+cleanup:
         for(int i = 0; i < command.argc; i++) {
+            free(command.argv[i]->buffer);
             free(command.argv[i]);
         }
 
