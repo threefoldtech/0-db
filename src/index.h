@@ -5,8 +5,8 @@
     typedef struct index_t {
         char magic[4];
         uint32_t version;
-        uint32_t created;
-        uint32_t opened;
+        uint64_t created;
+        uint64_t opened;
         uint16_t fileid;
 
     } index_t;
