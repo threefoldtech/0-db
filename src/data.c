@@ -151,6 +151,8 @@ size_t data_insert(char *data, unsigned char *hash, uint32_t length) {
         return 0;
     }
 
+    // fdatasync(rootdata->datafd);
+
     return offset;
 }
 
@@ -181,3 +183,6 @@ void data_init(uint16_t dataid) {
     rootdata = lroot;
 }
 
+void data_emergency() {
+    fsync(rootdata->datafd);
+}

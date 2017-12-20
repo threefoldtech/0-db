@@ -280,4 +280,6 @@ uint16_t index_init() {
     return lroot->indexid;
 }
 
-
+void index_emergency() {
+    fsync(rootindex->indexfd);
+}

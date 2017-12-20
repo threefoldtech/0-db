@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <errno.h>
+#include <signal.h>
 #include "rkv.h"
 #include "redis.h"
 #include "index.h"
@@ -18,7 +19,45 @@ void diep(char *str) {
     exit(EXIT_FAILURE);
 }
 
+static int signal_intercept(int signal, void (*function)(int)) {
+    struct sigaction sig;
+    int ret;
+
+    sigemptyset(&sig.sa_mask);
+    sig.sa_handler = function;
+    sig.sa_flags   = 0;
+
+    if((ret = sigaction(signal, &sig, NULL)) == -1)
+        diep("sigaction");
+
+    return ret;
+}
+
+static void sighandler(int signal) {
+    switch(signal) {
+        case SIGSEGV:
+            fprintf(stderr, "[-] segmentation fault, flushing what's possible");
+            // no break, we will execute SIGINT handler in SIGSEGV
+
+        case SIGINT:
+            printf("\n[+] flushing index and data\n");
+            index_emergency();
+            data_emergency();
+
+
+        break;
+    }
+
+    // forwarding original error code
+    exit(128 + signal);
+}
+
+
 int main(void) {
+    printf("[+] initializing\n");
+    signal_intercept(SIGSEGV, sighandler);
+    signal_intercept(SIGINT, sighandler);
+
     uint16_t indexid = index_init();
     data_init(indexid);
 

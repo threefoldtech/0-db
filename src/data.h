@@ -22,6 +22,7 @@
     void data_init(uint16_t dataid);
     void data_destroy();
     size_t data_jump_next();
+    void data_emergency();
     
     char *data_get(size_t offset, size_t length, uint16_t dataid);
     size_t data_insert(char *buffer, unsigned char *hash, uint32_t length);

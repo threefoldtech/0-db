@@ -39,6 +39,7 @@
     uint16_t index_init();
     void index_destroy();
     size_t index_jump_next();
+    void index_emergency();
 
     index_entry_t *index_entry_get(unsigned char *hash);
     index_entry_t *index_entry_insert(unsigned char *hash, size_t offset, size_t length);
