@@ -60,7 +60,7 @@ static int dispatcher(resp_request_t *request) {
 
         printf("[+] trying to insert entry\n");
 
-        size_t offset = data_insert(request->argv[2]->buffer, request->argv[2]->length);
+        size_t offset = data_insert(request->argv[2]->buffer, hash, request->argv[2]->length);
         if(!index_entry_insert(hash, offset, request->argv[2]->length))
             printf("[+] key was already on the backend\n");
 

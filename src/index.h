@@ -1,7 +1,6 @@
 #ifndef __RKV_INDEX_H
     #define __RKV_INDEX_H
 
-    #define HASHSIZE 32  // sha-256
 
     typedef struct index_t {
         char magic[4];

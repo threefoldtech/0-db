@@ -60,7 +60,7 @@ void data_init() {
 char *data_get(size_t offset, size_t length) {
     char *buffer = malloc(length);
 
-    lseek(rootdata->datafd, offset, SEEK_SET);
+    lseek(rootdata->datafd, offset + sizeof(data_header_t), SEEK_SET);
     if(read(rootdata->datafd, buffer, length) != (ssize_t) length) {
         fprintf(stderr, "[-] cannot read data\n");
         free(buffer);
@@ -70,12 +70,24 @@ char *data_get(size_t offset, size_t length) {
     return buffer;
 }
 
-size_t data_insert(char *data, size_t length) {
+size_t data_insert(char *data, unsigned char *hash, uint32_t length) {
     size_t offset = lseek(rootdata->datafd, 0, SEEK_CUR);
+    data_header_t header;
+
+    memcpy(header.hash, hash, HASHSIZE);
+    header.length = length;
+
+    // data offset will always be >= 1
+    // we can use 0 as error detection
+
+    if(write(rootdata->datafd, &header, sizeof(data_header_t)) != sizeof(data_header_t)) {
+        fprintf(stderr, "[-] cannot write data header\n");
+        return 0;
+    }
 
     if(write(rootdata->datafd, data, length) != (ssize_t) length) {
         fprintf(stderr, "[-] cannot write data\n");
-        return 0; // data starts at 1, 0 cannot be used as offset
+        return 0;
     }
 
     return offset;
