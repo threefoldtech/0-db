@@ -208,7 +208,7 @@ index_entry_t *index_entry_insert_memory(unsigned char *hash, size_t offset, siz
 
     if(branch->next == branch->length) {
         printf("[+] buckets resize occures\n");
-        branch->length = branch->length + 32;
+        branch->length = branch->length + 128;
         branch->entries = realloc(branch->entries, sizeof(index_entry_t *) * branch->length);
     }
 
@@ -262,7 +262,7 @@ uint16_t index_init() {
         lroot->branches[i] = malloc(sizeof(index_branch_t));
         index_branch_t *branch = lroot->branches[i];
 
-        branch->length = 32;
+        branch->length = 128;
         branch->next = 0;
         branch->entries = (index_entry_t **) malloc(sizeof(index_entry_t *) * branch->length);
     }
