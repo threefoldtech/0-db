@@ -9,9 +9,13 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
+#include <sys/epoll.h>
+#include <fcntl.h>
 #include "rkv.h"
 #include "index.h"
 #include "data.h"
+
+#define MAXEVENTS 64
 
 typedef enum resp_type_t {
     INTEGER,
@@ -34,6 +38,11 @@ typedef struct resp_request_t {
 
 } resp_request_t;
 
+typedef struct redis_handler_t {
+    int mainfd;
+    int epollfd;
+
+} redis_handler_t;
 
 static int yes = 1;
 
@@ -268,48 +277,132 @@ cleanup:
     return 0;
 }
 
-int redis_listen(char *listenaddr, int port) {
-    int sockfd, cfd;
-    struct sockaddr_in addr_listen, addr_client;
-    socklen_t addr_client_len;
-    char *client_ip;
+static void socket_nonblock(int fd) {
+    int flags;
 
-    addr_listen.sin_family = AF_INET;
-    addr_listen.sin_port = htons(port);
-    addr_listen.sin_addr.s_addr = inet_addr(listenaddr);
+    if((flags = fcntl(fd, F_GETFL, 0)) < 0)
+        diep("fcntl");
 
-    addr_client_len = sizeof(addr_client);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
 
-    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-        diep("socket");
+static void socket_block(int fd) {
+    int flags;
 
-    if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
-        diep("setsockopt");
+    if((flags = fcntl(fd, F_GETFL, 0)) < 0)
+        diep("fcntl");
 
-    if(bind(sockfd, (struct sockaddr*) &addr_listen, sizeof(addr_listen)) == -1)
-        diep("bind");
+    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+}
 
-    if(listen(sockfd, 32) == -1)
-        diep("listen");
 
-    while(1) {
-        printf("[+] waiting new connection...\n");
+static int socket_event(struct epoll_event *events, int notified, redis_handler_t *redis) {
+    struct epoll_event *ev;
 
-        if((cfd = accept(sockfd, (struct sockaddr *)&addr_client, &addr_client_len)) == -1)
-            warnp("accept");
+    for(int i = 0; i < notified; i++) {
+        ev = events + i;
 
-        client_ip = inet_ntoa(addr_client.sin_addr);
-        printf("[+] connection from %s\n", client_ip);
+        // epoll issue
+        if((ev->events & EPOLLERR) || (ev->events & EPOLLHUP) || (!(ev->events & EPOLLIN))) {
+            warnp("epoll");
+            close(ev->data.fd);
 
-        int ctrl = resp(cfd);
-        close(cfd);
+            continue;
+        }
+
+        // main socket
+        if(ev->data.fd == redis->mainfd) {
+            int clientfd;
+            char *client_ip;
+            struct sockaddr_in addr_client;
+            socklen_t addr_client_len;
+
+            addr_client_len = sizeof(addr_client);
+
+            if((clientfd = accept(redis->mainfd, (struct sockaddr *)&addr_client, &addr_client_len)) == -1)
+                warnp("accept");
+
+            socket_nonblock(clientfd);
+
+            client_ip = inet_ntoa(addr_client.sin_addr);
+            printf("[+] incoming connection from %s\n", client_ip);
+
+            // adding client to the epoll list
+            struct epoll_event event;
+            event.data.fd = clientfd;
+            event.events = EPOLLIN;
+
+            if(epoll_ctl(redis->epollfd, EPOLL_CTL_ADD, clientfd, &event) < 0)
+                warnp("epoll_ctl");
+
+            continue;
+        }
+
+        // FIXME
+        socket_block(ev->data.fd);
+
+        // client event
+        int ctrl = resp(ev->data.fd);
+        close(ev->data.fd);
 
         if(ctrl == 2) {
             printf("[+] stopping daemon\n");
-            close(sockfd);
+            close(redis->mainfd);
             return 1;
         }
     }
 
     return 0;
+}
+
+static int socket_handler(redis_handler_t *handler) {
+    struct epoll_event event;
+    struct epoll_event *events;
+
+    if((handler->epollfd = epoll_create1(0)) < 0)
+        diep("epoll_create1");
+
+    event.data.fd = handler->mainfd;
+    event.events = EPOLLIN;
+
+    if(epoll_ctl(handler->epollfd, EPOLL_CTL_ADD, handler->mainfd, &event) < 0)
+        diep("epoll_ctl");
+
+    events = calloc(MAXEVENTS, sizeof event);
+
+    while(1) {
+        int n = epoll_wait(handler->epollfd, events, MAXEVENTS, -1);
+        if(socket_event(events, n, handler) == 1)
+            return 1;
+    }
+
+    return 0;
+}
+
+int redis_listen(char *listenaddr, int port) {
+    struct sockaddr_in addr_listen;
+    redis_handler_t redis;
+
+    addr_listen.sin_family = AF_INET;
+    addr_listen.sin_port = htons(port);
+    addr_listen.sin_addr.s_addr = inet_addr(listenaddr);
+
+
+    if((redis.mainfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+        diep("socket");
+
+    if(setsockopt(redis.mainfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
+        diep("setsockopt");
+
+    socket_nonblock(redis.mainfd);
+
+    if(bind(redis.mainfd, (struct sockaddr*) &addr_listen, sizeof(addr_listen)) == -1)
+        diep("bind");
+
+    if(listen(redis.mainfd, SOMAXCONN) == -1)
+        diep("listen");
+
+    printf("[+] listening on %s:%d\n", listenaddr, port);
+
+    return socket_handler(&redis);
 }
