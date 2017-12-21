@@ -15,11 +15,16 @@ static data_t *rootdata = NULL;
 
 //
 // hash functions
+static char __hex[] = "0123456789abcdef";
+
 char *sha256_hex(unsigned char *hash) {
     char *buffer = calloc((SHA256_DIGEST_LENGTH * 2) + 1, sizeof(char));
+    char *writer = buffer;
 
-    for(int i = 0; i < SHA256_DIGEST_LENGTH; i++)
-        sprintf(buffer + (i * 2), "%02x", hash[i]);
+    for(int i = 0, j = 0; i < SHA256_DIGEST_LENGTH; i++, j += 2) {
+        *writer++ = __hex[(hash[i] & 0xF0) >> 4];
+        *writer++ = __hex[hash[i] & 0x0F];
+    }
 
     return buffer;
 }
@@ -35,12 +40,25 @@ unsigned char *sha256_compute(unsigned char *target, const char *buffer, size_t 
     return target;
 }
 
+inline static char sha256_parse_index(char byte) {
+    if(byte >= 'a' && byte <= 'f')
+        return byte - 87;
+
+    if(byte >= '0' && byte <= '9')
+        return byte - 48;
+
+    return 0;
+}
+
 unsigned char *sha256_parse(char *buffer, unsigned char *target) {
-    char temp[5] = "0xFF";
+    char *byte;
 
     for(int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-        strncpy(temp + 2, buffer + (i * 2), 2);
-        target[i] = strtol(temp, NULL, 16);
+        byte = buffer + (i * 2);
+        target[i] = sha256_parse_index(*byte) << 4;
+
+        byte++;
+        target[i] |= sha256_parse_index(*byte);
     }
 
     return target;
