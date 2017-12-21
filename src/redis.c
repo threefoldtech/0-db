@@ -67,7 +67,7 @@ static int dispatcher(resp_request_t *request) {
         sha256_compute(hash, request->argv[2]->buffer, request->argv[2]->length);
         hashex = sha256_hex(hash);
 
-        printf("[+] trying to insert entry\n");
+        // printf("[+] trying to insert entry\n");
 
         size_t offset = data_insert(request->argv[2]->buffer, hash, request->argv[2]->length);
         if(!index_entry_insert(hash, offset, request->argv[2]->length))
@@ -272,9 +272,11 @@ cleanup:
 
         if(dvalue == 2)
             return 2;
+
+        return 0;
     }
 
-    return 0;
+    return 3;
 }
 
 static void socket_nonblock(int fd) {
@@ -338,12 +340,18 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             continue;
         }
 
-        // FIXME
+        // FIXM
         socket_block(ev->data.fd);
 
         // client event
         int ctrl = resp(ev->data.fd);
-        close(ev->data.fd);
+
+        if(ctrl == 3) {
+            close(ev->data.fd);
+            continue;
+        }
+
+        socket_nonblock(ev->data.fd);
 
         if(ctrl == 2) {
             printf("[+] stopping daemon\n");

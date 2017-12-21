@@ -127,7 +127,7 @@ char *data_get(size_t offset, size_t length, uint16_t dataid) {
     int fd = rootdata->datafd;
 
     if(rootdata->dataid != dataid) {
-        printf("not on same data id, %d <> %d\n", rootdata->dataid, dataid);
+        // printf("[-] current data file: %d, requested: %d, switching\n", rootdata->dataid, dataid);
         fd = data_open_id(rootdata, dataid);
     }
 
