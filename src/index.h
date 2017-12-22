@@ -12,7 +12,7 @@
     } index_t;
 
     typedef struct index_entry_t {
-        unsigned char hash[HASHSIZE];
+        uint64_t id;
         uint64_t offset;
         uint64_t length;
         uint8_t flags;
@@ -32,6 +32,7 @@
         char *indexfile;
         uint16_t indexid;
         int indexfd;
+        uint64_t nextentry;
         index_branch_t *branches[256];
 
     } index_root_t;
@@ -40,8 +41,9 @@
     void index_destroy();
     size_t index_jump_next();
     void index_emergency();
+    uint64_t index_next_id();
 
-    index_entry_t *index_entry_get(unsigned char *hash);
-    index_entry_t *index_entry_insert(unsigned char *hash, size_t offset, size_t length);
-    index_entry_t *index_entry_insert_memory(unsigned char *hash, size_t offset, size_t length);
+    index_entry_t *index_entry_get(uint64_t id);
+    index_entry_t *index_entry_insert(uint64_t id, size_t offset, size_t length);
+    index_entry_t *index_entry_insert_memory(uint64_t id, size_t offset, size_t length);
 #endif

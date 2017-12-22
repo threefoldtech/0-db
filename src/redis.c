@@ -61,24 +61,18 @@ static int dispatcher(resp_request_t *request) {
 
     // SET
     if(!strncmp(request->argv[0]->buffer, "SET", request->argv[0]->length)) {
-        unsigned char hash[HASHSIZE];
-        char *hashex;
-
-        sha256_compute(hash, request->argv[2]->buffer, request->argv[2]->length);
-        hashex = sha256_hex(hash);
-
         // printf("[+] trying to insert entry\n");
 
-        size_t offset = data_insert(request->argv[2]->buffer, hash, request->argv[2]->length);
-        if(!index_entry_insert(hash, offset, request->argv[2]->length))
+        uint64_t entryid = index_next_id();
+
+        size_t offset = data_insert(request->argv[2]->buffer, entryid, request->argv[2]->length);
+        if(!index_entry_insert(entryid, offset, request->argv[2]->length))
             printf("[+] key was already on the backend\n");
 
         // building response
-        char response[HASHSIZE * 2 + 4];
-        sprintf(response, "+%s\r\n", hashex);
+        char response[64];
+        sprintf(response, "+%lu\r\n", entryid);
         send(request->fd, response, strlen(response), 0);
-
-        free(hashex);
 
         // checking if we need to jump to the next files
         if(offset + request->argv[2]->length > 100 * 1024 * 1024) { // 100 MB
@@ -91,18 +85,19 @@ static int dispatcher(resp_request_t *request) {
 
     // GET
     if(!strncmp(request->argv[0]->buffer, "GET", request->argv[0]->length)) {
-        if(request->argv[1]->length != (HASHSIZE * 2)) {
+        if(request->argv[1]->length > 60) {
             printf("[-] invalid key size\n");
             send(request->fd, "-Invalid key\r\n", 14, 0);
             return 1;
         }
 
-        unsigned char hash[HASHSIZE];
-        sha256_parse(request->argv[1]->buffer, hash);
+        char temp[64];
+        strncpy(temp, request->argv[1]->buffer, sizeof(temp));
 
         index_entry_t *entry;
+        uint64_t askid = atoi(temp);
 
-        if(!(entry = index_entry_get(hash))) {
+        if(!(entry = index_entry_get(askid))) {
             printf("[-] key not found\n");
             send(request->fd, "$-1\r\n", 5, 0);
             return 1;

@@ -39,15 +39,12 @@ static void index_dump(int fulldump) {
 
         for(size_t i = 0; i < branch->next; i++) {
             index_entry_t *entry = branch->entries[i];
-            char *hex = sha256_hex((unsigned char *) entry->hash);
 
             if(fulldump)
-                printf("[+] %s: offset %lu, length: %lu\n", hex, entry->offset, entry->length);
+                printf("[+] Key %lu: offset %lu, length: %lu\n", entry->id, entry->offset, entry->length);
 
             size += entry->length;
             entries += 1;
-
-            free(hex);
         }
     }
 
@@ -118,7 +115,7 @@ static size_t index_load_file(index_root_t *root) {
 
     // reading the index, populating memory
     while(read(root->indexfd, &entry, sizeof(index_entry_t)) == sizeof(index_entry_t))
-        index_entry_insert_memory(entry.hash, entry.offset, entry.length);
+        index_entry_insert_memory(entry.id, entry.offset, entry.length);
 
     close(root->indexfd);
 
@@ -180,31 +177,35 @@ size_t index_jump_next() {
 //
 // index manipulation
 //
-index_entry_t *index_entry_get(unsigned char *hash) {
-    index_branch_t *branch = rootindex->branches[hash[0]];
+uint64_t index_next_id() {
+    return rootindex->nextentry++;
+}
+
+index_entry_t *index_entry_get(uint64_t id) {
+    index_branch_t *branch = rootindex->branches[id % 256];
 
     for(size_t i = 0; i < branch->next; i++) {
-        if(memcmp(branch->entries[i]->hash, hash, HASHSIZE) == 0)
+        if(branch->entries[i]->id == id)
             return branch->entries[i];
     }
 
     return NULL;
 }
 
-index_entry_t *index_entry_insert_memory(unsigned char *hash, size_t offset, size_t length) {
+index_entry_t *index_entry_insert_memory(uint64_t id, size_t offset, size_t length) {
     // item already exists
-    if(index_entry_get(hash))
+    if(index_entry_get(id))
         return NULL;
 
     index_entry_t *entry = calloc(sizeof(index_entry_t), 1);
 
-    memcpy(entry->hash, hash, HASHSIZE);
+    entry->id = id;
     entry->offset = offset;
     entry->length = length;
     entry->dataid = rootindex->indexid;
 
     // maybe resize
-    index_branch_t *branch = rootindex->branches[hash[0]];
+    index_branch_t *branch = rootindex->branches[id % 256];
 
     if(branch->next == branch->length) {
         printf("[+] buckets resize occures\n");
@@ -218,10 +219,10 @@ index_entry_t *index_entry_insert_memory(unsigned char *hash, size_t offset, siz
     return entry;
 }
 
-index_entry_t *index_entry_insert(unsigned char *hash, size_t offset, size_t length) {
+index_entry_t *index_entry_insert(uint64_t id, size_t offset, size_t length) {
     index_entry_t *entry = NULL;
 
-    if(!(entry = index_entry_insert_memory(hash, offset, length)))
+    if(!(entry = index_entry_insert_memory(id, offset, length)))
         return NULL;
 
     if(write(rootindex->indexfd, entry, sizeof(index_entry_t)) != sizeof(index_entry_t))
@@ -270,6 +271,7 @@ uint16_t index_init() {
     lroot->indexdir = "/mnt/storage/tmp/rkv";
     lroot->indexid = 0;
     lroot->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
+    lroot->nextentry = 0;
 
     // commit variable
     rootindex = lroot;

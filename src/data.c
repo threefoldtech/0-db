@@ -14,57 +14,6 @@
 static data_t *rootdata = NULL;
 
 //
-// hash functions
-static char __hex[] = "0123456789abcdef";
-
-char *sha256_hex(unsigned char *hash) {
-    char *buffer = calloc((SHA256_DIGEST_LENGTH * 2) + 1, sizeof(char));
-    char *writer = buffer;
-
-    for(int i = 0, j = 0; i < SHA256_DIGEST_LENGTH; i++, j += 2) {
-        *writer++ = __hex[(hash[i] & 0xF0) >> 4];
-        *writer++ = __hex[hash[i] & 0x0F];
-    }
-
-    return buffer;
-}
-
-unsigned char *sha256_compute(unsigned char *target, const char *buffer, size_t length) {
-    const unsigned char *input = (const unsigned char *) buffer;
-    SHA256_CTX sha256;
-
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, input, length);
-    SHA256_Final(target, &sha256);
-
-    return target;
-}
-
-inline static char sha256_parse_index(char byte) {
-    if(byte >= 'a' && byte <= 'f')
-        return byte - 87;
-
-    if(byte >= '0' && byte <= '9')
-        return byte - 48;
-
-    return 0;
-}
-
-unsigned char *sha256_parse(char *buffer, unsigned char *target) {
-    char *byte;
-
-    for(int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-        byte = buffer + (i * 2);
-        target[i] = sha256_parse_index(*byte) << 4;
-
-        byte++;
-        target[i] |= sha256_parse_index(*byte);
-    }
-
-    return target;
-}
-
-//
 // data management
 //
 void data_initialize(char *filename) {
@@ -137,11 +86,8 @@ char *data_get(size_t offset, size_t length, uint16_t dataid) {
 
         free(buffer);
         buffer = NULL;
-
-        goto cleanup;
     }
 
-cleanup:
     if(rootdata->dataid != dataid) {
         close(fd);
     }
@@ -149,11 +95,11 @@ cleanup:
     return buffer;
 }
 
-size_t data_insert(char *data, unsigned char *hash, uint32_t length) {
+size_t data_insert(char *data, uint64_t id, uint32_t length) {
     size_t offset = lseek(rootdata->datafd, 0, SEEK_CUR);
     data_header_t header;
 
-    memcpy(header.hash, hash, HASHSIZE);
+    header.id = id;
     header.length = length;
 
     // data offset will always be >= 1
@@ -169,7 +115,11 @@ size_t data_insert(char *data, unsigned char *hash, uint32_t length) {
         return 0;
     }
 
-    // fdatasync(rootdata->datafd);
+    /*
+    // force flush after some amount of write
+    if(id % 256 == 0)
+        fdatasync(rootdata->datafd);
+    */
 
     return offset;
 }
