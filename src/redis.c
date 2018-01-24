@@ -63,15 +63,26 @@ static int dispatcher(resp_request_t *request) {
     if(!strncmp(request->argv[0]->buffer, "SET", request->argv[0]->length)) {
         // printf("[+] trying to insert entry\n");
 
-        uint64_t entryid = index_next_id();
+        if(request->argv[1]->length > 255) {
+            send(request->fd, "-Key too large\r\n", 16, 0);
+            return 1;
+        }
 
-        size_t offset = data_insert(request->argv[2]->buffer, entryid, request->argv[2]->length);
-        if(!index_entry_insert(entryid, offset, request->argv[2]->length))
+        unsigned char *id = request->argv[1]->buffer;
+        uint8_t idlength = request->argv[1]->length;
+
+        printf("SET KEY: %.*s\n", idlength, id);
+        printf("SET VALUE: %.*s\n", request->argv[2]->length, request->argv[2]->buffer);
+
+        // size_t offset = data_insert(request->argv[2]->buffer, entryid, request->argv[2]->length);
+        size_t offset = 42;
+
+        if(!index_entry_insert(id, idlength, offset, request->argv[2]->length))
             printf("[+] key was already on the backend\n");
 
         // building response
         char response[64];
-        sprintf(response, "+%lu\r\n", entryid);
+        sprintf(response, "+%.*s\r\n", idlength, id);
         send(request->fd, response, strlen(response), 0);
 
         // checking if we need to jump to the next files
@@ -91,6 +102,7 @@ static int dispatcher(resp_request_t *request) {
             return 1;
         }
 
+        /*
         char temp[64];
         strncpy(temp, request->argv[1]->buffer, sizeof(temp));
 
@@ -129,6 +141,7 @@ static int dispatcher(resp_request_t *request) {
 
         free(response);
         free(payload);
+        */
 
         return 0;
     }

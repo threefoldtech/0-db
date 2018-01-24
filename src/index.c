@@ -40,8 +40,10 @@ static void index_dump(int fulldump) {
         for(size_t i = 0; i < branch->next; i++) {
             index_entry_t *entry = branch->entries[i];
 
+            /*
             if(fulldump)
                 printf("[+] Key %lu: offset %lu, length: %lu\n", entry->id, entry->offset, entry->length);
+            */
 
             size += entry->length;
             entries += 1;
@@ -114,8 +116,8 @@ static size_t index_load_file(index_root_t *root) {
     printf("[+] index last open: %s\n", index_date(header.opened, date, sizeof(date)));
 
     // reading the index, populating memory
-    while(read(root->indexfd, &entry, sizeof(index_entry_t)) == sizeof(index_entry_t))
-        index_entry_insert_memory(entry.id, entry.offset, entry.length);
+    // while(read(root->indexfd, &entry, sizeof(index_entry_t)) == sizeof(index_entry_t))
+    //    index_entry_insert_memory(entry.id, entry.offset, entry.length);
 
     close(root->indexfd);
 
@@ -181,8 +183,8 @@ uint64_t index_next_id() {
     return rootindex->nextentry++;
 }
 
-index_entry_t *index_entry_get(uint64_t id) {
-    index_branch_t *branch = rootindex->branches[id % 256];
+index_entry_t *index_entry_get(unsigned char *id, uint8_t idlength) {
+    index_branch_t *branch = rootindex->branches[*id % 256];
 
     for(size_t i = 0; i < branch->next; i++) {
         if(branch->entries[i]->id == id)
@@ -192,20 +194,21 @@ index_entry_t *index_entry_get(uint64_t id) {
     return NULL;
 }
 
-index_entry_t *index_entry_insert_memory(uint64_t id, size_t offset, size_t length) {
+index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, size_t offset, size_t length) {
     // item already exists
-    if(index_entry_get(id))
-        return NULL;
+    // if(index_entry_get(id))
+    //    return NULL;
 
-    index_entry_t *entry = calloc(sizeof(index_entry_t), 1);
+    index_entry_t *entry = calloc(sizeof(index_entry_t) + idlength, 1);
 
-    entry->id = id;
+    memcpy(entry->id, id, idlength);
+    entry->idlength = idlength;
     entry->offset = offset;
     entry->length = length;
     entry->dataid = rootindex->indexid;
 
     // maybe resize
-    index_branch_t *branch = rootindex->branches[id % 256];
+    index_branch_t *branch = rootindex->branches[*id % 256];
 
     if(branch->next == branch->length) {
         printf("[+] buckets resize occures\n");
@@ -219,13 +222,15 @@ index_entry_t *index_entry_insert_memory(uint64_t id, size_t offset, size_t leng
     return entry;
 }
 
-index_entry_t *index_entry_insert(uint64_t id, size_t offset, size_t length) {
+index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t offset, size_t length) {
     index_entry_t *entry = NULL;
 
-    if(!(entry = index_entry_insert_memory(id, offset, length)))
+    if(!(entry = index_entry_insert_memory(id, idlength, offset, length)))
         return NULL;
 
-    if(write(rootindex->indexfd, entry, sizeof(index_entry_t)) != sizeof(index_entry_t))
+    size_t entrylength = sizeof(index_entry_t) + entry->idlength;
+
+    if(write(rootindex->indexfd, entry, entrylength) != entrylength)
         diep(rootindex->indexfile);
 
     return entry;
