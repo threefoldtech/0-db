@@ -66,7 +66,7 @@ static void data_open_final(data_t *root) {
 // jumping to the next id close the current data file
 // and open the next id file, it will create the new file
 size_t data_jump_next() {
-    printf("[+] jumping to the next data file\n");
+    verbose("[+] jumping to the next data file\n");
 
     // closing current file descriptor
     close(rootdata->datafd);
@@ -152,10 +152,10 @@ void data_destroy() {
     free(rootdata);
 }
 
-void data_init(uint16_t dataid) {
+void data_init(uint16_t dataid, char *datapath) {
     data_t *lroot = (data_t *) malloc(sizeof(data_t));
 
-    lroot->datadir = "/mnt/storage/tmp/rkv";
+    lroot->datadir = datapath;
     lroot->datafile = malloc(sizeof(char) * (PATH_MAX + 1));
     lroot->dataid = dataid;
 

@@ -7,6 +7,9 @@ LDFLAGS=-rdynamic -lcrypto
 
 all: $(EXEC)
 
+release: CFLAGS+=-DRELEASE
+release: $(EXEC)
+
 $(EXEC): $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
 

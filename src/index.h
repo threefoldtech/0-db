@@ -58,7 +58,7 @@
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1
 
-    uint16_t index_init();
+    uint16_t index_init(char *indexpath, int dump);
     void index_destroy();
     size_t index_jump_next();
     void index_emergency();

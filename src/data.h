@@ -21,7 +21,7 @@
 
     } __attribute__((packed)) data_header_t;
 
-    void data_init(uint16_t dataid);
+    void data_init(uint16_t dataid, char *datapath);
     void data_destroy();
     size_t data_jump_next();
     void data_emergency();

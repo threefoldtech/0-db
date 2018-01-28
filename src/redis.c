@@ -49,13 +49,13 @@ static int yes = 1;
 // main worker when a redis command was successfuly parsed
 static int dispatcher(resp_request_t *request) {
     if(request->argv[0]->type != STRING) {
-        printf("[+] not a string command, ignoring\n");
+        debug("[+] not a string command, ignoring\n");
         return 0;
     }
 
     // PING
     if(!strncmp(request->argv[0]->buffer, "PING", request->argv[0]->length)) {
-        printf("[+] redis: PING\n");
+        verbose("[+] redis: PING\n");
         send(request->fd, "+PONG\r\n", 7, 0);
         return 0;
     }
@@ -121,7 +121,7 @@ static int dispatcher(resp_request_t *request) {
         index_entry_t *entry;
 
         if(!(entry = index_entry_get(request->argv[1]->buffer, request->argv[1]->length))) {
-            printf("[-] key not found\n");
+            verbose("[-] key not found\n");
             send(request->fd, "$-1\r\n", 5, 0);
             return 1;
         }
@@ -359,7 +359,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             socket_nonblock(clientfd);
 
             client_ip = inet_ntoa(addr_client.sin_addr);
-            printf("[+] incoming connection from %s\n", client_ip);
+            verbose("[+] incoming connection from %s\n", client_ip);
 
             // adding client to the epoll list
             struct epoll_event event;

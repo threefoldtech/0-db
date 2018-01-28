@@ -118,8 +118,12 @@ static void index_dump(int fulldump) {
         }
     }
 
-    if(fulldump)
+    if(fulldump) {
+        if(entries == 0)
+            printf("[+] index is empty\n");
+
         printf("[+] ===========================\n");
+    }
 
     #if 0
     if(fulldump) {
@@ -134,11 +138,11 @@ static void index_dump(int fulldump) {
     }
     #endif
 
-    printf("[+] index load: %lu entries\n", entries);
-    printf("[+] index uses: %lu branches\n", branches);
+    verbose("[+] index load: %lu entries\n", entries);
+    verbose("[+] index uses: %lu branches\n", branches);
 
-    printf("[+] datasize expected: %.2f MB (%lu bytes)\n", (datasize / (1024.0 * 1024)), datasize);
-    printf("[+] index raw usage: %.2f KB (%lu bytes)\n", (indexsize / 1024.0), indexsize);
+    verbose("[+] datasize expected: %.2f MB (%lu bytes)\n", (datasize / (1024.0 * 1024)), datasize);
+    verbose("[+] index raw usage: %.2f KB (%lu bytes)\n", (indexsize / 1024.0), indexsize);
 
     // overhead contains:
     // - the buffer allocated to hold each (futur) branches pointer
@@ -148,7 +152,7 @@ static void index_dump(int fulldump) {
                       (branches * sizeof(index_branch_t)) +
                       (preallocated * sizeof(index_entry_t *));
 
-    printf("[+] memory overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
+    verbose("[+] memory overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
 }
 
 // initialize an index file
@@ -179,7 +183,7 @@ static size_t index_load_file(index_root_t *root) {
     index_t header;
     size_t length;
 
-    printf("[+] loading index file: %s\n", root->indexfile);
+    verbose("[+] loading index file: %s\n", root->indexfile);
 
     if((root->indexfd = open(root->indexfile, O_CREAT | O_RDWR, 0600)) < 0)
         diep(root->indexfile);
@@ -200,7 +204,7 @@ static size_t index_load_file(index_root_t *root) {
         // a new file not expected, otherwise if index is zero,
         // this is the initial index file we need to create
         if(root->indexid > 0) {
-            printf("[+] discarding index file\n");
+            verbose("[+] discarding index file\n");
             close(root->indexfd);
             return 0;
         }
@@ -221,10 +225,10 @@ static size_t index_load_file(index_root_t *root) {
         diep(root->indexfile);
 
     char date[256];
-    printf("[+] index created at: %s\n", index_date(header.created, date, sizeof(date)));
-    printf("[+] index last open: %s\n", index_date(header.opened, date, sizeof(date)));
+    verbose("[+] index created at: %s\n", index_date(header.created, date, sizeof(date)));
+    verbose("[+] index last open: %s\n", index_date(header.opened, date, sizeof(date)));
 
-    printf("[+] populating index...\n");
+    printf("[+] populating index: %s\n", root->indexfile);
 
     // reading the index, populating memory
     //
@@ -313,7 +317,7 @@ static void index_load(index_root_t *root) {
 // data file, we only do this when datafile changes basicly, this is
 // triggered by a datafile too big event
 size_t index_jump_next() {
-    printf("[+] jumping to the next index file\n");
+    verbose("[+] jumping to the next index file\n");
 
     // closing current file descriptor
     close(rootindex->indexfd);
@@ -406,7 +410,7 @@ index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, si
         // here is the branch bucket resize
         // we pre-allocate certain amount of bucket, but when
         // we filled the full bucket, we need to extends it
-        printf("[+] buckets resize occures\n");
+        debug("[+] buckets 0x%x resize: %lu + %d\n", branchkey, branch->length, BUCKET_CHUNKS);
         branch->length = branch->length + BUCKET_CHUNKS;
         branch->entries = realloc(branch->entries, sizeof(index_entry_t *) * branch->length);
     }
@@ -454,14 +458,14 @@ void index_destroy() {
 }
 
 // create an index and load files
-uint16_t index_init() {
+uint16_t index_init(char *indexpath, int dump) {
     index_root_t *lroot = malloc(sizeof(index_root_t));
 
-    printf("[+] initializing index (%d lazy branches)\n", BUCKET_BRANCHES);
+    debug("[+] initializing index (%d lazy branches)\n", BUCKET_BRANCHES);
 
     lroot->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), BUCKET_BRANCHES);
 
-    lroot->indexdir = "/mnt/storage/tmp/rkv";
+    lroot->indexdir = indexpath;
     lroot->indexid = 0;
     lroot->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
     lroot->nextentry = 0;
@@ -470,7 +474,7 @@ uint16_t index_init() {
     rootindex = lroot;
 
     index_load(lroot);
-    index_dump(1);
+    index_dump(dump);
 
     return lroot->indexid;
 }
