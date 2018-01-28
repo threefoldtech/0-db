@@ -62,6 +62,10 @@ static int dispatcher(resp_request_t *request) {
     // SET
     if(!strncmp(request->argv[0]->buffer, "SET", request->argv[0]->length)) {
         // printf("[+] trying to insert entry\n");
+        if(request->argc != 3) {
+            send(request->fd, "-Invalid argument\r\n", 19, 0);
+            return 1;
+        }
 
         if(request->argv[1]->length > 255) {
             send(request->fd, "-Key too large\r\n", 16, 0);
@@ -71,17 +75,20 @@ static int dispatcher(resp_request_t *request) {
         unsigned char *id = request->argv[1]->buffer;
         uint8_t idlength = request->argv[1]->length;
 
-        printf("SET KEY: %.*s\n", idlength, id);
-        printf("SET VALUE: %.*s\n", request->argv[2]->length, request->argv[2]->buffer);
+        unsigned char *value = request->argv[2]->buffer;
+        uint32_t valuelength = request->argv[2]->length;
 
-        // size_t offset = data_insert(request->argv[2]->buffer, entryid, request->argv[2]->length);
-        size_t offset = 42;
+        // printf("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
+        // printf("SET KEY: %.*s\n", idlength, id);
+        // printf("SET VALUE: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
+
+        size_t offset = data_insert(value, valuelength, id, idlength);
 
         if(!index_entry_insert(id, idlength, offset, request->argv[2]->length))
             printf("[+] key was already on the backend\n");
 
         // building response
-        char response[64];
+        char response[MAX_KEY_LENGTH + 8];
         sprintf(response, "+%.*s\r\n", idlength, id);
         send(request->fd, response, strlen(response), 0);
 
@@ -96,31 +103,27 @@ static int dispatcher(resp_request_t *request) {
 
     // GET
     if(!strncmp(request->argv[0]->buffer, "GET", request->argv[0]->length)) {
-        if(request->argv[1]->length > 60) {
+        if(request->argv[1]->length > MAX_KEY_LENGTH) {
             printf("[-] invalid key size\n");
             send(request->fd, "-Invalid key\r\n", 14, 0);
             return 1;
         }
 
-        /*
-        char temp[64];
-        strncpy(temp, request->argv[1]->buffer, sizeof(temp));
-
         index_entry_t *entry;
-        uint64_t askid = atoi(temp);
 
-        if(!(entry = index_entry_get(askid))) {
+        if(!(entry = index_entry_get(request->argv[1]->buffer, request->argv[1]->length))) {
             printf("[-] key not found\n");
             send(request->fd, "$-1\r\n", 5, 0);
             return 1;
         }
 
+        // convert data length integer to string
         char strsize[64];
         size_t stroffset = sprintf(strsize, "%lu", entry->length);
 
         // $xx\r\n + payload + \r\n
         size_t total = 1 + stroffset + 2 + entry->length + 2;
-        char *payload = data_get(entry->offset, entry->length, entry->dataid);
+        unsigned char *payload = data_get(entry->offset, entry->length, entry->dataid, entry->idlength);
 
         if(!payload) {
             printf("[-] cannot read payload\n");
@@ -134,6 +137,8 @@ static int dispatcher(resp_request_t *request) {
         strcpy(response, "$");
         strcat(response, strsize);
         strcat(response, "\r\n");
+
+        // appending to response (stroffset + 3 for skipping already written)
         memcpy(response + stroffset + 3, payload, entry->length);
         memcpy(response + total - 2, "\r\n", 2);
 
@@ -141,7 +146,6 @@ static int dispatcher(resp_request_t *request) {
 
         free(response);
         free(payload);
-        */
 
         return 0;
     }

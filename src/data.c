@@ -71,8 +71,8 @@ size_t data_jump_next() {
     return rootdata->dataid;
 }
 
-char *data_get(size_t offset, size_t length, uint16_t dataid) {
-    char *buffer = malloc(length);
+unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
+    unsigned char *buffer = malloc(length);
     int fd = rootdata->datafd;
 
     if(rootdata->dataid != dataid) {
@@ -80,7 +80,7 @@ char *data_get(size_t offset, size_t length, uint16_t dataid) {
         fd = data_open_id(rootdata, dataid);
     }
 
-    lseek(fd, offset + sizeof(data_header_t), SEEK_SET);
+    lseek(fd, offset + sizeof(data_header_t) + idlength, SEEK_SET);
     if(read(fd, buffer, length) != (ssize_t) length) {
         warnp("data_get: read");
 
@@ -95,22 +95,28 @@ char *data_get(size_t offset, size_t length, uint16_t dataid) {
     return buffer;
 }
 
-size_t data_insert(char *data, uint64_t id, uint32_t length) {
+size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, uint8_t idlength) {
     size_t offset = lseek(rootdata->datafd, 0, SEEK_CUR);
-    data_header_t header;
+    data_header_t *header;
+    size_t headerlength = sizeof(data_header_t) + idlength;
 
-    header.id = id;
-    header.length = length;
+    if(!(header = malloc(headerlength)))
+        diep("malloc");
+
+    header->idlength = idlength;
+    header->datalength = datalength;
+
+    memcpy(header->id, id, idlength);
 
     // data offset will always be >= 1
     // we can use 0 as error detection
 
-    if(write(rootdata->datafd, &header, sizeof(data_header_t)) != sizeof(data_header_t)) {
+    if(write(rootdata->datafd, header, headerlength) != (ssize_t) headerlength) {
         fprintf(stderr, "[-] cannot write data header\n");
         return 0;
     }
 
-    if(write(rootdata->datafd, data, length) != (ssize_t) length) {
+    if(write(rootdata->datafd, data, datalength) != (ssize_t) datalength) {
         fprintf(stderr, "[-] cannot write data\n");
         return 0;
     }

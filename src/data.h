@@ -10,8 +10,9 @@
     } data_t;
 
     typedef struct data_header_t {
-        uint64_t id;
-        uint32_t length;
+        uint8_t idlength;
+        uint32_t datalength;
+        char id[];
 
     } __attribute__((packed)) data_header_t;
 
@@ -20,6 +21,6 @@
     size_t data_jump_next();
     void data_emergency();
 
-    char *data_get(size_t offset, size_t length, uint16_t dataid);
-    size_t data_insert(char *buffer, uint64_t id, uint32_t length);
+    unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t idlength);
+    size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, uint8_t idlength);
 #endif

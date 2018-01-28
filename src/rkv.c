@@ -39,7 +39,7 @@ static void sighandler(int signal) {
 
     switch(signal) {
         case SIGSEGV:
-            fprintf(stderr, "[-] segmentation fault, flushing what's possible\n");
+            fprintf(stderr, "[-] fatal: segmentation fault\n");
             fprintf(stderr, "[-] ----------------------------------\n");
 
             int calls = backtrace(buffer, sizeof(buffer) / sizeof(void *));

@@ -16,6 +16,26 @@
 static index_root_t *rootindex = NULL;
 
 //
+// index static memory management
+//
+static index_entry_t *index_entry_push(index_entry_t *entry) {
+    // maybe resize
+    index_branch_t *branch = rootindex->branches[entry->id[0] % 256];
+
+    if(branch->next == branch->length) {
+        printf("[+] buckets resize occures\n");
+        branch->length = branch->length + 128;
+        branch->entries = realloc(branch->entries, sizeof(index_entry_t *) * branch->length);
+    }
+
+    branch->entries[branch->next] = entry;
+    branch->next += 1;
+
+    return entry;
+}
+
+
+//
 // index initialized
 //
 static char *index_date(uint32_t epoch, char *target, size_t length) {
@@ -34,21 +54,25 @@ static void index_dump(int fulldump) {
     size_t size = 0;
     size_t entries = 0;
 
+    if(fulldump)
+        printf("[+] ===========================\n");
+
     for(int b = 0; b < 256; b++) {
         index_branch_t *branch = rootindex->branches[b];
 
         for(size_t i = 0; i < branch->next; i++) {
             index_entry_t *entry = branch->entries[i];
 
-            /*
             if(fulldump)
-                printf("[+] Key %lu: offset %lu, length: %lu\n", entry->id, entry->offset, entry->length);
-            */
+                printf("[+] key %.*s: offset %lu, length: %lu\n", entry->idlength, entry->id, entry->offset, entry->length);
 
             size += entry->length;
             entries += 1;
         }
     }
+
+    if(fulldump)
+        printf("[+] ===========================\n");
 
     size_t overhead = sizeof(data_header_t) * entries;
 
@@ -77,7 +101,6 @@ static index_t index_initialize(int fd, uint16_t indexid) {
 static size_t index_load_file(index_root_t *root) {
     index_t header;
     size_t length;
-    index_entry_t entry;
 
     printf("[+] loading index file: %s\n", root->indexfile);
 
@@ -116,8 +139,19 @@ static size_t index_load_file(index_root_t *root) {
     printf("[+] index last open: %s\n", index_date(header.opened, date, sizeof(date)));
 
     // reading the index, populating memory
-    // while(read(root->indexfd, &entry, sizeof(index_entry_t)) == sizeof(index_entry_t))
-    //    index_entry_insert_memory(entry.id, entry.offset, entry.length);
+    uint8_t idlength;
+
+    while(read(root->indexfd, &idlength, sizeof(idlength)) == sizeof(idlength)) {
+        ssize_t entrylength = sizeof(index_entry_t) + idlength;
+        index_entry_t *entry = malloc(entrylength);
+
+        lseek(root->indexfd, -1, SEEK_CUR);
+
+        if(read(root->indexfd, entry, entrylength) != entrylength)
+            diep("index read");
+
+        index_entry_push(entry);
+    }
 
     close(root->indexfd);
 
@@ -187,7 +221,10 @@ index_entry_t *index_entry_get(unsigned char *id, uint8_t idlength) {
     index_branch_t *branch = rootindex->branches[*id % 256];
 
     for(size_t i = 0; i < branch->next; i++) {
-        if(branch->entries[i]->id == id)
+        if(branch->entries[i]->idlength != idlength)
+            continue;
+
+        if(memcmp(branch->entries[i]->id, id, idlength) == 0)
             return branch->entries[i];
     }
 
@@ -207,19 +244,7 @@ index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, si
     entry->length = length;
     entry->dataid = rootindex->indexid;
 
-    // maybe resize
-    index_branch_t *branch = rootindex->branches[*id % 256];
-
-    if(branch->next == branch->length) {
-        printf("[+] buckets resize occures\n");
-        branch->length = branch->length + 128;
-        branch->entries = realloc(branch->entries, sizeof(index_entry_t *) * branch->length);
-    }
-
-    branch->entries[branch->next] = entry;
-    branch->next += 1;
-
-    return entry;
+    return index_entry_push(entry);
 }
 
 index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t offset, size_t length) {
@@ -230,7 +255,7 @@ index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t of
 
     size_t entrylength = sizeof(index_entry_t) + entry->idlength;
 
-    if(write(rootindex->indexfd, entry, entrylength) != entrylength)
+    if(write(rootindex->indexfd, entry, entrylength) != (ssize_t) entrylength)
         diep(rootindex->indexfile);
 
     return entry;

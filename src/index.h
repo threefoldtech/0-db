@@ -60,6 +60,9 @@
 
     } index_response_t;
 
+    // key length is uint8_t
+    #define MAX_KEY_LENGTH  (1 << 8) - 1
+
     uint16_t index_init();
     void index_destroy();
     size_t index_jump_next();
