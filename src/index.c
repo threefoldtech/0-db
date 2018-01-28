@@ -16,26 +16,6 @@
 static index_root_t *rootindex = NULL;
 
 //
-// index static memory management
-//
-static index_entry_t *index_entry_push(index_entry_t *entry) {
-    // maybe resize
-    index_branch_t *branch = rootindex->branches[entry->id[0] % 256];
-
-    if(branch->next == branch->length) {
-        printf("[+] buckets resize occures\n");
-        branch->length = branch->length + 128;
-        branch->entries = realloc(branch->entries, sizeof(index_entry_t *) * branch->length);
-    }
-
-    branch->entries[branch->next] = entry;
-    branch->next += 1;
-
-    return entry;
-}
-
-
-//
 // index initialized
 //
 static char *index_date(uint32_t epoch, char *target, size_t length) {
@@ -140,18 +120,22 @@ static size_t index_load_file(index_root_t *root) {
 
     // reading the index, populating memory
     uint8_t idlength;
+    index_entry_t *entry = NULL;
 
     while(read(root->indexfd, &idlength, sizeof(idlength)) == sizeof(idlength)) {
         ssize_t entrylength = sizeof(index_entry_t) + idlength;
-        index_entry_t *entry = malloc(entrylength);
+        if(!(entry = realloc(entry, entrylength)))
+            diep("realloc");
 
         lseek(root->indexfd, -1, SEEK_CUR);
 
         if(read(root->indexfd, entry, entrylength) != entrylength)
             diep("index read");
 
-        index_entry_push(entry);
+        index_entry_insert_memory(entry->id, entry->idlength, entry->offset, entry->length);
     }
+
+    free(entry);
 
     close(root->indexfd);
 
@@ -232,9 +216,16 @@ index_entry_t *index_entry_get(unsigned char *id, uint8_t idlength) {
 }
 
 index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, size_t offset, size_t length) {
+    index_entry_t *exists = NULL;
+
     // item already exists
-    // if(index_entry_get(id))
-    //    return NULL;
+    if((exists = index_entry_get(id, idlength))) {
+        // re-use existing entry
+        exists->length = length;
+        exists->offset = offset;
+
+        return exists;
+    }
 
     index_entry_t *entry = calloc(sizeof(index_entry_t) + idlength, 1);
 
@@ -244,7 +235,19 @@ index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, si
     entry->length = length;
     entry->dataid = rootindex->indexid;
 
-    return index_entry_push(entry);
+    // maybe resize
+    index_branch_t *branch = rootindex->branches[entry->id[0] % 256];
+
+    if(branch->next == branch->length) {
+        printf("[+] buckets resize occures\n");
+        branch->length = branch->length + 512;
+        branch->entries = realloc(branch->entries, sizeof(index_entry_t *) * branch->length);
+    }
+
+    branch->entries[branch->next] = entry;
+    branch->next += 1;
+
+    return entry;
 }
 
 index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t offset, size_t length) {
@@ -293,7 +296,7 @@ uint16_t index_init() {
         lroot->branches[i] = malloc(sizeof(index_branch_t));
         index_branch_t *branch = lroot->branches[i];
 
-        branch->length = 128;
+        branch->length = 512;
         branch->next = 0;
         branch->entries = (index_entry_t **) malloc(sizeof(index_entry_t *) * branch->length);
     }

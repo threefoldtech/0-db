@@ -25,18 +25,6 @@
 
     } __attribute__((packed)) index_entry_t;
 
-    /*
-    typedef struct index_entry_t {
-        uint8_t idlength;
-        unsigned char *id;
-        uint64_t offset;
-        uint64_t length;
-        uint8_t flags;
-        uint16_t dataid;
-
-    } index_entry_t;
-    */
-
     typedef struct index_branch_t {
         size_t length;
         size_t next;

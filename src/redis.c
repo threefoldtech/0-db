@@ -85,7 +85,7 @@ static int dispatcher(resp_request_t *request) {
         size_t offset = data_insert(value, valuelength, id, idlength);
 
         if(!index_entry_insert(id, idlength, offset, request->argv[2]->length))
-            printf("[+] key was already on the backend\n");
+            printf("[+] key overwritten\n");
 
         // building response
         char response[MAX_KEY_LENGTH + 8];
