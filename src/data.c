@@ -8,7 +8,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <openssl/sha.h>
-#include "rkv.h"
+#include "zerodb.h"
 #include "data.h"
 
 static data_t *rootdata = NULL;

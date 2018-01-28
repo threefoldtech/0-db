@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <execinfo.h>
-#include "rkv.h"
+#include "zerodb.h"
 #include "redis.h"
 #include "index.h"
 #include "data.h"

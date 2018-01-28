@@ -9,7 +9,7 @@
 #include <time.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include "rkv.h"
+#include "zerodb.h"
 #include "index.h"
 #include "data.h"
 

@@ -1,4 +1,4 @@
-EXEC=rkv
+EXEC=zdb
 SRC=$(wildcard *.c)
 OBJ=$(SRC:.c=.o)
 
