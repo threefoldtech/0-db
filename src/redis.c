@@ -61,24 +61,36 @@ static int dispatcher(resp_request_t *request) {
 
     // SET
     if(!strncmp(request->argv[0]->buffer, "SET", request->argv[0]->length)) {
-        unsigned char hash[HASHSIZE];
-        char *hashex;
-
-        sha256_compute(hash, request->argv[2]->buffer, request->argv[2]->length);
-        hashex = sha256_hex(hash);
-
         // printf("[+] trying to insert entry\n");
+        if(request->argc != 3) {
+            send(request->fd, "-Invalid argument\r\n", 19, 0);
+            return 1;
+        }
 
-        size_t offset = data_insert(request->argv[2]->buffer, hash, request->argv[2]->length);
-        if(!index_entry_insert(hash, offset, request->argv[2]->length))
+        if(request->argv[1]->length > 255) {
+            send(request->fd, "-Key too large\r\n", 16, 0);
+            return 1;
+        }
+
+        unsigned char *id = request->argv[1]->buffer;
+        uint8_t idlength = request->argv[1]->length;
+
+        unsigned char *value = request->argv[2]->buffer;
+        uint32_t valuelength = request->argv[2]->length;
+
+        // printf("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
+        // printf("SET KEY: %.*s\n", idlength, id);
+        // printf("SET VALUE: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
+
+        size_t offset = data_insert(value, valuelength, id, idlength);
+
+        if(!index_entry_insert(id, idlength, offset, request->argv[2]->length))
             printf("[+] key was already on the backend\n");
 
         // building response
-        char response[HASHSIZE * 2 + 4];
-        sprintf(response, "+%s\r\n", hashex);
+        char response[MAX_KEY_LENGTH + 8];
+        sprintf(response, "+%.*s\r\n", idlength, id);
         send(request->fd, response, strlen(response), 0);
-
-        free(hashex);
 
         // checking if we need to jump to the next files
         if(offset + request->argv[2]->length > 100 * 1024 * 1024) { // 100 MB
@@ -91,29 +103,27 @@ static int dispatcher(resp_request_t *request) {
 
     // GET
     if(!strncmp(request->argv[0]->buffer, "GET", request->argv[0]->length)) {
-        if(request->argv[1]->length != (HASHSIZE * 2)) {
+        if(request->argv[1]->length > MAX_KEY_LENGTH) {
             printf("[-] invalid key size\n");
             send(request->fd, "-Invalid key\r\n", 14, 0);
             return 1;
         }
 
-        unsigned char hash[HASHSIZE];
-        sha256_parse(request->argv[1]->buffer, hash);
-
         index_entry_t *entry;
 
-        if(!(entry = index_entry_get(hash))) {
+        if(!(entry = index_entry_get(request->argv[1]->buffer, request->argv[1]->length))) {
             printf("[-] key not found\n");
             send(request->fd, "$-1\r\n", 5, 0);
             return 1;
         }
 
+        // convert data length integer to string
         char strsize[64];
         size_t stroffset = sprintf(strsize, "%lu", entry->length);
 
         // $xx\r\n + payload + \r\n
         size_t total = 1 + stroffset + 2 + entry->length + 2;
-        char *payload = data_get(entry->offset, entry->length, entry->dataid);
+        unsigned char *payload = data_get(entry->offset, entry->length, entry->dataid, entry->idlength);
 
         if(!payload) {
             printf("[-] cannot read payload\n");
@@ -127,6 +137,8 @@ static int dispatcher(resp_request_t *request) {
         strcpy(response, "$");
         strcat(response, strsize);
         strcat(response, "\r\n");
+
+        // appending to response (stroffset + 3 for skipping already written)
         memcpy(response + stroffset + 3, payload, entry->length);
         memcpy(response + total - 2, "\r\n", 2);
 
@@ -138,6 +150,7 @@ static int dispatcher(resp_request_t *request) {
         return 0;
     }
 
+    // STOP
     if(!strncmp(request->argv[0]->buffer, "STOP", request->argv[0]->length)) {
         send(request->fd, "+Stopping\r\n", 11, 0);
         return 2;
@@ -331,6 +344,9 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 
             // adding client to the epoll list
             struct epoll_event event;
+
+            memset(&event, 0, sizeof(struct epoll_event));
+
             event.data.fd = clientfd;
             event.events = EPOLLIN;
 
@@ -365,7 +381,10 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 
 static int socket_handler(redis_handler_t *handler) {
     struct epoll_event event;
-    struct epoll_event *events;
+    struct epoll_event *events = NULL;
+
+    // initialize empty struct
+    memset(&event, 0, sizeof(struct epoll_event));
 
     if((handler->epollfd = epoll_create1(0)) < 0)
         diep("epoll_create1");
@@ -380,8 +399,10 @@ static int socket_handler(redis_handler_t *handler) {
 
     while(1) {
         int n = epoll_wait(handler->epollfd, events, MAXEVENTS, -1);
-        if(socket_event(events, n, handler) == 1)
+        if(socket_event(events, n, handler) == 1) {
+            free(events);
             return 1;
+        }
     }
 
     return 0;

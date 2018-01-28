@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <signal.h>
+#include <execinfo.h>
 #include "rkv.h"
 #include "redis.h"
 #include "index.h"
@@ -34,16 +35,25 @@ static int signal_intercept(int signal, void (*function)(int)) {
 }
 
 static void sighandler(int signal) {
+    void *buffer[1024];
+
     switch(signal) {
         case SIGSEGV:
-            fprintf(stderr, "[-] segmentation fault, flushing what's possible");
+            fprintf(stderr, "[-] fatal: segmentation fault\n");
+            fprintf(stderr, "[-] ----------------------------------\n");
+
+            int calls = backtrace(buffer, sizeof(buffer) / sizeof(void *));
+			backtrace_symbols_fd(buffer, calls, 1);
+
+            fprintf(stderr, "[-] ----------------------------------");
+
             // no break, we will execute SIGINT handler in SIGSEGV
+            // which will try to save and flush buffers
 
         case SIGINT:
             printf("\n[+] flushing index and data\n");
             index_emergency();
             data_emergency();
-
 
         break;
     }

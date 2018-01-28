@@ -14,57 +14,6 @@
 static data_t *rootdata = NULL;
 
 //
-// hash functions
-static char __hex[] = "0123456789abcdef";
-
-char *sha256_hex(unsigned char *hash) {
-    char *buffer = calloc((SHA256_DIGEST_LENGTH * 2) + 1, sizeof(char));
-    char *writer = buffer;
-
-    for(int i = 0, j = 0; i < SHA256_DIGEST_LENGTH; i++, j += 2) {
-        *writer++ = __hex[(hash[i] & 0xF0) >> 4];
-        *writer++ = __hex[hash[i] & 0x0F];
-    }
-
-    return buffer;
-}
-
-unsigned char *sha256_compute(unsigned char *target, const char *buffer, size_t length) {
-    const unsigned char *input = (const unsigned char *) buffer;
-    SHA256_CTX sha256;
-
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, input, length);
-    SHA256_Final(target, &sha256);
-
-    return target;
-}
-
-inline static char sha256_parse_index(char byte) {
-    if(byte >= 'a' && byte <= 'f')
-        return byte - 87;
-
-    if(byte >= '0' && byte <= '9')
-        return byte - 48;
-
-    return 0;
-}
-
-unsigned char *sha256_parse(char *buffer, unsigned char *target) {
-    char *byte;
-
-    for(int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-        byte = buffer + (i * 2);
-        target[i] = sha256_parse_index(*byte) << 4;
-
-        byte++;
-        target[i] |= sha256_parse_index(*byte);
-    }
-
-    return target;
-}
-
-//
 // data management
 //
 void data_initialize(char *filename) {
@@ -122,8 +71,8 @@ size_t data_jump_next() {
     return rootdata->dataid;
 }
 
-char *data_get(size_t offset, size_t length, uint16_t dataid) {
-    char *buffer = malloc(length);
+unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
+    unsigned char *buffer = malloc(length);
     int fd = rootdata->datafd;
 
     if(rootdata->dataid != dataid) {
@@ -131,17 +80,14 @@ char *data_get(size_t offset, size_t length, uint16_t dataid) {
         fd = data_open_id(rootdata, dataid);
     }
 
-    lseek(fd, offset + sizeof(data_header_t), SEEK_SET);
+    lseek(fd, offset + sizeof(data_header_t) + idlength, SEEK_SET);
     if(read(fd, buffer, length) != (ssize_t) length) {
         warnp("data_get: read");
 
         free(buffer);
         buffer = NULL;
-
-        goto cleanup;
     }
 
-cleanup:
     if(rootdata->dataid != dataid) {
         close(fd);
     }
@@ -149,27 +95,40 @@ cleanup:
     return buffer;
 }
 
-size_t data_insert(char *data, unsigned char *hash, uint32_t length) {
+size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, uint8_t idlength) {
     size_t offset = lseek(rootdata->datafd, 0, SEEK_CUR);
-    data_header_t header;
+    size_t headerlength = sizeof(data_header_t) + idlength;
+    data_header_t *header;
 
-    memcpy(header.hash, hash, HASHSIZE);
-    header.length = length;
+    if(!(header = malloc(headerlength)))
+        diep("malloc");
+
+    header->idlength = idlength;
+    header->datalength = datalength;
+
+    memcpy(header->id, id, idlength);
 
     // data offset will always be >= 1
     // we can use 0 as error detection
 
-    if(write(rootdata->datafd, &header, sizeof(data_header_t)) != sizeof(data_header_t)) {
+    if(write(rootdata->datafd, header, headerlength) != (ssize_t) headerlength) {
         fprintf(stderr, "[-] cannot write data header\n");
+        free(header);
         return 0;
     }
 
-    if(write(rootdata->datafd, data, length) != (ssize_t) length) {
+    free(header);
+
+    if(write(rootdata->datafd, data, datalength) != (ssize_t) datalength) {
         fprintf(stderr, "[-] cannot write data\n");
         return 0;
     }
 
-    // fdatasync(rootdata->datafd);
+    /*
+    // force flush after some amount of write
+    if(id % 256 == 0)
+        fdatasync(rootdata->datafd);
+    */
 
     return offset;
 }
