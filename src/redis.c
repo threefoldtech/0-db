@@ -150,6 +150,7 @@ static int dispatcher(resp_request_t *request) {
         return 0;
     }
 
+    // STOP
     if(!strncmp(request->argv[0]->buffer, "STOP", request->argv[0]->length)) {
         send(request->fd, "+Stopping\r\n", 11, 0);
         return 2;
@@ -343,6 +344,9 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 
             // adding client to the epoll list
             struct epoll_event event;
+
+            memset(&event, 0, sizeof(struct epoll_event));
+
             event.data.fd = clientfd;
             event.events = EPOLLIN;
 
@@ -377,7 +381,10 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 
 static int socket_handler(redis_handler_t *handler) {
     struct epoll_event event;
-    struct epoll_event *events;
+    struct epoll_event *events = NULL;
+
+    // initialize empty struct
+    memset(&event, 0, sizeof(struct epoll_event));
 
     if((handler->epollfd = epoll_create1(0)) < 0)
         diep("epoll_create1");
@@ -392,8 +399,10 @@ static int socket_handler(redis_handler_t *handler) {
 
     while(1) {
         int n = epoll_wait(handler->epollfd, events, MAXEVENTS, -1);
-        if(socket_event(events, n, handler) == 1)
+        if(socket_event(events, n, handler) == 1) {
+            free(events);
             return 1;
+        }
     }
 
     return 0;

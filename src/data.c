@@ -97,8 +97,8 @@ unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t i
 
 size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, uint8_t idlength) {
     size_t offset = lseek(rootdata->datafd, 0, SEEK_CUR);
-    data_header_t *header;
     size_t headerlength = sizeof(data_header_t) + idlength;
+    data_header_t *header;
 
     if(!(header = malloc(headerlength)))
         diep("malloc");
@@ -113,8 +113,11 @@ size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, 
 
     if(write(rootdata->datafd, header, headerlength) != (ssize_t) headerlength) {
         fprintf(stderr, "[-] cannot write data header\n");
+        free(header);
         return 0;
     }
+
+    free(header);
 
     if(write(rootdata->datafd, data, datalength) != (ssize_t) datalength) {
         fprintf(stderr, "[-] cannot write data\n");
