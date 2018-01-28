@@ -13,22 +13,22 @@
 #include "index.h"
 #include "data.h"
 
-#define BUCKET_CHUNKS   64
-#define BUCKET_BRANCHES (1 << 24)
+#define BUCKET_CHUNKS   32
+#define BUCKET_BRANCHES (1 << 20)
 
 static index_root_t *rootindex = NULL;
 
 //
 // index branch
 // this implementation use a lazy load of branches
-// this allows us to use lot of branch (2^24 in this case) without
+// this allows us to use lot of branch (BUCKET_BRANCH in this case) without
 // consuming all the memory if we don't need it
 //
 // the current status allows us to store up to 3 bytes prefix directly
 // after that, it's a simple unordered linked list
 //
 index_branch_t *index_branch_init(uint32_t branchid) {
-    printf("[+] initializing branch id 0x%x\n", branchid);
+    // printf("[+] initializing branch id 0x%x\n", branchid);
 
     rootindex->branches[branchid] = malloc(sizeof(index_branch_t));
     index_branch_t *branch = rootindex->branches[branchid];
@@ -89,6 +89,8 @@ static void index_dump(int fulldump) {
     size_t datasize = 0;
     size_t entries = 0;
     size_t indexsize = 0;
+    size_t branches = 0;
+    size_t preallocated = 0;
 
     if(fulldump)
         printf("[+] ===========================\n");
@@ -99,6 +101,9 @@ static void index_dump(int fulldump) {
         // skipping empty branch
         if(!branch)
             continue;
+
+        branches += 1;
+        preallocated += branch->length;
 
         for(size_t i = 0; i < branch->next; i++) {
             index_entry_t *entry = branch->entries[i];
@@ -117,10 +122,30 @@ static void index_dump(int fulldump) {
         printf("[+] ===========================\n");
 
 
+    #if 0
+    if(fulldump) {
+        for(int b = 0; b < BUCKET_BRANCHES; b++) {
+            index_branch_t *branch = index_branch_get(b);
+
+            if(branch)
+                printf("[+] branch 0x%x: %lu entries\n", b, branch->next);
+        }
+
+        printf("[+] ===========================\n");
+    }
+    #endif
+
     printf("[+] index load: %lu entries\n", entries);
+    printf("[+] index uses: %lu branches\n", branches);
 
     printf("[+] datasize expected: %.2f MB (%lu bytes)\n", (datasize / (1024.0 * 1024)), datasize);
-    printf("[+] dataindex overhead: %.2f KB (%lu bytes)\n", (indexsize / 1024.0), indexsize);
+    printf("[+] index raw usage: %.2f KB (%lu bytes)\n", (indexsize / 1024.0), indexsize);
+
+    // overhead contains:
+    // - the buffer allocated to hold each (futur) branches pointer
+    // - each branch already allocated with their pre-registered buckets
+    size_t overhead = (BUCKET_BRANCHES * sizeof(index_branch_t *)) + (preallocated * sizeof(index_entry_t *));
+    printf("[+] memory overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
 }
 
 // initialize an index file
@@ -195,6 +220,8 @@ static size_t index_load_file(index_root_t *root) {
     char date[256];
     printf("[+] index created at: %s\n", index_date(header.created, date, sizeof(date)));
     printf("[+] index last open: %s\n", index_date(header.opened, date, sizeof(date)));
+
+    printf("[+] populating index...\n");
 
     // reading the index, populating memory
     //
@@ -307,18 +334,23 @@ uint64_t index_next_id() {
     return rootindex->nextentry++;
 }
 
-// perform the basic "hashing" (not, we just take the 3 first bytes, it's not a hash)
-// used to point to the expected branch
+// perform the basic "hashing" (crc based) used to point to the expected branch
+// we only keep partial amount of the result to now fill the memory too fast
 static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
-    uint32_t key = *id << 16;
+    uint32_t key = 0xffffff;
+    uint32_t mask;
 
-    if(idlength > 1)
-        key |= id[1] << 8;
+    for(int i = 0; i != idlength; i++) {
+        key = key ^ id[i];
 
-    if(idlength > 2)
-        key |= id[2];
+        // perform a basic crc32
+        for(int j = 7; j >= 0; j--) {
+            mask = -(key & 1);
+            key = (key >> 1) ^ (0xedb88320 & mask);
+        }
+    }
 
-    return key;
+    return ~key & 0xfffff;
 }
 
 // main look-up function, used to get an entry from the memory index
