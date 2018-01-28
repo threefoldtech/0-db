@@ -38,7 +38,7 @@
         uint16_t indexid;
         int indexfd;
         uint64_t nextentry;
-        index_branch_t *branches[256];
+        index_branch_t **branches;
 
     } index_root_t;
 

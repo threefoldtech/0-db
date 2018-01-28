@@ -13,7 +13,50 @@
 #include "index.h"
 #include "data.h"
 
+#define BUCKET_CHUNKS   64
+#define BUCKET_BRANCHES (1 << 24)
+
 static index_root_t *rootindex = NULL;
+
+//
+// index branch
+//
+index_branch_t *index_branch_init(uint32_t branchid) {
+    printf("[+] initializing branch id 0x%x\n", branchid);
+
+    rootindex->branches[branchid] = malloc(sizeof(index_branch_t));
+    index_branch_t *branch = rootindex->branches[branchid];
+
+    branch->length = BUCKET_CHUNKS;
+    branch->next = 0;
+    branch->entries = (index_entry_t **) malloc(sizeof(index_entry_t *) * branch->length);
+
+    return branch;
+}
+
+void index_branch_free(uint32_t branchid) {
+    if(!rootindex->branches[branchid])
+        return;
+
+    // deleting branch content
+    for(size_t i = 0; i < rootindex->branches[branchid]->next; i++)
+        free(rootindex->branches[branchid]->entries[i]);
+
+    // deleting branch
+    free(rootindex->branches[branchid]->entries);
+    free(rootindex->branches[branchid]);
+}
+
+index_branch_t *index_branch_get(uint32_t branchid) {
+    return rootindex->branches[branchid];
+}
+
+index_branch_t *index_branch_get_allocate(uint32_t branchid) {
+    if(!rootindex->branches[branchid])
+        return index_branch_init(branchid);
+
+    return rootindex->branches[branchid];
+}
 
 //
 // index initialized
@@ -31,14 +74,19 @@ static char *index_date(uint32_t epoch, char *target, size_t length) {
 }
 
 static void index_dump(int fulldump) {
-    size_t size = 0;
+    size_t datasize = 0;
     size_t entries = 0;
+    size_t indexsize = 0;
 
     if(fulldump)
         printf("[+] ===========================\n");
 
-    for(int b = 0; b < 256; b++) {
-        index_branch_t *branch = rootindex->branches[b];
+    for(int b = 0; b < BUCKET_BRANCHES; b++) {
+        index_branch_t *branch = index_branch_get(b);
+
+        // skipping empty branch
+        if(!branch)
+            continue;
 
         for(size_t i = 0; i < branch->next; i++) {
             index_entry_t *entry = branch->entries[i];
@@ -46,7 +94,9 @@ static void index_dump(int fulldump) {
             if(fulldump)
                 printf("[+] key %.*s: offset %lu, length: %lu\n", entry->idlength, entry->id, entry->offset, entry->length);
 
-            size += entry->length;
+            indexsize += sizeof(index_entry_t) + entry->idlength;
+            datasize += entry->length;
+
             entries += 1;
         }
     }
@@ -54,11 +104,11 @@ static void index_dump(int fulldump) {
     if(fulldump)
         printf("[+] ===========================\n");
 
-    size_t overhead = sizeof(data_header_t) * entries;
 
     printf("[+] index load: %lu entries\n", entries);
-    printf("[+] datasize expected: %.2f MB (%lu bytes)\n", (size / (1024.0 * 1024)), size);
-    printf("[+] dataindex overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
+
+    printf("[+] datasize expected: %.2f MB (%lu bytes)\n", (datasize / (1024.0 * 1024)), datasize);
+    printf("[+] dataindex overhead: %.2f KB (%lu bytes)\n", (indexsize / 1024.0), indexsize);
 }
 
 static index_t index_initialize(int fd, uint16_t indexid) {
@@ -201,8 +251,25 @@ uint64_t index_next_id() {
     return rootindex->nextentry++;
 }
 
+static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
+    uint32_t key = *id << 16;
+
+    if(idlength > 1)
+        key |= id[1] << 8;
+
+    if(idlength > 2)
+        key |= id[2];
+
+    return key;
+}
+
 index_entry_t *index_entry_get(unsigned char *id, uint8_t idlength) {
-    index_branch_t *branch = rootindex->branches[*id % 256];
+    uint32_t branchkey = index_key_hash(id, idlength);
+    index_branch_t *branch = index_branch_get(branchkey);
+
+    // branch not exists
+    if(!branch)
+        return NULL;
 
     for(size_t i = 0; i < branch->next; i++) {
         if(branch->entries[i]->idlength != idlength)
@@ -236,11 +303,13 @@ index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, si
     entry->dataid = rootindex->indexid;
 
     // maybe resize
-    index_branch_t *branch = rootindex->branches[entry->id[0] % 256];
+    uint32_t branchkey = index_key_hash(id, idlength);
+
+    index_branch_t *branch = index_branch_get_allocate(branchkey);
 
     if(branch->next == branch->length) {
         printf("[+] buckets resize occures\n");
-        branch->length = branch->length + 512;
+        branch->length = branch->length + BUCKET_CHUNKS;
         branch->entries = realloc(branch->entries, sizeof(index_entry_t *) * branch->length);
     }
 
@@ -270,19 +339,11 @@ index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t of
 
 // clean all opened index related stuff
 void index_destroy() {
-    for(int b = 0; b < 256; b++) {
-        index_branch_t *branch = rootindex->branches[b];
-
-        // deleting branch content
-        for(size_t i = 0; i < branch->next; i++)
-            free(branch->entries[i]);
-
-        // deleting branch
-        free(rootindex->branches[b]->entries);
-        free(rootindex->branches[b]);
-    }
+    for(int b = 0; b < BUCKET_BRANCHES; b++)
+        index_branch_free(b);
 
     // delete root object
+    free(rootindex->branches);
     free(rootindex->indexfile);
     free(rootindex);
 }
@@ -291,15 +352,9 @@ void index_destroy() {
 uint16_t index_init() {
     index_root_t *lroot = malloc(sizeof(index_root_t));
 
-    printf("[+] initializing index\n");
-    for(int i = 0; i < 256; i++) {
-        lroot->branches[i] = malloc(sizeof(index_branch_t));
-        index_branch_t *branch = lroot->branches[i];
+    printf("[+] initializing index (%d lazy branches)\n", BUCKET_BRANCHES);
 
-        branch->length = 512;
-        branch->next = 0;
-        branch->entries = (index_entry_t **) malloc(sizeof(index_entry_t *) * branch->length);
-    }
+    lroot->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), BUCKET_BRANCHES);
 
     lroot->indexdir = "/mnt/storage/tmp/rkv";
     lroot->indexid = 0;
