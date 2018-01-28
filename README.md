@@ -3,7 +3,7 @@
 makes data persistant behing always append index/datafile
 
 # Implementation
-This project rely on any dependencies, it's from scratch.
+This project doesn't rely on any dependencies, it's from scratch.
 
 A rudimental and very simplified redis protocol is supported, allowing only few commands (PING, GET, SET).
 
@@ -23,9 +23,13 @@ appended to disk and entry in memory is replaced by the new one.
 Each time the server starts, it loads (basicly replay) the index in memory. The index is **always** in memory and
 only this in-memory index is reached to fetch a key, index files are never read except during startup.
 
+# Index
+The current index in memory is a really bad and poor implementation, to be improved.
+
 # Supported redis command
 - `PING`
 - `SET key value`
 - `GET key`
+- `STOP` (used only for debugging, to check memory leaks)
 
 > Compared to real redis protocol, during a `SET`, the key is returned as response.
