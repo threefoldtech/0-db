@@ -121,7 +121,6 @@ static void index_dump(int fulldump) {
     if(fulldump)
         printf("[+] ===========================\n");
 
-
     #if 0
     if(fulldump) {
         for(int b = 0; b < BUCKET_BRANCHES; b++) {
@@ -143,8 +142,12 @@ static void index_dump(int fulldump) {
 
     // overhead contains:
     // - the buffer allocated to hold each (futur) branches pointer
+    // - the branch struct itself for each branches
     // - each branch already allocated with their pre-registered buckets
-    size_t overhead = (BUCKET_BRANCHES * sizeof(index_branch_t *)) + (preallocated * sizeof(index_entry_t *));
+    size_t overhead = (BUCKET_BRANCHES * sizeof(index_branch_t **)) +
+                      (branches * sizeof(index_branch_t)) +
+                      (preallocated * sizeof(index_entry_t *));
+
     printf("[+] memory overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
 }
 
