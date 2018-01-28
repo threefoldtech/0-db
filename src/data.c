@@ -23,16 +23,24 @@ void data_initialize(char *filename) {
         diep(filename);
 
     // writing initial header
+    // this header is, right now, not used and not useful
+    // we should probably improve it
+    //
+    // anyway, it's important for the implementation to have
+    // at least 1 byte already written, we use 0 as error when
+    // expecting an offset
     if(write(fd, "X", 1) != 1)
         diep(filename);
 
     close(fd);
 }
 
+// simply set globaly the current filename based on it's id
 static void data_set_id(data_t *root) {
     sprintf(root->datafile, "%s/rkv-data-%04u", root->datadir, root->dataid);
 }
 
+// open the datafile based on it's id
 static int data_open_id(data_t *root, uint16_t id) {
     char temp[PATH_MAX];
     int fd;
@@ -55,6 +63,8 @@ static void data_open_final(data_t *root) {
     printf("[+] active data file: %s\n", root->datafile);
 }
 
+// jumping to the next id close the current data file
+// and open the next id file, it will create the new file
 size_t data_jump_next() {
     printf("[+] jumping to the next data file\n");
 
@@ -71,11 +81,15 @@ size_t data_jump_next() {
     return rootdata->dataid;
 }
 
+// get a payload from any datafile
 unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
     unsigned char *buffer = malloc(length);
     int fd = rootdata->datafd;
 
     if(rootdata->dataid != dataid) {
+        // the requested datafile is not the current datafile opened
+        // we will re-open the expected datafile temporary
+
         // printf("[-] current data file: %d, requested: %d, switching\n", rootdata->dataid, dataid);
         fd = data_open_id(rootdata, dataid);
     }
@@ -89,12 +103,15 @@ unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t i
     }
 
     if(rootdata->dataid != dataid) {
+        // closing the temporary file descriptor
+        // we only keep the current one
         close(fd);
     }
 
     return buffer;
 }
 
+// insert data on the datafile and returns it's offset
 size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, uint8_t idlength) {
     size_t offset = lseek(rootdata->datafd, 0, SEEK_CUR);
     size_t headerlength = sizeof(data_header_t) + idlength;
@@ -123,12 +140,6 @@ size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, 
         fprintf(stderr, "[-] cannot write data\n");
         return 0;
     }
-
-    /*
-    // force flush after some amount of write
-    if(id % 256 == 0)
-        fdatasync(rootdata->datafd);
-    */
 
     return offset;
 }

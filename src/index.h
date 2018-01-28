@@ -6,25 +6,37 @@
     // this is not really relevant but can be used
     // to validate contents and detect type with the magic
     typedef struct index_t {
-        char magic[4];
+        char magic[4];     // four bytes magic bytes to recognize the file
         uint32_t version;
-        uint64_t created;
-        uint64_t opened;
-        uint16_t fileid;
+        uint64_t created;  // unix timestamp of creation time
+        uint64_t opened;   // unix timestamp of last opened time
+        uint16_t fileid;   // current index file id (sync with dataid)
 
     } index_t;
 
-    // this struct is used to read/write on disk
+    // main entry structure
+    // each key will use one of this entry
     typedef struct index_entry_t {
-        uint8_t idlength;
-        uint64_t offset;
-        uint64_t length;
-        uint8_t flags;
-        uint16_t dataid;
-        unsigned char id[];
+        uint8_t idlength;    // length of the id, here uint8_t limits to 256 bytes
+        uint64_t offset;     // offset on the corresponding datafile
+        uint64_t length;     // length of the payload on the datafile
+        uint8_t flags;       // flags not used yet, could provide information about deletion
+        uint16_t dataid;     // datafile id where is stored the payload
+        unsigned char id[];  // the id accessor, dynamically loaded
 
     } __attribute__((packed)) index_entry_t;
 
+    // the current implementation of the index use rudimental index memory system
+    // it's basicly just array to read sequentially
+    // to improve performance without changing this basic implementation,
+    // which is really slow, of course, we use a "branch" system which simply
+    // split all the arrays based on an id
+    //
+    // the id is specified on the implementation file, with the length, etc.
+    //
+    // - id 0000: [...........]
+    // - id 0001: [...................]
+    // - id 0002: [...]
     typedef struct index_branch_t {
         size_t length;
         size_t next;
@@ -32,21 +44,16 @@
 
     } index_branch_t;
 
+    // global root memory structure of the index
     typedef struct index_root_t {
-        char *indexdir;
-        char *indexfile;
-        uint16_t indexid;
-        int indexfd;
-        uint64_t nextentry;
-        index_branch_t **branches;
+        char *indexdir;     // directory where index files are
+        char *indexfile;    // current index filename in use
+        uint16_t indexid;   // current index file id in use (sync with data id)
+        int indexfd;        // current file descriptor used
+        uint64_t nextentry; // next-entry is a global id used in sequential mode (next seq-id)
+        index_branch_t **branches; // list of branches explained later
 
     } index_root_t;
-
-    typedef struct index_response_t {
-        char *response;
-        char status;
-
-    } index_response_t;
 
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1

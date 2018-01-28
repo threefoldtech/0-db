@@ -1,18 +1,23 @@
 #ifndef __RKV_DATA_H
     #define __RKV_DATA_H
 
+    // root point of the memory handler
+    // used by the data manager
     typedef struct data_t {
-        char *datadir;
-        char *datafile;
-        uint16_t dataid;
-        int datafd;
+        char *datadir;    // root path of the data files
+        char *datafile;   // pointer to the current datafile used
+        uint16_t dataid;  // id of the datafile currently in use
+        int datafd;       // file descriptor of the current datafile used
 
     } data_t;
 
+    // data_header_t contains header of each entry on the datafile
+    // this header doesn't contains the payload, we assume the payload
+    // follows the header
     typedef struct data_header_t {
-        uint8_t idlength;
-        uint32_t datalength;
-        char id[];
+        uint8_t idlength;     // length of the id
+        uint32_t datalength;  // length of the payload
+        char id[];            // accessor to the id, dynamically
 
     } __attribute__((packed)) data_header_t;
 

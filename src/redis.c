@@ -46,6 +46,7 @@ typedef struct redis_handler_t {
 
 static int yes = 1;
 
+// main worker when a redis command was successfuly parsed
 static int dispatcher(resp_request_t *request) {
     if(request->argv[0]->type != STRING) {
         printf("[+] not a string command, ignoring\n");
@@ -61,7 +62,6 @@ static int dispatcher(resp_request_t *request) {
 
     // SET
     if(!strncmp(request->argv[0]->buffer, "SET", request->argv[0]->length)) {
-        // printf("[+] trying to insert entry\n");
         if(request->argc != 3) {
             send(request->fd, "-Invalid argument\r\n", 19, 0);
             return 1;
@@ -72,6 +72,7 @@ static int dispatcher(resp_request_t *request) {
             return 1;
         }
 
+        // create some easier accessor
         unsigned char *id = request->argv[1]->buffer;
         uint8_t idlength = request->argv[1]->length;
 
@@ -79,20 +80,28 @@ static int dispatcher(resp_request_t *request) {
         uint32_t valuelength = request->argv[2]->length;
 
         // printf("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
-        // printf("SET KEY: %.*s\n", idlength, id);
-        // printf("SET VALUE: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
+        // printf("[+] set key: %.*s\n", idlength, id);
+        // printf("[+] set value: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
 
+        // insert the data on the datafile
+        // this will returns us the offset where the header is
         size_t offset = data_insert(value, valuelength, id, idlength);
 
-        if(!index_entry_insert(id, idlength, offset, request->argv[2]->length))
-            printf("[+] key overwritten\n");
+        // inserting this offset with the id on the index
+        index_entry_insert(id, idlength, offset, request->argv[2]->length);
 
         // building response
+        // here, from original redis protocol, we don't reply with a basic
+        // OK or Error when inserting a key, we reply with the key itself
+        //
+        // this is how the sequential-id can returns the id generated
         char response[MAX_KEY_LENGTH + 8];
         sprintf(response, "+%.*s\r\n", idlength, id);
         send(request->fd, response, strlen(response), 0);
 
         // checking if we need to jump to the next files
+        // we do this check here and not from data (event if this is like a
+        // datafile event) to keep data and index code completly distinct
         if(offset + request->argv[2]->length > 100 * 1024 * 1024) { // 100 MB
             size_t newid = index_jump_next();
             data_jump_next(newid);
@@ -121,7 +130,7 @@ static int dispatcher(resp_request_t *request) {
         char strsize[64];
         size_t stroffset = sprintf(strsize, "%lu", entry->length);
 
-        // $xx\r\n + payload + \r\n
+        // $(xx)\r\n + (payload) + \r\n
         size_t total = 1 + stroffset + 2 + entry->length + 2;
         unsigned char *payload = data_get(entry->offset, entry->length, entry->dataid, entry->idlength);
 
@@ -134,6 +143,7 @@ static int dispatcher(resp_request_t *request) {
 
         char *response = malloc(total);
 
+        // build redis response
         strcpy(response, "$");
         strcat(response, strsize);
         strcat(response, "\r\n");
@@ -150,14 +160,14 @@ static int dispatcher(resp_request_t *request) {
         return 0;
     }
 
-    // STOP
+    // STOP (should only be used as debug, to check memory leaks or so)
     if(!strncmp(request->argv[0]->buffer, "STOP", request->argv[0]->length)) {
         send(request->fd, "+Stopping\r\n", 11, 0);
         return 2;
     }
 
     // unknown
-    printf("unknown\n");
+    printf("[-] unsupported redis command\n");
     send(request->fd, "-Command not supported\r\n", 24, 0);
 
     return 1;
@@ -186,6 +196,11 @@ static void resp_discard(int fd, char *message) {
         fprintf(stderr, "[-] send failed for error message\n");
 }
 
+// parsing a redis request
+// we parse the string and try to allocate something
+// in memory representing the request
+//
+// basic kind of argc/argv is used to expose the received request
 static int resp(int fd) {
     resp_request_t command;
 
@@ -283,12 +298,14 @@ cleanup:
 
         free(command.argv);
 
+        // special catch for STOP request
         if(dvalue == 2)
             return 2;
 
         return 0;
     }
 
+    // error, let's drop this client
     return 3;
 }
 
@@ -318,6 +335,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
         ev = events + i;
 
         // epoll issue
+        // discarding this client
         if((ev->events & EPOLLERR) || (ev->events & EPOLLHUP) || (!(ev->events & EPOLLIN))) {
             warnp("epoll");
             close(ev->data.fd);
@@ -325,7 +343,8 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             continue;
         }
 
-        // main socket
+        // main socket event: we have a new client
+        // creating the new client and accepting it
         if(ev->data.fd == redis->mainfd) {
             int clientfd;
             char *client_ip;
@@ -356,12 +375,20 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             continue;
         }
 
-        // FIXM
+        // here is the "blocking" state
+        // which only allows us to parse one client at a time
+        // we will only proceed a full request at a time
+        //
+        // -- FIXME --
+        // basicly here is one security issue, a client could
+        // potentially lock the daemon by starting a command and not complete it
+        //
         socket_block(ev->data.fd);
 
-        // client event
+        // dispatching client event
         int ctrl = resp(ev->data.fd);
 
+        // client error, we discard it
         if(ctrl == 3) {
             close(ev->data.fd);
             continue;
@@ -369,6 +396,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 
         socket_nonblock(ev->data.fd);
 
+        // dirty way the STOP event is handled
         if(ctrl == 2) {
             printf("[+] stopping daemon\n");
             close(redis->mainfd);
@@ -397,6 +425,11 @@ static int socket_handler(redis_handler_t *handler) {
 
     events = calloc(MAXEVENTS, sizeof event);
 
+    // waiting for clients
+    // this is how we supports multi-client using a single thread
+    // note that, we will only proceed one request at a time
+    // allows multiple client to be connected
+
     while(1) {
         int n = epoll_wait(handler->epollfd, events, MAXEVENTS, -1);
         if(socket_event(events, n, handler) == 1) {
@@ -412,10 +445,10 @@ int redis_listen(char *listenaddr, int port) {
     struct sockaddr_in addr_listen;
     redis_handler_t redis;
 
+    // classic basic network socket operation
     addr_listen.sin_family = AF_INET;
     addr_listen.sin_port = htons(port);
     addr_listen.sin_addr.s_addr = inet_addr(listenaddr);
-
 
     if((redis.mainfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
         diep("socket");
@@ -433,5 +466,6 @@ int redis_listen(char *listenaddr, int port) {
 
     printf("[+] listening on %s:%d\n", listenaddr, port);
 
+    // entering the worker loop
     return socket_handler(&redis);
 }
