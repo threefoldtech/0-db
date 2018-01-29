@@ -80,6 +80,22 @@ size_t data_jump_next() {
     return rootdata->dataid;
 }
 
+//
+// data manipulation
+//
+static uint16_t crc16(const unsigned char *data, uint32_t length) {
+    unsigned char x;
+    uint16_t crc = 0x1d0f;
+
+    while(length--) {
+        x = crc >> 8 ^ *data++;
+        x ^= x >> 4;
+        crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ (uint16_t) x;
+    }
+
+    return crc;
+}
+
 // get a payload from any datafile
 unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
     unsigned char *buffer = malloc(length);
@@ -121,6 +137,7 @@ size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, 
 
     header->idlength = idlength;
     header->datalength = datalength;
+    header->integrity = crc16(data, datalength);
 
     memcpy(header->id, id, idlength);
 
