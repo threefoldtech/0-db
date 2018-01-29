@@ -55,6 +55,9 @@
 
     } index_root_t;
 
+    // flags
+    #define INDEX_ENTRY_DELETED      1  // we keep deleted flags not keep entry in memory
+
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1
 
@@ -66,5 +69,6 @@
 
     index_entry_t *index_entry_get(unsigned char *id, uint8_t length);
     index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t offset, size_t length);
-    index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, size_t offset, size_t length);
+    index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags);
+    index_entry_t *index_entry_delete(unsigned char *id, uint8_t length);
 #endif

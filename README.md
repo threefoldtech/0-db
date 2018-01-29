@@ -5,7 +5,7 @@ makes data persistant inside an always append index/datafile
 # Implementation
 This project doesn't rely on any dependencies, it's from scratch.
 
-A rudimental and very simplified redis protocol is supported, allowing only few commands (PING, GET, SET).
+A rudimental and very simplified redis protocol is supported, allowing only few commands (PING, GET, SET, DEL).
 
 Each index files contains a 26 bytes headers containing a magic 4 bytes identifier,
 a version, creation and last opened date and it's own file-sequential-id.
@@ -24,6 +24,9 @@ Each time the server starts, it loads (basicly replay) the index in memory. The 
 **all the time** and only this in-memory index is reached to fetch a key, index files are
 never read again except during startup.
 
+When a key-delete is requested, the key is kept in memory and is flagged as deleted. A new entry is added
+to the index file, with the according flags. When the server restart, the latest state of the entry is used.
+
 # Index
 The current index in memory is a really bad and poor implementation, to be improved.
 
@@ -39,6 +42,7 @@ When the branch is found based on the key, the list of buckets is read sequentia
 - `PING`
 - `SET key value`
 - `GET key`
+- `DEL key`
 - `STOP` (used only for debugging, to check memory leaks)
 
 > Compared to real redis protocol, during a `SET`, the key is returned as response.

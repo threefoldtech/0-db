@@ -263,7 +263,7 @@ static size_t index_load_file(index_root_t *root) {
         // insert this entry like it was inserted by a user
         // this allows us to keep a generic way of inserting data and keeping a
         // single point of logic when adding data (logic for overwrite, resize bucket, ...)
-        index_entry_insert_memory(entry->id, entry->idlength, entry->offset, entry->length);
+        index_entry_insert_memory(entry->id, entry->idlength, entry->offset, entry->length, entry->flags);
     }
 
     free(entry);
@@ -383,7 +383,7 @@ index_entry_t *index_entry_get(unsigned char *id, uint8_t idlength) {
 // insert a key, only in memory, no disk is touched
 // this function should be called externaly only when populating something
 // if we need to add something on the index, we should write it on disk
-index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, size_t offset, size_t length) {
+index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags) {
     index_entry_t *exists = NULL;
 
     // item already exists
@@ -391,10 +391,12 @@ index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, si
         // re-use existing entry
         exists->length = length;
         exists->offset = offset;
+        exists->flags = flags;
 
         return exists;
     }
 
+    // calloc will ensure any unset fields (eg: flags) to zero
     index_entry_t *entry = calloc(sizeof(index_entry_t) + idlength, 1);
 
     memcpy(entry->id, id, idlength);
@@ -431,13 +433,34 @@ index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, si
 index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t offset, size_t length) {
     index_entry_t *entry = NULL;
 
-    if(!(entry = index_entry_insert_memory(id, idlength, offset, length)))
+    if(!(entry = index_entry_insert_memory(id, idlength, offset, length, 0)))
         return NULL;
 
     size_t entrylength = sizeof(index_entry_t) + entry->idlength;
 
     if(write(rootindex->indexfd, entry, entrylength) != (ssize_t) entrylength)
         diep(rootindex->indexfile);
+
+    return entry;
+}
+
+index_entry_t *index_entry_delete(unsigned char *id, uint8_t idlength) {
+    index_entry_t *entry = index_entry_get(id, idlength);
+
+    if(!entry || entry->flags & INDEX_ENTRY_DELETED) {
+        verbose("[-] key not found or deleted\n");
+        return NULL;
+    }
+
+    // mark entry as deleted
+    entry->flags |= INDEX_ENTRY_DELETED;
+
+    // write deleted entry flagged on index file
+    size_t entrylength = sizeof(index_entry_t) + entry->idlength;
+
+    if(write(rootindex->indexfd, entry, entrylength) != (ssize_t) entrylength)
+        diep(rootindex->indexfile);
+
 
     return entry;
 }

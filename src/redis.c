@@ -118,10 +118,11 @@ static int dispatcher(resp_request_t *request) {
             return 1;
         }
 
-        index_entry_t *entry;
+        index_entry_t *entry = index_entry_get(request->argv[1]->buffer, request->argv[1]->length);
 
-        if(!(entry = index_entry_get(request->argv[1]->buffer, request->argv[1]->length))) {
-            verbose("[-] key not found\n");
+        // checking if ket exists and if it was not deleted
+        if(!entry || entry->flags & INDEX_ENTRY_DELETED) {
+            verbose("[-] key not found or deleted\n");
             send(request->fd, "$-1\r\n", 5, 0);
             return 1;
         }
@@ -159,6 +160,20 @@ static int dispatcher(resp_request_t *request) {
 
         return 0;
     }
+
+    if(!strncmp(request->argv[0]->buffer, "DEL", request->argv[0]->length)) {
+        if(request->argv[1]->length > MAX_KEY_LENGTH) {
+            printf("[-] invalid key size\n");
+            send(request->fd, "-Invalid key\r\n", 14, 0);
+            return 1;
+        }
+
+        index_entry_delete(request->argv[1]->buffer, request->argv[1]->length);
+        send(request->fd, "+OK\r\n", 5, 0);
+
+        return 0;
+    }
+
 
     // STOP (should only be used as debug, to check memory leaks or so)
     if(!strncmp(request->argv[0]->buffer, "STOP", request->argv[0]->length)) {
