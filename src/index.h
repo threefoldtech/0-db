@@ -12,7 +12,7 @@
         uint64_t opened;   // unix timestamp of last opened time
         uint16_t fileid;   // current index file id (sync with dataid)
 
-    } index_t;
+    } __attribute__((packed)) index_t;
 
     // main entry structure
     // each key will use one of this entry
