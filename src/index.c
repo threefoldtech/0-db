@@ -448,19 +448,18 @@ index_entry_t *index_entry_delete(unsigned char *id, uint8_t idlength) {
     index_entry_t *entry = index_entry_get(id, idlength);
 
     if(!entry || entry->flags & INDEX_ENTRY_DELETED) {
-        verbose("[-] key not found or deleted\n");
+        verbose("[-] key not found or already deleted\n");
         return NULL;
     }
 
     // mark entry as deleted
     entry->flags |= INDEX_ENTRY_DELETED;
 
-    // write deleted entry flagged on index file
+    // write flagged deleted entry on index file
     size_t entrylength = sizeof(index_entry_t) + entry->idlength;
 
     if(write(rootindex->indexfd, entry, entrylength) != (ssize_t) entrylength)
         diep(rootindex->indexfile);
-
 
     return entry;
 }

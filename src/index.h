@@ -55,7 +55,7 @@
 
     } index_root_t;
 
-    // flags
+    // flags values
     #define INDEX_ENTRY_DELETED      1  // we keep deleted flags not keep entry in memory
 
     // key length is uint8_t
