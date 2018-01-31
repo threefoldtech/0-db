@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <x86intrin.h>
 #include "zerodb.h"
 #include "data.h"
 
@@ -81,20 +82,19 @@ size_t data_jump_next() {
     return rootdata->dataid;
 }
 
-#if 0
-static uint16_t crc16(const unsigned char *data, uint32_t length) {
-    unsigned char x;
-    uint16_t crc = 0x1d0f;
+static uint32_t crc32(const uint8_t *bytes, ssize_t length) {
+    uint64_t *input = (uint64_t *) bytes;
+    uint32_t hash = 0;
+    ssize_t i = 0;
 
-    while(length--) {
-        x = crc >> 8 ^ *data++;
-        x ^= x >> 4;
-        crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ (uint16_t) x;
-    }
+    for(i = 0; i < length - 8; i += 8)
+        hash = _mm_crc32_u64(hash, *input++);
 
-    return crc;
+    for(; i < length; i++)
+        hash = _mm_crc32_u8(hash, bytes[i]);
+
+    return hash;
 }
-#endif
 
 // get a payload from any datafile
 unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
@@ -137,7 +137,7 @@ size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, 
 
     header->idlength = idlength;
     header->datalength = datalength;
-    header->integrity = 0; // crc16(data, datalength);
+    header->integrity = crc32(data, datalength);
 
     memcpy(header->id, id, idlength);
 

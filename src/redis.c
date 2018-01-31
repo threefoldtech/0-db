@@ -119,6 +119,7 @@ static int dispatcher(resp_request_t *request) {
             return 1;
         }
 
+        // printf("[+] requesting key: %.*s\n", request->argv[1]->length, (char *) request->argv[1]->buffer);
         index_entry_t *entry = index_entry_get(request->argv[1]->buffer, request->argv[1]->length);
 
         // checking if ket exists and if it was not deleted

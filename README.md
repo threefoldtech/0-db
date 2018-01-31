@@ -2,10 +2,12 @@
 0-db is a simple implementation of a key-value store redis-protocol compatible which
 makes data persistant inside an always append index/datafile
 
-# Build
+# Build and restriction
 For now, only Linux (using `epoll`) is supported. To build the code, just type `make`.
 
 The binary will be on the `src/zdb`. No dependencies (except a default compiler) are needed.
+
+Note, for now you **NEED** Intel SSE4.2 available to compile and run this project.
 
 # Implementation
 This project doesn't rely on any dependencies, it's from scratch.

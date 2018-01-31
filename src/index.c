@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <limits.h>
+#include <x86intrin.h>
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
@@ -345,20 +346,17 @@ uint64_t index_next_id() {
 // perform the basic "hashing" (crc based) used to point to the expected branch
 // we only keep partial amount of the result to now fill the memory too fast
 static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
-    uint32_t key = 0xffffff;
-    uint32_t mask;
+    uint64_t *input = (uint64_t *) id;
+    uint32_t hash = 0;
+    ssize_t i = 0;
 
-    for(int i = 0; i != idlength; i++) {
-        key = key ^ id[i];
+    for(i = 0; i < idlength - 8; i += 8)
+        hash = _mm_crc32_u64(hash, *input++);
 
-        // perform a basic crc32
-        for(int j = 7; j >= 0; j--) {
-            mask = -(key & 1);
-            key = (key >> 1) ^ (0xedb88320 & mask);
-        }
-    }
+    for(; i < idlength; i++)
+        hash = _mm_crc32_u8(hash, id[i]);
 
-    return ~key & 0xfffff;
+    return hash & 0xfffff;
 }
 
 // main look-up function, used to get an entry from the memory index

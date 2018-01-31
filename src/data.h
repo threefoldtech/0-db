@@ -17,7 +17,7 @@
     typedef struct data_header_t {
         uint8_t idlength;     // length of the id
         uint32_t datalength;  // length of the payload
-        uint16_t integrity;   // simple integrity check (crc16)
+        uint32_t integrity;   // simple integrity check (crc32)
         char id[];            // accessor to the id, dynamically
 
     } __attribute__((packed)) data_header_t;
