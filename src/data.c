@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <limits.h>
 #include "zerodb.h"
 #include "data.h"
 

@@ -9,6 +9,7 @@
 #include <time.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <limits.h>
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
