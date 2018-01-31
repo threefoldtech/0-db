@@ -82,7 +82,7 @@ size_t data_jump_next() {
     return rootdata->dataid;
 }
 
-static uint32_t crc32(const uint8_t *bytes, ssize_t length) {
+static uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
     uint64_t *input = (uint64_t *) bytes;
     uint32_t hash = 0;
     ssize_t i = 0;
@@ -137,7 +137,7 @@ size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, 
 
     header->idlength = idlength;
     header->datalength = datalength;
-    header->integrity = crc32(data, datalength);
+    header->integrity = data_crc32(data, datalength);
 
     memcpy(header->id, id, idlength);
 
