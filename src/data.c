@@ -145,7 +145,7 @@ size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, 
     // we can use 0 as error detection
 
     if(write(rootdata->datafd, header, headerlength) != (ssize_t) headerlength) {
-        fprintf(stderr, "[-] cannot write data header\n");
+        warnp("cannot write data header");
         free(header);
         return 0;
     }
@@ -153,7 +153,7 @@ size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, 
     free(header);
 
     if(write(rootdata->datafd, data, datalength) != (ssize_t) datalength) {
-        fprintf(stderr, "[-] cannot write data\n");
+        warnp("cannot write data");
         return 0;
     }
 

@@ -259,8 +259,10 @@ static size_t index_load_file(index_root_t *root) {
         // rollback the 1 byte read for the id length
         lseek(root->indexfd, -1, SEEK_CUR);
 
-        if(read(root->indexfd, entry, entrylength) != entrylength)
-            diep("index read");
+        if(read(root->indexfd, entry, entrylength) != entrylength) {
+            warnp("cannot populate entry, index looks like currupted");
+            continue;
+        }
 
         // insert this entry like it was inserted by a user
         // this allows us to keep a generic way of inserting data and keeping a
@@ -284,8 +286,11 @@ static void index_set_id(index_root_t *root) {
 
 // open the current filename set on the global struct
 static void index_open_final(index_root_t *root) {
-    if((root->indexfd = open(root->indexfile, O_CREAT | O_RDWR | O_APPEND, 0600)) < 0)
-        diep(root->indexfile);
+    if((root->indexfd = open(root->indexfile, O_CREAT | O_RDWR | O_APPEND, 0600)) < 0) {
+        warnp(root->indexfile);
+        fprintf(stderr, "[-] could not open index file\n");
+        return;
+    }
 
     printf("[+] active index file: %s\n", root->indexfile);
 }
@@ -437,8 +442,9 @@ index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t of
 
     size_t entrylength = sizeof(index_entry_t) + entry->idlength;
 
-    if(write(rootindex->indexfd, entry, entrylength) != (ssize_t) entrylength)
-        diep(rootindex->indexfile);
+    if(write(rootindex->indexfd, entry, entrylength) != (ssize_t) entrylength) {
+        warnp("cannot write index entry on disk");
+    }
 
     return entry;
 }

@@ -88,6 +88,14 @@ static int dispatcher(resp_request_t *request) {
         // this will returns us the offset where the header is
         size_t offset = data_insert(value, valuelength, id, idlength);
 
+        // checking for writing error
+        // if we couldn't write the data, we won't add entry on the index
+        // and report to the client an error
+        if(offset == 0) {
+            send(request->fd, "-Cannot write data\r\n", 20, 0);
+            return 0;
+        }
+
         // inserting this offset with the id on the index
         index_entry_insert(id, idlength, offset, request->argv[2]->length);
 
