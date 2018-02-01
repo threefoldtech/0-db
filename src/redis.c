@@ -12,6 +12,7 @@
 #include <sys/epoll.h>
 #include <fcntl.h>
 #include <limits.h>
+#include "redis.h"
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
@@ -57,19 +58,19 @@ static int dispatcher(resp_request_t *request) {
     // PING
     if(!strncmp(request->argv[0]->buffer, "PING", request->argv[0]->length)) {
         verbose("[+] redis: PING\n");
-        send(request->fd, "+PONG\r\n", 7, 0);
+        redis_hardsend(request->fd, "+PONG");
         return 0;
     }
 
     // SET
     if(!strncmp(request->argv[0]->buffer, "SET", request->argv[0]->length)) {
         if(request->argc != 3) {
-            send(request->fd, "-Invalid argument\r\n", 19, 0);
+            redis_hardsend(request->fd, "-Invalid argument");
             return 1;
         }
 
         if(request->argv[1]->length > 255) {
-            send(request->fd, "-Key too large\r\n", 16, 0);
+            redis_hardsend(request->fd, "-Key too large");
             return 1;
         }
 
@@ -80,7 +81,7 @@ static int dispatcher(resp_request_t *request) {
         unsigned char *value = request->argv[2]->buffer;
         uint32_t valuelength = request->argv[2]->length;
 
-        // printf("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
+        debug("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
         // printf("[+] set key: %.*s\n", idlength, id);
         // printf("[+] set value: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
 
@@ -92,7 +93,7 @@ static int dispatcher(resp_request_t *request) {
         // if we couldn't write the data, we won't add entry on the index
         // and report to the client an error
         if(offset == 0) {
-            send(request->fd, "-Cannot write data\r\n", 20, 0);
+            redis_hardsend(request->fd, "-Cannot write data");
             return 0;
         }
 
@@ -123,7 +124,7 @@ static int dispatcher(resp_request_t *request) {
     if(!strncmp(request->argv[0]->buffer, "GET", request->argv[0]->length)) {
         if(request->argv[1]->length > MAX_KEY_LENGTH) {
             printf("[-] invalid key size\n");
-            send(request->fd, "-Invalid key\r\n", 14, 0);
+            redis_hardsend(request->fd, "-Invalid key");
             return 1;
         }
 
@@ -133,7 +134,7 @@ static int dispatcher(resp_request_t *request) {
         // checking if ket exists and if it was not deleted
         if(!entry || entry->flags & INDEX_ENTRY_DELETED) {
             verbose("[-] key not found or deleted\n");
-            send(request->fd, "$-1\r\n", 5, 0);
+            redis_hardsend(request->fd, "$-1");
             return 1;
         }
 
@@ -147,7 +148,7 @@ static int dispatcher(resp_request_t *request) {
 
         if(!payload) {
             printf("[-] cannot read payload\n");
-            send(request->fd, "-Internal Error\r\n", 17, 0);
+            redis_hardsend(request->fd, "-Internal Error");
             free(payload);
             return 0;
         }
@@ -174,12 +175,12 @@ static int dispatcher(resp_request_t *request) {
     if(!strncmp(request->argv[0]->buffer, "DEL", request->argv[0]->length)) {
         if(request->argv[1]->length > MAX_KEY_LENGTH) {
             printf("[-] invalid key size\n");
-            send(request->fd, "-Invalid key\r\n", 14, 0);
+            redis_hardsend(request->fd, "-Invalid key");
             return 1;
         }
 
         index_entry_delete(request->argv[1]->buffer, request->argv[1]->length);
-        send(request->fd, "+OK\r\n", 5, 0);
+        redis_hardsend(request->fd, "+OK");
 
         return 0;
     }
@@ -187,13 +188,13 @@ static int dispatcher(resp_request_t *request) {
 
     // STOP (should only be used as debug, to check memory leaks or so)
     if(!strncmp(request->argv[0]->buffer, "STOP", request->argv[0]->length)) {
-        send(request->fd, "+Stopping\r\n", 11, 0);
+        redis_hardsend(request->fd, "+Stopping");
         return 2;
     }
 
     // unknown
     printf("[-] unsupported redis command\n");
-    send(request->fd, "-Command not supported\r\n", 24, 0);
+    redis_hardsend(request->fd, "-Command not supported");
 
     return 1;
 }
