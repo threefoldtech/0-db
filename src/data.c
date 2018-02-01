@@ -128,7 +128,7 @@ unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t i
 
 // insert data on the datafile and returns it's offset
 size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, uint8_t idlength) {
-    size_t offset = lseek(rootdata->datafd, 0, SEEK_CUR);
+    size_t offset = lseek(rootdata->datafd, 0, SEEK_END);
     size_t headerlength = sizeof(data_header_t) + idlength;
     data_header_t *header;
 
