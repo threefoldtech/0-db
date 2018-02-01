@@ -97,6 +97,9 @@ static int dispatcher(resp_request_t *request) {
             return 0;
         }
 
+        debug("[+] userkey: %.*s\n", idlength, id);
+        debug("[+] data insertion offset: %lu\n", offset);
+
         // inserting this offset with the id on the index
         index_entry_insert(id, idlength, offset, request->argv[2]->length);
 
@@ -128,7 +131,8 @@ static int dispatcher(resp_request_t *request) {
             return 1;
         }
 
-        // printf("[+] requesting key: %.*s\n", request->argv[1]->length, (char *) request->argv[1]->buffer);
+        debug("[+] lookup key: %.*s\n", request->argv[1]->length, (char *) request->argv[1]->buffer);
+
         index_entry_t *entry = index_entry_get(request->argv[1]->buffer, request->argv[1]->length);
 
         // checking if ket exists and if it was not deleted
@@ -137,6 +141,10 @@ static int dispatcher(resp_request_t *request) {
             redis_hardsend(request->fd, "$-1");
             return 1;
         }
+
+        // key found, let's checking the contents
+        debug("[+] entry found, flags: %x, data length: %lu\n", entry->flags, entry->length);
+        debug("[+] data file: %d, data offset: %lu\n", entry->dataid, entry->offset);
 
         // convert data length integer to string
         char strsize[64];

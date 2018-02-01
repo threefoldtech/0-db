@@ -71,7 +71,7 @@ int data_integrity(int fd) {
             diep("realloc");
 
         // rollback the 1 byte read for the id length
-        lseek(fd, -1, SEEK_CUR);
+        off_t current = lseek(fd, -1, SEEK_CUR);
 
         if(read(fd, entry, entrylength) != entrylength)
             diep("data header read failed");
@@ -79,9 +79,9 @@ int data_integrity(int fd) {
         entrycount += 1;
 
         printf("[+] data entry: %lu, id length: %d\n", entrycount, entry->idlength);
-        printf("[+] expected length: %u\n", entry->datalength);
-        printf("[+] payload crc: %08x\n", entry->integrity);
-        printf("[+] entry key: <%.*s>\n", entry->idlength, entry->id);
+        printf("[+]   expected length: %u, current offset: %ld\n", entry->datalength, current);
+        printf("[+]   payload crc: %08x\n", entry->integrity);
+        printf("[+]   entry key: <%.*s>\n", entry->idlength, entry->id);
 
         if(!(buffer = realloc(buffer, entry->datalength)))
             diep("realloc");
@@ -96,7 +96,7 @@ int data_integrity(int fd) {
             errors += 1;
 
         } else {
-            printf("[+] crc match\n");
+            printf("[+]   data crc: match\n");
         }
     }
 
