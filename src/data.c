@@ -46,7 +46,7 @@ static int data_open_id(data_t *root, uint16_t id) {
     char temp[PATH_MAX];
     int fd;
 
-    sprintf(temp, "%s/rkv-data-%04u", root->datadir, id);
+    sprintf(temp, "%s/rkv-data-%05u", root->datadir, id);
 
     if((fd = open(temp, O_RDONLY, 0600)) < 0)
         diep(temp);

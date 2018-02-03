@@ -30,7 +30,7 @@ static index_root_t *rootindex = NULL;
 // after that, it's a simple unordered linked list
 //
 index_branch_t *index_branch_init(uint32_t branchid) {
-    // printf("[+] initializing branch id 0x%x\n", branchid);
+    debug("[+] initializing branch id 0x%x\n", branchid);
 
     rootindex->branches[branchid] = malloc(sizeof(index_branch_t));
     index_branch_t *branch = rootindex->branches[branchid];
@@ -67,6 +67,7 @@ index_branch_t *index_branch_get_allocate(uint32_t branchid) {
     if(!rootindex->branches[branchid])
         return index_branch_init(branchid);
 
+    debug("[+] branch exists: %lu entries\n", rootindex->branches[branchid]->next);
     return rootindex->branches[branchid];
 }
 
@@ -392,6 +393,8 @@ index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, si
 
     // item already exists
     if((exists = index_entry_get(id, idlength))) {
+        debug("[+] key already exists, overwriting\n");
+
         // re-use existing entry
         exists->length = length;
         exists->offset = offset;
