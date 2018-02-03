@@ -35,9 +35,9 @@ index_branch_t *index_branch_init(uint32_t branchid) {
     rootindex->branches[branchid] = malloc(sizeof(index_branch_t));
     index_branch_t *branch = rootindex->branches[branchid];
 
-    branch->length = BUCKET_CHUNKS;
-    branch->next = 0;
-    branch->entries = (index_entry_t **) malloc(sizeof(index_entry_t *) * branch->length);
+    branch->length = 0;
+    branch->last = NULL;
+    branch->list = NULL;
 
     return branch;
 }
@@ -47,11 +47,15 @@ void index_branch_free(uint32_t branchid) {
         return;
 
     // deleting branch content
-    for(size_t i = 0; i < rootindex->branches[branchid]->next; i++)
-        free(rootindex->branches[branchid]->entries[i]);
+    index_entry_t *entry = rootindex->branches[branchid]->list;
+    index_entry_t *next = NULL;
+
+    for(; entry; entry = next) {
+        next = entry->next;
+        free(entry);
+    }
 
     // deleting branch
-    free(rootindex->branches[branchid]->entries);
     free(rootindex->branches[branchid]);
 }
 
@@ -67,9 +71,33 @@ index_branch_t *index_branch_get_allocate(uint32_t branchid) {
     if(!rootindex->branches[branchid])
         return index_branch_init(branchid);
 
-    debug("[+] branch exists: %lu entries\n", rootindex->branches[branchid]->next);
+    debug("[+] branch exists: %lu entries\n", rootindex->branches[branchid]->length);
     return rootindex->branches[branchid];
 }
+
+// append an entry (item) to the memory list
+index_entry_t *index_branch_append(uint32_t branchid, index_entry_t *entry) {
+    index_branch_t *branch;
+
+    // grabbing the branch
+    branch = index_branch_get_allocate(branchid);
+    branch->length += 1;
+
+    // adding this item and pointing previous last one
+    // to this new one
+    if(!branch->list)
+        branch->list = entry;
+
+    if(branch->last)
+        branch->last->next = entry;
+
+    branch->last = entry;
+
+    entry->next = NULL;
+
+    return entry;
+}
+
 
 //
 // index initialized
@@ -93,7 +121,6 @@ static void index_dump(int fulldump) {
     size_t entries = 0;
     size_t indexsize = 0;
     size_t branches = 0;
-    size_t preallocated = 0;
 
     if(fulldump)
         printf("[+] ===========================\n");
@@ -106,11 +133,9 @@ static void index_dump(int fulldump) {
             continue;
 
         branches += 1;
-        preallocated += branch->length;
+        index_entry_t *entry = branch->list;
 
-        for(size_t i = 0; i < branch->next; i++) {
-            index_entry_t *entry = branch->entries[i];
-
+        for(; entry; entry = entry->next) {
             if(fulldump)
                 printf("[+] key %.*s: offset %lu, length: %lu\n", entry->idlength, entry->id, entry->offset, entry->length);
 
@@ -128,19 +153,6 @@ static void index_dump(int fulldump) {
         printf("[+] ===========================\n");
     }
 
-    #if 0
-    if(fulldump) {
-        for(int b = 0; b < BUCKET_BRANCHES; b++) {
-            index_branch_t *branch = index_branch_get(b);
-
-            if(branch)
-                printf("[+] branch 0x%x: %lu entries\n", b, branch->next);
-        }
-
-        printf("[+] ===========================\n");
-    }
-    #endif
-
     verbose("[+] index load: %lu entries\n", entries);
     verbose("[+] index uses: %lu branches\n", branches);
 
@@ -152,8 +164,7 @@ static void index_dump(int fulldump) {
     // - the branch struct itself for each branches
     // - each branch already allocated with their pre-registered buckets
     size_t overhead = (BUCKET_BRANCHES * sizeof(index_branch_t **)) +
-                      (branches * sizeof(index_branch_t)) +
-                      (preallocated * sizeof(index_entry_t *));
+                      (branches * sizeof(index_branch_t));
 
     verbose("[+] memory overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
 }
@@ -249,11 +260,11 @@ static size_t index_load_file(index_root_t *root) {
     //
     // anyway, this is only at the boot-time, performance doesn't really matter
     uint8_t idlength;
-    index_entry_t *entry = NULL;
+    index_item_t *entry = NULL;
 
     while(read(root->indexfd, &idlength, sizeof(idlength)) == sizeof(idlength)) {
         // we have the length of the key
-        ssize_t entrylength = sizeof(index_entry_t) + idlength;
+        ssize_t entrylength = sizeof(index_item_t) + idlength;
         if(!(entry = realloc(entry, entrylength)))
             diep("realloc");
 
@@ -369,17 +380,18 @@ static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
 index_entry_t *index_entry_get(unsigned char *id, uint8_t idlength) {
     uint32_t branchkey = index_key_hash(id, idlength);
     index_branch_t *branch = index_branch_get(branchkey);
+    index_entry_t *entry;
 
     // branch not exists
     if(!branch)
         return NULL;
 
-    for(size_t i = 0; i < branch->next; i++) {
-        if(branch->entries[i]->idlength != idlength)
+    for(entry = branch->list; entry; entry = entry->next) {
+        if(entry->idlength != idlength)
             continue;
 
-        if(memcmp(branch->entries[i]->id, id, idlength) == 0)
-            return branch->entries[i];
+        if(memcmp(entry->id, id, idlength) == 0)
+            return entry;
     }
 
     return NULL;
@@ -413,22 +425,17 @@ index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, si
     entry->dataid = rootindex->indexid;
 
     uint32_t branchkey = index_key_hash(id, idlength);
-    index_branch_t *branch = index_branch_get_allocate(branchkey);
 
-    if(branch->next == branch->length) {
-        // here is the branch bucket resize
-        // we pre-allocate certain amount of bucket, but when
-        // we filled the full bucket, we need to extends it
-        debug("[+] buckets 0x%x resize: %lu + %d\n", branchkey, branch->length, BUCKET_CHUNKS);
-        branch->length = branch->length + BUCKET_CHUNKS;
-        branch->entries = realloc(branch->entries, sizeof(index_entry_t *) * branch->length);
-    }
-
-    branch->entries[branch->next] = entry;
-    branch->next += 1;
+    // commit entry into memory
+    index_branch_append(branchkey, entry);
 
     return entry;
 }
+
+// this will be a global item we will allocate only once, to avoid
+// useless reallocation
+// this item will be used to move from an index_entry_t (disk) to index_item_t (memory)
+static index_item_t *transition = NULL;
 
 // main function to insert anything on the index, in memory and on the disk
 // perform at first a memory insertion then disk writing
@@ -443,9 +450,16 @@ index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t of
     if(!(entry = index_entry_insert_memory(id, idlength, offset, length, 0)))
         return NULL;
 
-    size_t entrylength = sizeof(index_entry_t) + entry->idlength;
+    size_t entrylength = sizeof(index_item_t) + entry->idlength;
 
-    if(write(rootindex->indexfd, entry, entrylength) != (ssize_t) entrylength) {
+    memcpy(transition->id, entry->id, entry->idlength);
+    transition->idlength = entry->idlength;
+    transition->offset = entry->offset;
+    transition->length = entry->length;
+    transition->flags = entry->flags;
+    transition->dataid = entry->dataid;
+
+    if(write(rootindex->indexfd, transition, entrylength) != (ssize_t) entrylength) {
         warnp("cannot write index entry on disk");
     }
 
@@ -464,9 +478,16 @@ index_entry_t *index_entry_delete(unsigned char *id, uint8_t idlength) {
     entry->flags |= INDEX_ENTRY_DELETED;
 
     // write flagged deleted entry on index file
-    size_t entrylength = sizeof(index_entry_t) + entry->idlength;
+    size_t entrylength = sizeof(index_item_t) + entry->idlength;
 
-    if(write(rootindex->indexfd, entry, entrylength) != (ssize_t) entrylength)
+    memcpy(transition->id, entry->id, entry->idlength);
+    transition->idlength = entry->idlength;
+    transition->offset = entry->offset;
+    transition->length = entry->length;
+    transition->flags = entry->flags;
+    transition->dataid = entry->dataid;
+
+    if(write(rootindex->indexfd, transition, entrylength) != (ssize_t) entrylength)
         diep(rootindex->indexfile);
 
     return entry;
@@ -485,6 +506,7 @@ void index_destroy() {
     free(rootindex->branches);
     free(rootindex->indexfile);
     free(rootindex);
+    free(transition);
 }
 
 // create an index and load files
@@ -502,6 +524,9 @@ uint16_t index_init(char *indexpath, int dump) {
 
     // commit variable
     rootindex = lroot;
+
+    // allocating transition variable, 256 is the key limit size
+    transition = malloc(sizeof(index_item_t) + 256);
 
     index_load(lroot);
     index_dump(dump);

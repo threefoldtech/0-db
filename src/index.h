@@ -16,7 +16,7 @@
 
     // main entry structure
     // each key will use one of this entry
-    typedef struct index_entry_t {
+    typedef struct index_item_t {
         uint8_t idlength;    // length of the id, here uint8_t limits to 256 bytes
         uint64_t offset;     // offset on the corresponding datafile
         uint64_t length;     // length of the payload on the datafile
@@ -24,10 +24,23 @@
         uint16_t dataid;     // datafile id where is stored the payload
         unsigned char id[];  // the id accessor, dynamically loaded
 
-    } __attribute__((packed)) index_entry_t;
+    } __attribute__((packed)) index_item_t;
+
+    typedef struct index_entry_t {
+        // linked list pointer
+        struct index_entry_t *next;
+
+        uint8_t idlength;    // length of the id, here uint8_t limits to 256 bytes
+        uint64_t offset;     // offset on the corresponding datafile
+        uint64_t length;     // length of the payload on the datafile
+        uint8_t flags;       // flags not used yet, could provide information about deletion
+        uint16_t dataid;     // datafile id where is stored the payload
+        unsigned char id[];  // the id accessor, dynamically loaded
+
+    } index_entry_t;
 
     // the current implementation of the index use rudimental index memory system
-    // it's basicly just array to read sequentially
+    // it's basicly just linked-list of entries
     // to improve performance without changing this basic implementation,
     // which is really slow, of course, we use a "branch" system which simply
     // split all the arrays based on an id
@@ -38,9 +51,9 @@
     // - id 0001: [...................]
     // - id 0002: [...]
     typedef struct index_branch_t {
-        size_t length;
-        size_t next;
-        index_entry_t **entries;
+        size_t length;       // length of this branch (count of entries)
+        index_entry_t *list; // entry point of the linked list
+        index_entry_t *last; // pointer to the last item, quicker to append
 
     } index_branch_t;
 
