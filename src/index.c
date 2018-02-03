@@ -281,7 +281,7 @@ static size_t index_load_file(index_root_t *root) {
 
 // set global filename based on the index id
 static void index_set_id(index_root_t *root) {
-    sprintf(root->indexfile, "%s/rkv-index-%04u", root->indexdir, root->indexid);
+    sprintf(root->indexfile, "%s/rkv-index-%05u", root->indexdir, root->indexid);
 }
 
 // open the current filename set on the global struct
@@ -298,7 +298,7 @@ static void index_open_final(index_root_t *root) {
 // load all the index found
 // if no index files exists, we create the original one
 static void index_load(index_root_t *root) {
-    for(root->indexid = 0; root->indexid < 10000; root->indexid++) {
+    for(root->indexid = 0; root->indexid < 65535; root->indexid++) {
         index_set_id(root);
 
         if(index_load_file(root) == 0) {

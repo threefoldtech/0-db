@@ -38,7 +38,7 @@ void data_initialize(char *filename) {
 
 // simply set globaly the current filename based on it's id
 static void data_set_id(data_t *root) {
-    sprintf(root->datafile, "%s/rkv-data-%04u", root->datadir, root->dataid);
+    sprintf(root->datafile, "%s/rkv-data-%05u", root->datadir, root->dataid);
 }
 
 // open the datafile based on it's id
