@@ -122,6 +122,8 @@ static void index_dump(int fulldump) {
     size_t indexsize = 0;
     size_t branches = 0;
 
+    printf("[+] verifyfing index populated\n");
+
     if(fulldump)
         printf("[+] ===========================\n");
 
