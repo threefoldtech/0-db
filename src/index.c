@@ -16,7 +16,7 @@
 #include "data.h"
 
 #define BUCKET_CHUNKS   32
-#define BUCKET_BRANCHES (1 << 20)
+#define BUCKET_BRANCHES (1 << 24)
 
 static index_root_t *rootindex = NULL;
 
@@ -373,7 +373,7 @@ static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
     for(; i < idlength; i++)
         hash = _mm_crc32_u8(hash, id[i]);
 
-    return hash & 0xfffff;
+    return hash & 0xffffff;
 }
 
 // main look-up function, used to get an entry from the memory index
