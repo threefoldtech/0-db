@@ -43,7 +43,7 @@
 static index_root_t *rootindex = NULL;
 
 // allows to works on readonly index (no write allowed)
-static int index_readonly = 0;
+static int index_status = INDEX_HEALTHY;
 
 // wrap (mostly) all write operation on indexfile
 // it's easier to keep a single logic with error handling
@@ -72,7 +72,7 @@ static int index_write(int fd, void *buffer, size_t length) {
 // without consuming all the memory if we don't need it
 //
 index_branch_t *index_branch_init(uint32_t branchid) {
-    debug("[+] initializing branch id 0x%x\n", branchid);
+    // debug("[+] initializing branch id 0x%x\n", branchid);
 
     rootindex->branches[branchid] = malloc(sizeof(index_branch_t));
     index_branch_t *branch = rootindex->branches[branchid];
@@ -269,7 +269,7 @@ static int index_try_rootindex(index_root_t *root) {
 
         // we keep track that we are on a readonly filesystem
         // we can't live with it, but with restriction
-        index_readonly = 1;
+        index_status |= INDEX_READ_ONLY;
     }
 
     return 1;
@@ -292,6 +292,14 @@ static size_t index_load_file(index_root_t *root) {
         return 0;
 
     if((length = read(root->indexfd, &header, sizeof(index_t))) != sizeof(index_t)) {
+        if(length < 0) {
+            // read failed, probably caused by a system error
+            // this is probably an unrecoverable issue, let's skip this
+            // index file (this could break consistancy)
+            index_status |= INDEX_DEGRADED;
+            return 1;
+        }
+
         if(length > 0) {
             // we read something, but not the expected header, at least
             // not this amount of data, which is a completly undefined behavior
@@ -317,7 +325,7 @@ static size_t index_load_file(index_root_t *root) {
         // and we are in read-only mode, we can't write on the index
         // and it's empty, there is no goal to do anything
         // let's crash
-        if(index_readonly) {
+        if(index_status & INDEX_READ_ONLY) {
             fprintf(stderr, "[-] no index found and readonly filesystem\n");
             fprintf(stderr, "[-] cannot starts correctly\n");
             exit(EXIT_FAILURE);
@@ -330,7 +338,7 @@ static size_t index_load_file(index_root_t *root) {
 
     // re-writing the header, with updated data if the index is writable
     // if the file was just created, it's okay, we have a new struct ready
-    if(!index_readonly) {
+    if(!(index_status & INDEX_READ_ONLY)) {
         // updating index with latest opening state
         header.opened = time(NULL);
         lseek(root->indexfd, 0, SEEK_SET);
@@ -403,7 +411,7 @@ static void index_set_id(index_root_t *root) {
 static void index_open_final(index_root_t *root) {
     int flags = O_CREAT | O_RDWR | O_APPEND;
 
-    if(index_readonly)
+    if(index_status & INDEX_READ_ONLY)
         flags = O_RDONLY;
 
     if((root->indexfd = open(root->indexfile, flags, 0600)) < 0) {
@@ -436,10 +444,16 @@ static void index_load(index_root_t *root) {
         }
     }
 
-    if(index_readonly) {
+    if(index_status & INDEX_READ_ONLY) {
         printf("[-] ========================================\n");
         printf("[-] WARNING: running in read-only mode\n");
         printf("[-] WARNING: index filesystem is not writable\n");
+        printf("[-] ========================================\n");
+    }
+
+    if(index_status & INDEX_DEGRADED) {
+        printf("[-] ========================================\n");
+        printf("[-] WARNING: index degraded (read errors)\n");
         printf("[-] ========================================\n");
     }
 

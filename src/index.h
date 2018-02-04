@@ -71,6 +71,12 @@
     // flags values
     #define INDEX_ENTRY_DELETED      1  // we keep deleted flags not keep entry in memory
 
+    // index status flags
+    // keep some heatly status of the index
+    #define INDEX_HEALTHY    1       // no issue detected
+    #define INDEX_READ_ONLY  1 << 1  // index filesystem is read-only
+    #define INDEX_DEGRADED   1 << 2  // some error occured during index loads
+
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1
 
