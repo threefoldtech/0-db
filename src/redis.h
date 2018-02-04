@@ -1,5 +1,5 @@
-#ifndef __RKV_REDIS_H
-    #define __RKV_REDIS_H
+#ifndef __ZDB_REDIS_H
+    #define __ZDB_REDIS_H
 
     // redis_hardsend is a macro which allows us to send
     // easily a hardcoded message to the client, without needing to
@@ -12,5 +12,31 @@
     // just be +1
     #define redis_hardsend(fd, message) send(fd, message "\r\n", sizeof(message) + 1, 0)
 
+    typedef enum resp_type_t {
+        INTEGER,
+        STRING,
+        NIL,
+
+    } resp_type_t;
+
+    typedef struct resp_object_t {
+        resp_type_t type;
+        void *buffer;
+        int length;
+
+    } resp_object_t;
+
+    typedef struct resp_request_t {
+        int fd;
+        int argc;
+        resp_object_t **argv;
+
+    } resp_request_t;
+
     int redis_listen(char *listenaddr, int port);
+    int redis_dispatcher(resp_request_t *request);
+    int redis_response(int fd);
+
+    void socket_nonblock(int fd);
+    void socket_block(int fd);
 #endif

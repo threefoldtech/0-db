@@ -1,0 +1,127 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/epoll.h>
+#include "redis.h"
+#include "socket_epoll.h"
+#include "zerodb.h"
+
+#define MAXEVENTS 64
+
+static int socket_event(struct epoll_event *events, int notified, redis_handler_t *redis) {
+    struct epoll_event *ev;
+
+    for(int i = 0; i < notified; i++) {
+        ev = events + i;
+
+        // epoll issue
+        // discarding this client
+        if((ev->events & EPOLLERR) || (ev->events & EPOLLHUP) || (!(ev->events & EPOLLIN))) {
+            warnp("epoll");
+            close(ev->data.fd);
+
+            continue;
+        }
+
+        // main socket event: we have a new client
+        // creating the new client and accepting it
+        if(ev->data.fd == redis->mainfd) {
+            int clientfd;
+            char *client_ip;
+            struct sockaddr_in addr_client;
+            socklen_t addr_client_len;
+
+            addr_client_len = sizeof(addr_client);
+
+            if((clientfd = accept(redis->mainfd, (struct sockaddr *)&addr_client, &addr_client_len)) == -1)
+                warnp("accept");
+
+            socket_nonblock(clientfd);
+
+            client_ip = inet_ntoa(addr_client.sin_addr);
+            verbose("[+] incoming connection from %s\n", client_ip);
+
+            // adding client to the epoll list
+            struct epoll_event event;
+
+            memset(&event, 0, sizeof(struct epoll_event));
+
+            event.data.fd = clientfd;
+            event.events = EPOLLIN;
+
+            if(epoll_ctl(redis->epollfd, EPOLL_CTL_ADD, clientfd, &event) < 0)
+                warnp("epoll_ctl");
+
+            continue;
+        }
+
+        // here is the "blocking" state
+        // which only allows us to parse one client at a time
+        // we will only proceed a full request at a time
+        //
+        // -- FIXME --
+        // basicly here is one security issue, a client could
+        // potentially lock the daemon by starting a command and not complete it
+        //
+        socket_block(ev->data.fd);
+
+        // dispatching client event
+        int ctrl = redis_response(ev->data.fd);
+
+        // client error, we discard it
+        if(ctrl == 3) {
+            close(ev->data.fd);
+            continue;
+        }
+
+        socket_nonblock(ev->data.fd);
+
+        // dirty way the STOP event is handled
+        if(ctrl == 2) {
+            printf("[+] stopping daemon\n");
+            close(redis->mainfd);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int socket_handler(redis_handler_t *handler) {
+    struct epoll_event event;
+    struct epoll_event *events = NULL;
+
+    // initialize empty struct
+    memset(&event, 0, sizeof(struct epoll_event));
+
+    if((handler->epollfd = epoll_create1(0)) < 0)
+        diep("epoll_create1");
+
+    event.data.fd = handler->mainfd;
+    event.events = EPOLLIN;
+
+    if(epoll_ctl(handler->epollfd, EPOLL_CTL_ADD, handler->mainfd, &event) < 0)
+        diep("epoll_ctl");
+
+    events = calloc(MAXEVENTS, sizeof event);
+
+    // waiting for clients
+    // this is how we supports multi-client using a single thread
+    // note that, we will only proceed one request at a time
+    // allows multiple client to be connected
+
+    while(1) {
+        int n = epoll_wait(handler->epollfd, events, MAXEVENTS, -1);
+        if(socket_event(events, n, handler) == 1) {
+            free(events);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
