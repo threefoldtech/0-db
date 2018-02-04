@@ -296,6 +296,7 @@ static size_t index_load_file(index_root_t *root) {
             // read failed, probably caused by a system error
             // this is probably an unrecoverable issue, let's skip this
             // index file (this could break consistancy)
+            warnp("index: header read");
             index_status |= INDEX_DEGRADED;
             return 1;
         }
@@ -456,6 +457,9 @@ static void index_load(index_root_t *root) {
         printf("[-] WARNING: index degraded (read errors)\n");
         printf("[-] ========================================\n");
     }
+
+    if(index_status & INDEX_HEALTHY)
+        verbose("[+] index healthy\n");
 
     // opening the real active index file in append mode
     index_open_final(root);
