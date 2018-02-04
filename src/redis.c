@@ -101,7 +101,11 @@ static int dispatcher(resp_request_t *request) {
         debug("[+] data insertion offset: %lu\n", offset);
 
         // inserting this offset with the id on the index
-        index_entry_insert(id, idlength, offset, request->argv[2]->length);
+        if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
+            // cannot insert index (disk issue)
+            redis_hardsend(request->fd, "$-1");
+            return 0;
+        }
 
         // building response
         // here, from original redis protocol, we don't reply with a basic
@@ -194,9 +198,12 @@ static int dispatcher(resp_request_t *request) {
             return 1;
         }
 
-        index_entry_delete(request->argv[1]->buffer, request->argv[1]->length);
-        redis_hardsend(request->fd, "+OK");
+        if(!index_entry_delete(request->argv[1]->buffer, request->argv[1]->length)) {
+            redis_hardsend(request->fd, "-Cannot delete key");
+            return 0;
+        }
 
+        redis_hardsend(request->fd, "+OK");
         return 0;
     }
 

@@ -16,22 +16,59 @@
 #include "index.h"
 #include "data.h"
 
-#define BUCKET_CHUNKS   32
+// maximum allowed branch in memory
+//
+// this settings is mainly the most important to
+// determine the keys lookup time
+//
+// the more bits you allows here, the more buckets
+// can be used for lookup without collision
+//
+// the index works like a hash-table and uses crc32 'hash'
+// algorithm, the result of the crc32 is used to point to
+// the bucket, but using a full 32-bits hashlist would
+// consume more than (2^32 * 8) GB of memory (on 64-bits)
+//
+// the default settings sets this to 24 bits, which allows
+// 16 millions direct entries, collisions uses linked-list
+//
+// if you change this settings, please adapt
+// the mask used on 'index_key_hash' function
+// to avoid any overflow (you need to mask the value with
+// same amount of bits)
 #define BUCKET_BRANCHES (1 << 24)
 
+// main global root index state
 static index_root_t *rootindex = NULL;
 
 // allows to works on readonly index (no write allowed)
 static int index_readonly = 0;
 
+// wrap (mostly) all write operation on indexfile
+// it's easier to keep a single logic with error handling
+// related to write check
+static int index_write(int fd, void *buffer, size_t length) {
+    ssize_t response;
+
+    if((response = write(fd, buffer, length)) < 0) {
+        warnp("index write");
+        return 0;
+    }
+
+    if(response != (ssize_t) length) {
+        fprintf(stderr, "[-] index write: partial write\n");
+        return 0;
+    }
+
+    return 1;
+}
+
+
 //
 // index branch
 // this implementation use a lazy load of branches
-// this allows us to use lot of branch (BUCKET_BRANCH in this case) without
-// consuming all the memory if we don't need it
-//
-// the current status allows us to store up to 3 bytes prefix directly
-// after that, it's a simple unordered linked list
+// this allows us to use lot of branch (BUCKET_BRANCHES in this case)
+// without consuming all the memory if we don't need it
 //
 index_branch_t *index_branch_init(uint32_t branchid) {
     debug("[+] initializing branch id 0x%x\n", branchid);
@@ -47,13 +84,15 @@ index_branch_t *index_branch_init(uint32_t branchid) {
 }
 
 void index_branch_free(uint32_t branchid) {
+    // this branch was not allocated
     if(!rootindex->branches[branchid])
         return;
 
-    // deleting branch content
     index_entry_t *entry = rootindex->branches[branchid]->list;
     index_entry_t *next = NULL;
 
+    // deleting branch content by
+    // iterate over the linked-list
     for(; entry; entry = next) {
         next = entry->next;
         free(entry);
@@ -70,7 +109,7 @@ index_branch_t *index_branch_get(uint32_t branchid) {
 }
 
 // returns branch from rootindex, if branch doesn't exists, it will be allocated
-// useful for any write in the index in memory
+// (useful for any write in the index in memory)
 index_branch_t *index_branch_get_allocate(uint32_t branchid) {
     if(!rootindex->branches[branchid])
         return index_branch_init(branchid);
@@ -80,6 +119,8 @@ index_branch_t *index_branch_get_allocate(uint32_t branchid) {
 }
 
 // append an entry (item) to the memory list
+// since we use a linked-list, the logic of appending
+// only occures here
 index_entry_t *index_branch_append(uint32_t branchid, index_entry_t *entry) {
     index_branch_t *branch;
 
@@ -96,7 +137,6 @@ index_entry_t *index_branch_append(uint32_t branchid, index_entry_t *entry) {
         branch->last->next = entry;
 
     branch->last = entry;
-
     entry->next = NULL;
 
     return entry;
@@ -119,7 +159,7 @@ static char *index_date(uint32_t epoch, char *target, size_t length) {
 }
 
 // dumps the current index load
-// fulldump flags enable printing each entry moreover
+// fulldump flags enable printing each entry
 static void index_dump(int fulldump) {
     size_t datasize = 0;
     size_t entries = 0;
@@ -131,6 +171,7 @@ static void index_dump(int fulldump) {
     if(fulldump)
         printf("[+] ===========================\n");
 
+    // iterating over each buckets
     for(int b = 0; b < BUCKET_BRANCHES; b++) {
         index_branch_t *branch = index_branch_get(b);
 
@@ -141,6 +182,7 @@ static void index_dump(int fulldump) {
         branches += 1;
         index_entry_t *entry = branch->list;
 
+        // iterating over the linked-list
         for(; entry; entry = entry->next) {
             if(fulldump)
                 printf("[+] key %.*s: offset %lu, length: %lu\n", entry->idlength, entry->id, entry->offset, entry->length);
@@ -168,7 +210,6 @@ static void index_dump(int fulldump) {
     // overhead contains:
     // - the buffer allocated to hold each (futur) branches pointer
     // - the branch struct itself for each branches
-    // - each branch already allocated with their pre-registered buckets
     size_t overhead = (BUCKET_BRANCHES * sizeof(index_branch_t **)) +
                       (branches * sizeof(index_branch_t));
 
@@ -186,7 +227,7 @@ static index_t index_initialize(int fd, uint16_t indexid) {
     header.fileid = indexid;
     header.opened = time(NULL);
 
-    if(write(fd, &header, sizeof(index_t)) != sizeof(index_t))
+    if(!index_write(fd, &header, sizeof(index_t)))
         diep("index_initialize: write");
 
     return header;
@@ -287,7 +328,7 @@ static size_t index_load_file(index_root_t *root) {
         header.opened = time(NULL);
         lseek(root->indexfd, 0, SEEK_SET);
 
-        if(write(root->indexfd, &header, sizeof(index_t)) != sizeof(index_t))
+        if(!index_write(root->indexfd, &header, sizeof(index_t)))
             diep(root->indexfile);
     }
 
@@ -466,7 +507,7 @@ index_entry_t *index_entry_get(unsigned char *id, uint8_t idlength) {
 
 // insert a key, only in memory, no disk is touched
 // this function should be called externaly only when populating something
-// if we need to add something on the index, we should write it on disk
+// if we need to add something new on the index, we should write it on disk
 index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags) {
     index_entry_t *exists = NULL;
 
@@ -526,8 +567,14 @@ index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t of
     transition->flags = entry->flags;
     transition->dataid = entry->dataid;
 
-    if(write(rootindex->indexfd, transition, entrylength) != (ssize_t) entrylength) {
-        warnp("cannot write index entry on disk");
+    if(!index_write(rootindex->indexfd, transition, entrylength)) {
+        fprintf(stderr, "[-] index: cannot write index entry on disk\n");
+
+        // it's easier to flag the entry as deleted than
+        // removing it from the list
+        entry->flags |= INDEX_ENTRY_DELETED;
+
+        return NULL;
     }
 
     return entry;
@@ -536,8 +583,13 @@ index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t of
 index_entry_t *index_entry_delete(unsigned char *id, uint8_t idlength) {
     index_entry_t *entry = index_entry_get(id, idlength);
 
-    if(!entry || entry->flags & INDEX_ENTRY_DELETED) {
-        verbose("[-] key not found or already deleted\n");
+    if(!entry) {
+        verbose("[-] key not found\n");
+        return NULL;
+    }
+
+    if(entry->flags & INDEX_ENTRY_DELETED) {
+        verbose("[-] key already deleted\n");
         return NULL;
     }
 
@@ -554,8 +606,8 @@ index_entry_t *index_entry_delete(unsigned char *id, uint8_t idlength) {
     transition->flags = entry->flags;
     transition->dataid = entry->dataid;
 
-    if(write(rootindex->indexfd, transition, entrylength) != (ssize_t) entrylength)
-        diep(rootindex->indexfile);
+    if(!index_write(rootindex->indexfd, transition, entrylength))
+        return NULL;
 
     return entry;
 }

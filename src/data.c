@@ -13,8 +13,14 @@
 #include "zerodb.h"
 #include "data.h"
 
+// global pointer of the main data object
+// we are single-threaded by design and this is mostly
+// only changed during initializing and file-swap
 static data_t *rootdata = NULL;
 
+// wrap (mostly) all write operation on datafile
+// it's easier to keep a single logic with error handling
+// related to write check
 static int data_write(int fd, void *buffer, size_t length) {
     ssize_t response;
 
@@ -79,7 +85,8 @@ static int data_open_id(data_t *root, uint16_t id) {
 static void data_open_final(data_t *root) {
     // try to open the datafile in write mode to append new data
     if((root->datafd = open(root->datafile, O_CREAT | O_RDWR | O_APPEND, 0600)) < 0) {
-        // maybe we are on a read-only filesystem, let's open it in read-only
+        // maybe we are on a read-only filesystem
+        // let's try to open it in read-only
         if(errno != EROFS)
             diep(root->datafile);
 
@@ -113,6 +120,8 @@ size_t data_jump_next() {
     return rootdata->dataid;
 }
 
+// compute a crc32 of the payload
+// this function uses Intel CRC32 (SSE4.2) intrinsic
 static uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
     uint64_t *input = (uint64_t *) bytes;
     uint32_t hash = 0;
@@ -140,6 +149,8 @@ unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t i
         fd = data_open_id(rootdata, dataid);
     }
 
+    // positioning datafile to expected offset
+    // and skiping header (pointing to payload)
     lseek(fd, offset + sizeof(data_header_t) + idlength, SEEK_SET);
     if(read(fd, buffer, length) != (ssize_t) length) {
         warnp("data_get: read");
@@ -172,7 +183,7 @@ size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, 
 
     memcpy(header->id, id, idlength);
 
-    // data offset will always be >= 1
+    // data offset will always be >= 1 (see initializer notes)
     // we can use 0 as error detection
 
     if(!data_write(rootdata->datafd, header, headerlength)) {
