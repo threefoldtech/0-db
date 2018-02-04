@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include "redis.h"
 #include "sockets.h"
 #include "zerodb.h"
@@ -122,12 +123,12 @@ int redis_dispatcher(resp_request_t *request) {
         }
 
         // key found and valid, let's checking the contents
-        debug("[+] entry found, flags: %x, data length: %lu\n", entry->flags, entry->length);
-        debug("[+] data file: %d, data offset: %lu\n", entry->dataid, entry->offset);
+        debug("[+] entry found, flags: %x, data length: %" PRIu64 "\n", entry->flags, entry->length);
+        debug("[+] data file: %d, data offset: %" PRIu64 "\n", entry->dataid, entry->offset);
 
         // convert data length integer to string
         char strsize[64];
-        size_t stroffset = sprintf(strsize, "%lu", entry->length);
+        size_t stroffset = sprintf(strsize, "%" PRIu64, entry->length);
 
         // $(xx)\r\n + (payload) + \r\n
         size_t total = 1 + stroffset + 2 + entry->length + 2;
