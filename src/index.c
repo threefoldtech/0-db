@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -158,6 +159,11 @@ static char *index_date(uint32_t epoch, char *target, size_t length) {
     return target;
 }
 
+static inline void index_dump_entry(index_entry_t *entry) {
+    printf("[+] key %.*s: ", entry->idlength, entry->id);
+    printf("offset %" PRIu64 ", length: %" PRIu64 "\n", entry->offset, entry->length);
+}
+
 // dumps the current index load
 // fulldump flags enable printing each entry
 static void index_dump(int fulldump) {
@@ -185,7 +191,7 @@ static void index_dump(int fulldump) {
         // iterating over the linked-list
         for(; entry; entry = entry->next) {
             if(fulldump)
-                printf("[+] key %.*s: offset %lu, length: %lu\n", entry->idlength, entry->id, entry->offset, entry->length);
+                index_dump_entry(entry);
 
             indexsize += sizeof(index_entry_t) + entry->idlength;
             datasize += entry->length;
