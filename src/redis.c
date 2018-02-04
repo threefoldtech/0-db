@@ -93,7 +93,7 @@ static int dispatcher(resp_request_t *request) {
         // if we couldn't write the data, we won't add entry on the index
         // and report to the client an error
         if(offset == 0) {
-            redis_hardsend(request->fd, "-Cannot write data");
+            redis_hardsend(request->fd, "$-1");
             return 0;
         }
 
@@ -135,14 +135,21 @@ static int dispatcher(resp_request_t *request) {
 
         index_entry_t *entry = index_entry_get(request->argv[1]->buffer, request->argv[1]->length);
 
-        // checking if ket exists and if it was not deleted
-        if(!entry || entry->flags & INDEX_ENTRY_DELETED) {
-            verbose("[-] key not found or deleted\n");
+        // key not found at all
+        if(!entry) {
+            verbose("[-] key not found\n");
             redis_hardsend(request->fd, "$-1");
             return 1;
         }
 
-        // key found, let's checking the contents
+        // key found but deleted
+        if(entry->flags & INDEX_ENTRY_DELETED) {
+            verbose("[-] key deleted\n");
+            redis_hardsend(request->fd, "$-1");
+            return 1;
+        }
+
+        // key found and valid, let's checking the contents
         debug("[+] entry found, flags: %x, data length: %lu\n", entry->flags, entry->length);
         debug("[+] data file: %d, data offset: %lu\n", entry->dataid, entry->offset);
 

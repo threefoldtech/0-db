@@ -9,10 +9,27 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <x86intrin.h>
+#include <errno.h>
 #include "zerodb.h"
 #include "data.h"
 
 static data_t *rootdata = NULL;
+
+static int data_write(int fd, void *buffer, size_t length) {
+    ssize_t response;
+
+    if((response = write(fd, buffer, length)) < 0) {
+        warnp("data write");
+        return 0;
+    }
+
+    if(response != (ssize_t) length) {
+        fprintf(stderr, "[-] data write: partial write\n");
+        return 0;
+    }
+
+    return 1;
+}
 
 //
 // data management
@@ -20,8 +37,13 @@ static data_t *rootdata = NULL;
 void data_initialize(char *filename) {
     int fd;
 
-    if((fd = open(filename, O_CREAT | O_RDWR, 0600)) < 0)
+    if((fd = open(filename, O_CREAT | O_RDWR, 0600)) < 0) {
+        // ignoring initializer on read-only filesystem
+        if(errno == EROFS)
+            return;
+
         diep(filename);
+    }
 
     // writing initial header
     // this header is, right now, not used and not useful
@@ -30,7 +52,7 @@ void data_initialize(char *filename) {
     // anyway, it's important for the implementation to have
     // at least 1 byte already written, we use 0 as error when
     // expecting an offset
-    if(write(fd, "X", 1) != 1)
+    if(!data_write(fd, "X", 1))
         diep(filename);
 
     close(fd);
@@ -55,8 +77,17 @@ static int data_open_id(data_t *root, uint16_t id) {
 }
 
 static void data_open_final(data_t *root) {
-    if((root->datafd = open(root->datafile, O_CREAT | O_RDWR | O_APPEND, 0600)) < 0)
-        diep(root->datafile);
+    // try to open the datafile in write mode to append new data
+    if((root->datafd = open(root->datafile, O_CREAT | O_RDWR | O_APPEND, 0600)) < 0) {
+        // maybe we are on a read-only filesystem, let's open it in read-only
+        if(errno != EROFS)
+            diep(root->datafile);
+
+        if((root->datafd = open(root->datafile, O_RDONLY, 0600)) < 0)
+            diep(root->datafile);
+
+        debug("[+] data file opened in read-only mode\n");
+    }
 
     // skipping header
     lseek(root->datafd, 0, SEEK_END);
@@ -144,16 +175,16 @@ size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, 
     // data offset will always be >= 1
     // we can use 0 as error detection
 
-    if(write(rootdata->datafd, header, headerlength) != (ssize_t) headerlength) {
-        warnp("cannot write data header");
+    if(!data_write(rootdata->datafd, header, headerlength)) {
+        verbose("[-] data header: write failed\n");
         free(header);
         return 0;
     }
 
     free(header);
 
-    if(write(rootdata->datafd, data, datalength) != (ssize_t) datalength) {
-        warnp("cannot write data");
+    if(!data_write(rootdata->datafd, data, datalength)) {
+        verbose("[-] data payload: write failed\n");
         return 0;
     }
 

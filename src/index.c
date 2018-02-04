@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <x86intrin.h>
+#include <errno.h>
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
@@ -19,6 +20,9 @@
 #define BUCKET_BRANCHES (1 << 24)
 
 static index_root_t *rootindex = NULL;
+
+// allows to works on readonly index (no write allowed)
+static int index_readonly = 0;
 
 //
 // index branch
@@ -188,6 +192,42 @@ static index_t index_initialize(int fd, uint16_t indexid) {
     return header;
 }
 
+static int index_try_rootindex(index_root_t *root) {
+    // try to open the index file with create flag
+    if((root->indexfd = open(root->indexfile, O_CREAT | O_RDWR, 0600)) < 0) {
+        // okay it looks like we can't open this file
+        // the only case we support is if the filesystem is in
+        // read only, otherwise we just crash, this should not happen
+        if(errno != EROFS)
+            diep(root->indexfile);
+
+        debug("[-] warning: read-only index filesystem\n");
+
+        // okay, it looks like the index filesystem is in readonly
+        // this can happen by choice or because the disk is unstable
+        // and the system remounted-it in readonly, this won't stop
+        // us to read it if we can, we won't change it
+        if((root->indexfd = open(root->indexfile, O_RDONLY, 0600)) < 0) {
+            // it looks like we can't open it, even in readonly
+            // we need to keep in mind that the index file we requests
+            // may not exists (we can then silently ignore this, we reached
+            // the last index file found)
+            if(errno == ENOENT)
+                return 0;
+
+            // if we are here, we can't read the indexfile for another reason
+            // this is not supported, let's crash
+            diep(root->indexfile);
+        }
+
+        // we keep track that we are on a readonly filesystem
+        // we can't live with it, but with restriction
+        index_readonly = 1;
+    }
+
+    return 1;
+}
+
 // opening, reading then closing the index file
 // if the index was created, 0 is returned
 //
@@ -201,8 +241,8 @@ static size_t index_load_file(index_root_t *root) {
 
     verbose("[+] loading index file: %s\n", root->indexfile);
 
-    if((root->indexfd = open(root->indexfile, O_CREAT | O_RDWR, 0600)) < 0)
-        diep(root->indexfile);
+    if(!index_try_rootindex(root))
+        return 0;
 
     if((length = read(root->indexfd, &header, sizeof(index_t))) != sizeof(index_t)) {
         if(length > 0) {
@@ -225,20 +265,31 @@ static size_t index_load_file(index_root_t *root) {
             return 0;
         }
 
-        printf("[+] creating empty index file\n");
+        // if we are here, it's the first index file found
+        // and we are in read-only mode, we can't write on the index
+        // and it's empty, there is no goal to do anything
+        // let's crash
+        if(index_readonly) {
+            fprintf(stderr, "[-] no index found and readonly filesystem\n");
+            fprintf(stderr, "[-] cannot starts correctly\n");
+            exit(EXIT_FAILURE);
+        }
 
-        // creating new index
+        printf("[+] creating empty index file\n");
         header = index_initialize(root->indexfd, root->indexid);
     }
 
-    // updating index with this opening state
-    header.opened = time(NULL);
-    lseek(root->indexfd, 0, SEEK_SET);
 
-    // re-writing the header, with updated data
+    // re-writing the header, with updated data if the index is writable
     // if the file was just created, it's okay, we have a new struct ready
-    if(write(root->indexfd, &header, sizeof(index_t)) != sizeof(index_t))
-        diep(root->indexfile);
+    if(!index_readonly) {
+        // updating index with latest opening state
+        header.opened = time(NULL);
+        lseek(root->indexfd, 0, SEEK_SET);
+
+        if(write(root->indexfd, &header, sizeof(index_t)) != sizeof(index_t))
+            diep(root->indexfile);
+    }
 
     char date[256];
     verbose("[+] index created at: %s\n", index_date(header.created, date, sizeof(date)));
@@ -262,6 +313,7 @@ static size_t index_load_file(index_root_t *root) {
     //
     // anyway, this is only at the boot-time, performance doesn't really matter
     uint8_t idlength;
+    ssize_t ahead;
     index_item_t *entry = NULL;
 
     while(read(root->indexfd, &idlength, sizeof(idlength)) == sizeof(idlength)) {
@@ -273,8 +325,9 @@ static size_t index_load_file(index_root_t *root) {
         // rollback the 1 byte read for the id length
         lseek(root->indexfd, -1, SEEK_CUR);
 
-        if(read(root->indexfd, entry, entrylength) != entrylength) {
-            warnp("cannot populate entry, index looks like currupted");
+        if((ahead = read(root->indexfd, entry, entrylength)) != entrylength) {
+            fprintf(stderr, "[-] index: invalid read during populate, skipping\n");
+            fprintf(stderr, "[-] index: %lu bytes expected, %lu bytes read\n", entrylength, ahead);
             continue;
         }
 
@@ -300,7 +353,12 @@ static void index_set_id(index_root_t *root) {
 
 // open the current filename set on the global struct
 static void index_open_final(index_root_t *root) {
-    if((root->indexfd = open(root->indexfile, O_CREAT | O_RDWR | O_APPEND, 0600)) < 0) {
+    int flags = O_CREAT | O_RDWR | O_APPEND;
+
+    if(index_readonly)
+        flags = O_RDONLY;
+
+    if((root->indexfd = open(root->indexfile, flags, 0600)) < 0) {
         warnp(root->indexfile);
         fprintf(stderr, "[-] could not open index file\n");
         return;
@@ -328,6 +386,13 @@ static void index_load(index_root_t *root) {
             index_set_id(root);
             break;
         }
+    }
+
+    if(index_readonly) {
+        printf("[-] ========================================\n");
+        printf("[-] WARNING: running in read-only mode\n");
+        printf("[-] WARNING: index filesystem is not writable\n");
+        printf("[-] ========================================\n");
     }
 
     // opening the real active index file in append mode
