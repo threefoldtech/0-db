@@ -284,7 +284,7 @@ static int index_try_rootindex(index_root_t *root) {
 // any new index until we don't have new data to add)
 static size_t index_load_file(index_root_t *root) {
     index_t header;
-    size_t length;
+    ssize_t length;
 
     verbose("[+] loading index file: %s\n", root->indexfile);
 
@@ -296,7 +296,8 @@ static size_t index_load_file(index_root_t *root) {
             // we read something, but not the expected header, at least
             // not this amount of data, which is a completly undefined behavior
             // let's just stopping here
-            fprintf(stderr, "[-] index file corrupted or incomplete\n");
+            fprintf(stderr, "[-] index: header corrupted or incomplete\n");
+            fprintf(stderr, "[-] index: expected %lu bytes, %ld read\n", sizeof(index_t), length);
             exit(EXIT_FAILURE);
         }
 
