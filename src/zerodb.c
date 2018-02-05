@@ -26,6 +26,7 @@ settings_t rootsettings = {
     .port = 9900,
     .verbose = 0,
     .dump = 0,
+    .sync = 0,
 };
 
 static struct option long_options[] = {
@@ -34,6 +35,7 @@ static struct option long_options[] = {
     {"listen",  required_argument, 0, 'l'},
     {"port",    required_argument, 0, 'p'},
     {"verbose", no_argument,       0, 'v'},
+    {"sync",    no_argument,       0, 's'},
     {"dump",    no_argument,       0, 'x'},
     {"help",    no_argument,       0, 'h'},
     {0, 0, 0, 0}
@@ -135,8 +137,8 @@ static int proceed(struct settings_t *settings) {
     // this will returns us the id of the index
     // file currently used, this is needed by the data
     // storage to keep files linked (index-0067 <> data-0067)
-    uint16_t indexid = index_init(settings->indexpath, settings->dump);
-    data_init(indexid, settings->datapath);
+    uint16_t indexid = index_init(settings->indexpath, settings->dump, settings->sync);
+    data_init(indexid, settings->datapath, settings->sync);
 
     // main worker point
     redis_listen(settings->listen, settings->port);
@@ -162,6 +164,7 @@ void usage() {
     printf("  --port      listen port (default 9900)\n");
     printf("  --verbose   enable verbose (debug) information\n");
     printf("  --dump      only dump index contents (debug)\n");
+    printf("  --sync      force all write to be sync'd\n");
     printf("  --help      print this message\n");
 
     exit(EXIT_FAILURE);
@@ -207,6 +210,10 @@ int main(int argc, char *argv[]) {
 
             case 'x':
                 settings->dump = 1;
+                break;
+
+            case 's':
+                settings->sync = 1;
                 break;
 
             case 'h':

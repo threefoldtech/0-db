@@ -8,6 +8,7 @@
         int port;
         int verbose;
         int dump;
+        int sync;
 
     } settings_t;
 

@@ -61,6 +61,9 @@ static int index_write(int fd, void *buffer, size_t length) {
         return 0;
     }
 
+    if(rootindex->sync)
+        fsync(fd);
+
     return 1;
 }
 
@@ -654,7 +657,7 @@ void index_destroy() {
 }
 
 // create an index and load files
-uint16_t index_init(char *indexpath, int dump) {
+uint16_t index_init(char *indexpath, int dump, int sync) {
     index_root_t *lroot = malloc(sizeof(index_root_t));
 
     debug("[+] initializing index (%d lazy branches)\n", BUCKET_BRANCHES);
@@ -665,6 +668,7 @@ uint16_t index_init(char *indexpath, int dump) {
     lroot->indexid = 0;
     lroot->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
     lroot->nextentry = 0;
+    lroot->sync = sync;
 
     // commit variable
     rootindex = lroot;

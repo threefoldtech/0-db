@@ -34,6 +34,9 @@ static int data_write(int fd, void *buffer, size_t length) {
         return 0;
     }
 
+    if(rootdata->sync)
+        fsync(fd);
+
     return 1;
 }
 
@@ -210,12 +213,16 @@ void data_destroy() {
     free(rootdata);
 }
 
-void data_init(uint16_t dataid, char *datapath) {
+void data_init(uint16_t dataid, char *datapath, int sync) {
     data_t *lroot = (data_t *) malloc(sizeof(data_t));
 
     lroot->datadir = datapath;
     lroot->datafile = malloc(sizeof(char) * (PATH_MAX + 1));
     lroot->dataid = dataid;
+    lroot->sync = sync;
+
+    // commit variable
+    rootdata = lroot;
 
     data_set_id(lroot);
 
@@ -225,8 +232,6 @@ void data_init(uint16_t dataid, char *datapath) {
     // opening the final file for appending only
     data_open_final(lroot);
 
-    // commit variable
-    rootdata = lroot;
 }
 
 void data_emergency() {

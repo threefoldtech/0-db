@@ -8,6 +8,7 @@
         char *datafile;   // pointer to the current datafile used
         uint16_t dataid;  // id of the datafile currently in use
         int datafd;       // file descriptor of the current datafile used
+        int sync;         // flag to force data write sync
 
     } data_t;
 
@@ -22,7 +23,7 @@
 
     } __attribute__((packed)) data_header_t;
 
-    void data_init(uint16_t dataid, char *datapath);
+    void data_init(uint16_t dataid, char *datapath, int sync);
     void data_destroy();
     size_t data_jump_next();
     void data_emergency();
