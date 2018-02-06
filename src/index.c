@@ -33,17 +33,26 @@
 // the default settings sets this to 24 bits, which allows
 // 16 millions direct entries, collisions uses linked-list
 //
-// if you change this settings, please adapt
-// the mask used on 'index_key_hash' function
-// to avoid any overflow (you need to mask the value with
-// same amount of bits)
-#define BUCKET_BRANCHES (1 << 24)
+// makes sur mask and amount of branch are always in relation
+// use 'index_set_buckets_bits' to be sure
+static uint32_t buckets_branches = (1 << 24);
+static uint32_t buckets_mask = (1 << 24) - 1;
 
 // main global root index state
 static index_root_t *rootindex = NULL;
 
 // allows to works on readonly index (no write allowed)
 static int index_status = INDEX_HEALTHY;
+
+// set buckets length variables in bits
+// WARNING: this doesn't resize anything, you should calls this
+//          only before initialization
+int index_set_buckets_bits(uint8_t bits) {
+    buckets_branches = 1 << bits;
+    buckets_mask = (1 << bits) - 1;
+
+    return buckets_branches;
+}
 
 // force index to be sync'd with underlaying device
 static inline int index_sync(int fd) {
@@ -98,7 +107,7 @@ static int index_write(int fd, void *buffer, size_t length) {
 //
 // index branch
 // this implementation use a lazy load of branches
-// this allows us to use lot of branch (BUCKET_BRANCHES in this case)
+// this allows us to use lot of branch (buckets_branches) in this case)
 // without consuming all the memory if we don't need it
 //
 index_branch_t *index_branch_init(uint32_t branchid) {
@@ -208,7 +217,7 @@ static void index_dump(int fulldump) {
         printf("[+] ===========================\n");
 
     // iterating over each buckets
-    for(int b = 0; b < BUCKET_BRANCHES; b++) {
+    for(uint32_t b = 0; b < buckets_branches; b++) {
         index_branch_t *branch = index_branch_get(b);
 
         // skipping empty branch
@@ -246,7 +255,7 @@ static void index_dump(int fulldump) {
     // overhead contains:
     // - the buffer allocated to hold each (futur) branches pointer
     // - the branch struct itself for each branches
-    size_t overhead = (BUCKET_BRANCHES * sizeof(index_branch_t **)) +
+    size_t overhead = (buckets_branches * sizeof(index_branch_t **)) +
                       (branches * sizeof(index_branch_t));
 
     verbose("[+] memory overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
@@ -536,7 +545,7 @@ static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
     for(; i < idlength; i++)
         hash = _mm_crc32_u8(hash, id[i]);
 
-    return hash & 0xffffff;
+    return hash & buckets_mask;
 }
 
 // main look-up function, used to get an entry from the memory index
@@ -673,7 +682,7 @@ index_entry_t *index_entry_delete(unsigned char *id, uint8_t idlength) {
 
 // clean all opened index related stuff
 void index_destroy() {
-    for(int b = 0; b < BUCKET_BRANCHES; b++)
+    for(uint32_t b = 0; b < buckets_branches; b++)
         index_branch_free(b);
 
     // delete root object
@@ -687,9 +696,9 @@ void index_destroy() {
 uint16_t index_init(settings_t *settings) {
     index_root_t *lroot = malloc(sizeof(index_root_t));
 
-    debug("[+] initializing index (%d lazy branches)\n", BUCKET_BRANCHES);
+    debug("[+] initializing index (%d lazy branches)\n", buckets_branches);
 
-    lroot->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), BUCKET_BRANCHES);
+    lroot->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches);
 
     lroot->indexdir = settings->indexpath;
     lroot->indexid = 0;
