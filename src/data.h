@@ -9,6 +9,8 @@
         uint16_t dataid;  // id of the datafile currently in use
         int datafd;       // file descriptor of the current datafile used
         int sync;         // flag to force data write sync
+        int synctime;     // force to sync data after this timeout (on next write)
+        time_t lastsync;  // keep track when the last sync was explictly made
 
     } data_t;
 
@@ -23,7 +25,7 @@
 
     } __attribute__((packed)) data_header_t;
 
-    void data_init(uint16_t dataid, char *datapath, int sync);
+    void data_init(uint16_t dataid, settings_t *settings);
     void data_destroy();
     size_t data_jump_next();
     void data_emergency();

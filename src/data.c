@@ -10,6 +10,7 @@
 #include <limits.h>
 #include <x86intrin.h>
 #include <errno.h>
+#include <time.h>
 #include "zerodb.h"
 #include "data.h"
 
@@ -18,10 +19,41 @@
 // only changed during initializing and file-swap
 static data_t *rootdata = NULL;
 
+// force to sync data buffer into the underlaying device
+static inline int data_sync(int fd) {
+    fsync(fd);
+    rootdata->lastsync = time(NULL);
+    return 1;
+}
+
+// checking is some sync is forced
+// there is two possibilities:
+// - we set --sync option on runtime, and each write is sync forced
+// - we set --synctime on runtime and after this amount of seconds
+//   we force to sync the last write
+static inline int data_sync_check(int fd) {
+    if(rootdata->sync)
+        return data_sync(fd);
+
+    if(!rootdata->synctime)
+        return 0;
+
+    if((time(NULL) - rootdata->lastsync) > rootdata->synctime) {
+        debug("[+] data: last sync expired, force sync\n");
+        return data_sync(fd);
+    }
+
+    return 0;
+}
+
 // wrap (mostly) all write operation on datafile
 // it's easier to keep a single logic with error handling
 // related to write check
-static int data_write(int fd, void *buffer, size_t length) {
+// this function takes an extra argument 'syncer" which explicitly
+// ask to check if we need to do some sync-check or not
+// this is useful when writing data, we write header then payload
+// and we can avoid to do two sync (only one when done)
+static int data_write(int fd, void *buffer, size_t length, int syncer) {
     ssize_t response;
 
     if((response = write(fd, buffer, length)) < 0) {
@@ -34,8 +66,8 @@ static int data_write(int fd, void *buffer, size_t length) {
         return 0;
     }
 
-    if(rootdata->sync)
-        fsync(fd);
+    if(syncer)
+        data_sync_check(fd);
 
     return 1;
 }
@@ -61,7 +93,7 @@ void data_initialize(char *filename) {
     // anyway, it's important for the implementation to have
     // at least 1 byte already written, we use 0 as error when
     // expecting an offset
-    if(!data_write(fd, "X", 1))
+    if(!data_write(fd, "X", 1, 1))
         diep(filename);
 
     close(fd);
@@ -189,7 +221,7 @@ size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, 
     // data offset will always be >= 1 (see initializer notes)
     // we can use 0 as error detection
 
-    if(!data_write(rootdata->datafd, header, headerlength)) {
+    if(!data_write(rootdata->datafd, header, headerlength, 0)) {
         verbose("[-] data header: write failed\n");
         free(header);
         return 0;
@@ -197,7 +229,7 @@ size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, 
 
     free(header);
 
-    if(!data_write(rootdata->datafd, data, datalength)) {
+    if(!data_write(rootdata->datafd, data, datalength, 1)) {
         verbose("[-] data payload: write failed\n");
         return 0;
     }
@@ -213,13 +245,15 @@ void data_destroy() {
     free(rootdata);
 }
 
-void data_init(uint16_t dataid, char *datapath, int sync) {
+void data_init(uint16_t dataid, settings_t *settings) {
     data_t *lroot = (data_t *) malloc(sizeof(data_t));
 
-    lroot->datadir = datapath;
+    lroot->datadir = settings->datapath;
     lroot->datafile = malloc(sizeof(char) * (PATH_MAX + 1));
     lroot->dataid = dataid;
-    lroot->sync = sync;
+    lroot->sync = settings->sync;
+    lroot->synctime = settings->synctime;
+    lroot->lastsync = 0;
 
     // commit variable
     rootdata = lroot;

@@ -27,17 +27,19 @@ settings_t rootsettings = {
     .verbose = 0,
     .dump = 0,
     .sync = 0,
+    .synctime = 0,
 };
 
 static struct option long_options[] = {
-    {"data",    required_argument, 0, 'd'},
-    {"index",   required_argument, 0, 'i'},
-    {"listen",  required_argument, 0, 'l'},
-    {"port",    required_argument, 0, 'p'},
-    {"verbose", no_argument,       0, 'v'},
-    {"sync",    no_argument,       0, 's'},
-    {"dump",    no_argument,       0, 'x'},
-    {"help",    no_argument,       0, 'h'},
+    {"data",      required_argument, 0, 'd'},
+    {"index",     required_argument, 0, 'i'},
+    {"listen",    required_argument, 0, 'l'},
+    {"port",      required_argument, 0, 'p'},
+    {"verbose",   no_argument,       0, 'v'},
+    {"sync",      no_argument,       0, 's'},
+    {"synctime",  required_argument, 0, 't'},
+    {"dump",      no_argument,       0, 'x'},
+    {"help",      no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
 
@@ -137,8 +139,8 @@ static int proceed(struct settings_t *settings) {
     // this will returns us the id of the index
     // file currently used, this is needed by the data
     // storage to keep files linked (index-0067 <> data-0067)
-    uint16_t indexid = index_init(settings->indexpath, settings->dump, settings->sync);
-    data_init(indexid, settings->datapath, settings->sync);
+    uint16_t indexid = index_init(settings);
+    data_init(indexid, settings);
 
     // main worker point
     redis_listen(settings->listen, settings->port);
@@ -214,6 +216,10 @@ int main(int argc, char *argv[]) {
 
             case 's':
                 settings->sync = 1;
+                break;
+
+            case 't':
+                settings->synctime = atoi(optarg);
                 break;
 
             case 'h':

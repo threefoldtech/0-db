@@ -66,6 +66,8 @@
         uint64_t nextentry; // next-entry is a global id used in sequential mode (next seq-id)
         index_branch_t **branches; // list of branches explained later
         int sync;           // flag to force write sync
+        int synctime;       // force sync index after this amount of time
+        time_t lastsync;    // keep track when the last sync was explictly made
 
     } index_root_t;
 
@@ -81,7 +83,7 @@
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1
 
-    uint16_t index_init(char *indexpath, int dump, int sync);
+    uint16_t index_init(settings_t *settings);
     void index_destroy();
     size_t index_jump_next();
     void index_emergency();

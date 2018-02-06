@@ -45,6 +45,34 @@ static index_root_t *rootindex = NULL;
 // allows to works on readonly index (no write allowed)
 static int index_status = INDEX_HEALTHY;
 
+// force index to be sync'd with underlaying device
+static inline int index_sync(int fd) {
+    fsync(fd);
+    rootindex->lastsync = time(NULL);
+    return 1;
+}
+
+// checking is some sync is forced
+// there is two possibilities:
+// - we set --sync option on runtime, and each write is sync forced
+// - we set --synctime on runtime and after this amount of seconds
+//   we force to sync the last write
+static inline int index_sync_check(int fd) {
+    if(rootindex->sync)
+        return index_sync(fd);
+
+    if(!rootindex->synctime)
+        return 0;
+
+    if((time(NULL) - rootindex->lastsync) > rootindex->synctime) {
+        debug("[+] index: last sync expired, force sync\n");
+        return index_sync(fd);
+    }
+
+    return 0;
+}
+
+
 // wrap (mostly) all write operation on indexfile
 // it's easier to keep a single logic with error handling
 // related to write check
@@ -61,8 +89,7 @@ static int index_write(int fd, void *buffer, size_t length) {
         return 0;
     }
 
-    if(rootindex->sync)
-        fsync(fd);
+    index_sync_check(fd);
 
     return 1;
 }
@@ -657,18 +684,20 @@ void index_destroy() {
 }
 
 // create an index and load files
-uint16_t index_init(char *indexpath, int dump, int sync) {
+uint16_t index_init(settings_t *settings) {
     index_root_t *lroot = malloc(sizeof(index_root_t));
 
     debug("[+] initializing index (%d lazy branches)\n", BUCKET_BRANCHES);
 
     lroot->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), BUCKET_BRANCHES);
 
-    lroot->indexdir = indexpath;
+    lroot->indexdir = settings->indexpath;
     lroot->indexid = 0;
     lroot->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
     lroot->nextentry = 0;
-    lroot->sync = sync;
+    lroot->sync = settings->sync;
+    lroot->synctime = settings->synctime;
+    lroot->lastsync = 0;
 
     // commit variable
     rootindex = lroot;
@@ -677,7 +706,7 @@ uint16_t index_init(char *indexpath, int dump, int sync) {
     transition = malloc(sizeof(index_item_t) + 256);
 
     index_load(lroot);
-    index_dump(dump);
+    index_dump(settings->dump);
 
     return lroot->indexid;
 }
