@@ -33,10 +33,20 @@
 
     } resp_request_t;
 
+    typedef struct redis_handler_t {
+        int mainfd;  // main socket handler
+        int evfd;    // event handler (epoll, kqueue, ...)
+
+    } redis_handler_t;
+
     int redis_listen(char *listenaddr, int port);
     int redis_dispatcher(resp_request_t *request);
     int redis_response(int fd);
 
     void socket_nonblock(int fd);
     void socket_block(int fd);
+
+    // abstract handler implemented by a plateform dependent
+    // code (see socket_epoll, socket_kqueue, ...)
+    int socket_handler(redis_handler_t *handler);
 #endif

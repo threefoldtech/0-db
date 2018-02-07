@@ -6,33 +6,33 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-// this implementation is only used on linux
-#ifdef __linux__
+// this implementation is used on macos and freebsd
+#ifdef __APPLE__
 
-#include <sys/epoll.h>
+#include <sys/event.h>
 #include "redis.h"
 #include "zerodb.h"
 
 #define MAXEVENTS 64
+struct kevent evset;
 
-static int socket_event(struct epoll_event *events, int notified, redis_handler_t *redis) {
-    struct epoll_event *ev;
+static int socket_event(struct kevent *events, int notified, redis_handler_t *redis) {
+    struct kevent *ev;
 
     for(int i = 0; i < notified; i++) {
         ev = events + i;
 
-        // epoll issue
-        // discarding this client
-        if((ev->events & EPOLLERR) || (ev->events & EPOLLHUP) || (!(ev->events & EPOLLIN))) {
-            warnp("epoll");
-            close(ev->data.fd);
+        if(ev->flags & EV_EOF) {
+            EV_SET(&evset, ev->ident, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+
+            if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1)
+                diep("kevent");
+
+            close(ev->ident);
 
             continue;
-        }
 
-        // main socket event: we have a new client
-        // creating the new client and accepting it
-        if(ev->data.fd == redis->mainfd) {
+        } else if((int) ev->ident == redis->mainfd) {
             int clientfd;
             char *clientip;
             struct sockaddr_in addr_client;
@@ -46,18 +46,11 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             socket_nonblock(clientfd);
 
             clientip = inet_ntoa(addr_client.sin_addr);
-            verbose("[+] incoming connection from %s\n", clientip);
+            verbose("[+] incoming connection from %s (socket %d)\n", clientip, clientfd);
 
-            // adding client to the epoll list
-            struct epoll_event event;
-
-            memset(&event, 0, sizeof(struct epoll_event));
-
-            event.data.fd = clientfd;
-            event.events = EPOLLIN;
-
-            if(epoll_ctl(redis->evfd, EPOLL_CTL_ADD, clientfd, &event) < 0)
-                warnp("epoll_ctl");
+            EV_SET(&evset, clientfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+            if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1)
+                diep("kevent");
 
             continue;
         }
@@ -70,18 +63,18 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
         // basicly here is one security issue, a client could
         // potentially lock the daemon by starting a command and not complete it
         //
-        socket_block(ev->data.fd);
+        socket_block(ev->ident);
 
         // dispatching client event
-        int ctrl = redis_response(ev->data.fd);
+        int ctrl = redis_response(ev->ident);
 
         // client error, we discard it
         if(ctrl == 3) {
-            close(ev->data.fd);
+            close(ev->ident);
             continue;
         }
 
-        socket_nonblock(ev->data.fd);
+        socket_nonblock(ev->ident);
 
         // dirty way the STOP event is handled
         if(ctrl == 2) {
@@ -95,37 +88,28 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 }
 
 int socket_handler(redis_handler_t *handler) {
-    struct epoll_event event;
-    struct epoll_event *events = NULL;
-
     // initialize empty struct
-    memset(&event, 0, sizeof(struct epoll_event));
+    EV_SET(&evset, handler->mainfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
 
-    if((handler->evfd = epoll_create1(0)) < 0)
-        diep("epoll_create1");
+    if((handler->evfd = kqueue()) < 0)
+        diep("kqueue");
 
-    event.data.fd = handler->mainfd;
-    event.events = EPOLLIN;
-
-    if(epoll_ctl(handler->evfd, EPOLL_CTL_ADD, handler->mainfd, &event) < 0)
-        diep("epoll_ctl");
-
-    events = calloc(MAXEVENTS, sizeof event);
+    if(kevent(handler->evfd, &evset, 1, NULL, 0, NULL) == -1)
+        diep("kevent");
 
     // waiting for clients
     // this is how we supports multi-client using a single thread
     // note that, we will only proceed one request at a time
     // allows multiple client to be connected
+    struct kevent evlist[MAXEVENTS];
 
     while(1) {
-        int n = epoll_wait(handler->evfd, events, MAXEVENTS, -1);
-        if(socket_event(events, n, handler) == 1) {
-            free(events);
+        int n = kevent(handler->evfd, NULL, 0, evlist, MAXEVENTS, NULL);
+        if(socket_event(evlist, n, handler) == 1)
             return 1;
-        }
     }
 
     return 0;
 }
 
-#endif // __linux__
+#endif // __APPLE__
