@@ -3,7 +3,9 @@
 makes data persistant inside an always append index/datafile
 
 # Build and restriction
-For now, only Linux (using `epoll`) is supported. To build the code, just type `make`.
+For now, only Linux (using `epoll`) and MacOS X/FreeBSD (kqueue) are supported.
+
+To build the code, just type `make`.
 
 The binary will be on the `src/zdb`. No dependencies (except a default compiler) are needed.
 
