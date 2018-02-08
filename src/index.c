@@ -394,10 +394,10 @@ static size_t index_load_file(index_root_t *root) {
     verbose("[+] index last open: %s\n", index_date(header.opened, date, sizeof(date)));
 
     if(header.mode != rootsettings.mode) {
-        printf("[-] ========================================\n");
-        printf("[-] WARNING: index created in another mode than running mode\n");
-        printf("[-] WARNING: unexpected result could occures, be careful\n");
-        printf("[-] ========================================\n");
+        danger("[!] ========================================================");
+        danger("[!] DANGER: index created in another mode than running mode");
+        danger("[!] DANGER: unexpected result could occures, be careful");
+        danger("[!] ========================================================");
     }
 
     printf("[+] populating index: %s\n", root->indexfile);
@@ -495,20 +495,20 @@ static void index_load(index_root_t *root) {
     }
 
     if(index_status & INDEX_READ_ONLY) {
-        printf("[-] ========================================\n");
-        printf("[-] WARNING: running in read-only mode\n");
-        printf("[-] WARNING: index filesystem is not writable\n");
-        printf("[-] ========================================\n");
+        warning("[-] ========================================================");
+        warning("[-] WARNING: running in read-only mode");
+        warning("[-] WARNING: index filesystem is not writable");
+        warning("[-] ========================================================");
     }
 
     if(index_status & INDEX_DEGRADED) {
-        printf("[-] ========================================\n");
-        printf("[-] WARNING: index degraded (read errors)\n");
-        printf("[-] ========================================\n");
+        warning("[-] ========================================================");
+        warning("[-] WARNING: index degraded (read errors)");
+        warning("[-] ========================================================");
     }
 
     if(index_status & INDEX_HEALTHY)
-        verbose("[+] index healthy\n");
+        success("[+] index healthy");
 
     // setting index as loaded (removing flag)
     index_status &= ~INDEX_NOT_LOADED;

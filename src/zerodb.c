@@ -206,7 +206,7 @@ void usage() {
 // main entry: processing arguments
 //
 int main(int argc, char *argv[]) {
-    printf("[*] Zero-DB (0-db), unstable version\n");
+    notice("[*] Zero-DB (0-db), unstable version");
 
     settings_t *settings = &rootsettings;
     int option_index = 0;

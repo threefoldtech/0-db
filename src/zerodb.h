@@ -55,6 +55,11 @@
 
     #define verbose(...) { if(rootsettings.verbose) { printf(__VA_ARGS__); } }
 
+    #define danger(fmt, ...) { printf("\033[31;1m" fmt "\033[0m\n", ##__VA_ARGS__); }
+    #define warning(fmt, ...) { printf("\033[33;1m" fmt "\033[0m\n", ##__VA_ARGS__); }
+    #define success(fmt, ...) { printf("\033[32;1m" fmt "\033[0m\n", ##__VA_ARGS__); }
+    #define notice(fmt, ...) { printf("\033[36;1m" fmt "\033[0m\n", ##__VA_ARGS__); }
+
     #ifndef RELEASE
         #define debug(...) { printf(__VA_ARGS__); }
         #define debughex(...) { hexdump(__VA_ARGS__); }

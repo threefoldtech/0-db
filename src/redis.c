@@ -547,7 +547,7 @@ int redis_listen(char *listenaddr, int port) {
     if(listen(redis.mainfd, SOMAXCONN) == -1)
         diep("listen");
 
-    printf("[+] listening on %s:%d\n", listenaddr, port);
+    success("[+] listening on %s:%d", listenaddr, port);
 
     // entering the worker loop
     return socket_handler(&redis);
