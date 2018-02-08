@@ -39,6 +39,13 @@
 
     } redis_handler_t;
 
+    typedef struct redis_bulk_t {
+        size_t length;
+        size_t writer;
+        unsigned char *buffer;
+
+    } redis_bulk_t;
+
     int redis_listen(char *listenaddr, int port);
     int redis_dispatcher(resp_request_t *request);
     int redis_response(int fd);

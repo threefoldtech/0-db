@@ -17,6 +17,41 @@
 
 static int yes = 1;
 
+static void redis_bulk_append(redis_bulk_t *bulk, void *data, size_t length) {
+    memcpy(bulk->buffer + bulk->writer, data, length);
+    bulk->writer += length;
+}
+
+static redis_bulk_t redis_bulk(unsigned char *buffer, size_t length) {
+    redis_bulk_t bulk = {
+        .length = 0,
+        .writer = 0
+    };
+
+    // convert length to string
+    char strsize[64];
+    size_t stroffset = sprintf(strsize, "%zu", length);
+
+    // build response:
+    // 1) $             -- bulk response
+    // 2) (length-str)  -- response length (in string)
+    // 3) \r\n          -- CRLF
+    // 4) (payload)     -- binary payload
+    // 5) \r\n          -- CRLF
+    //
+    bulk.length = 1 + stroffset + 2 + length + 2;
+    bulk.buffer = malloc(bulk.length);
+
+    // build redis response
+    redis_bulk_append(&bulk, "$", 1);
+    redis_bulk_append(&bulk, strsize, stroffset);
+    redis_bulk_append(&bulk, "\r\n", 2);
+    redis_bulk_append(&bulk, buffer, length);
+    redis_bulk_append(&bulk, "\r\n", 2);
+
+    return bulk;
+}
+
 // main worker when a redis command was successfuly parsed
 int redis_dispatcher(resp_request_t *request) {
     if(request->argv[0]->type != STRING) {
@@ -38,7 +73,7 @@ int redis_dispatcher(resp_request_t *request) {
             return 1;
         }
 
-        if(request->argv[1]->length > 255) {
+        if(request->argv[1]->length > MAX_KEY_LENGTH) {
             redis_hardsend(request->fd, "-Key too large");
             return 1;
         }
@@ -66,7 +101,10 @@ int redis_dispatcher(resp_request_t *request) {
             return 0;
         }
 
-        debug("[+] userkey: %.*s\n", idlength, id);
+        debug("[+] userkey: ");
+        debughex(id, idlength);
+        debug("\n");
+
         debug("[+] data insertion offset: %lu\n", offset);
 
         // inserting this offset with the id on the index
@@ -81,10 +119,10 @@ int redis_dispatcher(resp_request_t *request) {
         // OK or Error when inserting a key, we reply with the key itself
         //
         // this is how the sequential-id can returns the id generated
-        char response[MAX_KEY_LENGTH + 8];
-        sprintf(response, "+%.*s\r\n", idlength, id);
-        send(request->fd, response, strlen(response), 0);
+        redis_bulk_t response = redis_bulk(id, idlength);
+        send(request->fd, response.buffer, response.length, 0);
 
+        free(response.buffer);
         // checking if we need to jump to the next files
         // we do this check here and not from data (event if this is like a
         // datafile event) to keep data and index code completly distinct
@@ -104,7 +142,9 @@ int redis_dispatcher(resp_request_t *request) {
             return 1;
         }
 
-        debug("[+] lookup key: %.*s\n", request->argv[1]->length, (char *) request->argv[1]->buffer);
+        debug("[+] lookup key: ");
+        debughex(request->argv[1]->buffer, request->argv[1]->length);
+        debug("\n");
 
         index_entry_t *entry = index_entry_get(request->argv[1]->buffer, request->argv[1]->length);
 
@@ -126,12 +166,6 @@ int redis_dispatcher(resp_request_t *request) {
         debug("[+] entry found, flags: %x, data length: %" PRIu64 "\n", entry->flags, entry->length);
         debug("[+] data file: %d, data offset: %" PRIu64 "\n", entry->dataid, entry->offset);
 
-        // convert data length integer to string
-        char strsize[64];
-        size_t stroffset = sprintf(strsize, "%" PRIu64, entry->length);
-
-        // $(xx)\r\n + (payload) + \r\n
-        size_t total = 1 + stroffset + 2 + entry->length + 2;
         unsigned char *payload = data_get(entry->offset, entry->length, entry->dataid, entry->idlength);
 
         if(!payload) {
@@ -141,20 +175,10 @@ int redis_dispatcher(resp_request_t *request) {
             return 0;
         }
 
-        char *response = malloc(total);
+        redis_bulk_t response = redis_bulk(payload, entry->length);
+        send(request->fd, response.buffer, response.length, 0);
 
-        // build redis response
-        strcpy(response, "$");
-        strcat(response, strsize);
-        strcat(response, "\r\n");
-
-        // appending to response (stroffset + 3 for skipping already written)
-        memcpy(response + stroffset + 3, payload, entry->length);
-        memcpy(response + total - 2, "\r\n", 2);
-
-        send(request->fd, response, total, 0);
-
-        free(response);
+        free(response.buffer);
         free(payload);
 
         return 0;
