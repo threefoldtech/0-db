@@ -1,6 +1,18 @@
 #ifndef __ZDB_H
     #define __ZDB_H
 
+    typedef enum db_mode_t {
+        // default key-value store
+        KEYVALUE,
+
+        // auto-generated sequential id
+        SEQUENTIAL,
+
+        // id is hard-fixed data position
+        HARDBLOCK,
+
+    } db_mode_t;
+
     typedef struct settings_t {
         char *datapath;   // path where data files will be written
         char *indexpath;  // path where index files will be written
@@ -10,6 +22,7 @@
         int dump;         // ask to dump index on the load-time
         int sync;         // force to sync each write
         int synctime;     // force to sync writes after this amount of seconds
+        db_mode_t mode;   // running mode
 
         // the synctime can be useful to add basic security without killing
         // performance

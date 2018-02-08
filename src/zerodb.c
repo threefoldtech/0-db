@@ -28,6 +28,7 @@ settings_t rootsettings = {
     .dump = 0,
     .sync = 0,
     .synctime = 0,
+    .mode = KEYVALUE,
 };
 
 static struct option long_options[] = {
@@ -39,8 +40,15 @@ static struct option long_options[] = {
     {"sync",      no_argument,       0, 's'},
     {"synctime",  required_argument, 0, 't'},
     {"dump",      no_argument,       0, 'x'},
+    {"sequence",  no_argument,       0, 'q'},
     {"help",      no_argument,       0, 'h'},
     {0, 0, 0, 0}
+};
+
+static char *modes[] = {
+    "default key-value",
+    "sequential keys",
+    "hardcoded blocks position",
 };
 
 //
@@ -222,6 +230,10 @@ int main(int argc, char *argv[]) {
                 settings->synctime = atoi(optarg);
                 break;
 
+            case 'q':
+                settings->mode = SEQUENTIAL;
+                break;
+
             case 'h':
                 usage();
 
@@ -230,6 +242,8 @@ int main(int argc, char *argv[]) {
                exit(EXIT_FAILURE);
         }
     }
+
+    printf("[+] running mode: %s\n", modes[settings->mode]);
 
     if(!dir_exists(settings->datapath)) {
         verbose("[+] creating datapath: %s\n", settings->datapath);
