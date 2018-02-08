@@ -11,6 +11,7 @@
         uint64_t created;  // unix timestamp of creation time
         uint64_t opened;   // unix timestamp of last opened time
         uint16_t fileid;   // current index file id (sync with dataid)
+        uint8_t mode;      // running mode when index was created
 
     } __attribute__((packed)) index_t;
 
@@ -63,7 +64,7 @@
         char *indexfile;    // current index filename in use
         uint16_t indexid;   // current index file id in use (sync with data id)
         int indexfd;        // current file descriptor used
-        uint64_t nextentry; // next-entry is a global id used in sequential mode (next seq-id)
+        uint32_t nextentry; // next-entry is a global id used in sequential mode (next seq-id)
         index_branch_t **branches; // list of branches explained later
         int sync;           // flag to force write sync
         int synctime;       // force sync index after this amount of time
@@ -91,7 +92,7 @@
     uint64_t index_next_id();
 
     index_entry_t *index_entry_get(unsigned char *id, uint8_t length);
-    index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t offset, size_t length);
+    index_entry_t *index_entry_insert(void *vid, uint8_t idlength, size_t offset, size_t length);
     index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags);
     index_entry_t *index_entry_delete(unsigned char *id, uint8_t length);
 #endif

@@ -22,7 +22,8 @@ static void redis_bulk_append(redis_bulk_t *bulk, void *data, size_t length) {
     bulk->writer += length;
 }
 
-static redis_bulk_t redis_bulk(unsigned char *buffer, size_t length) {
+static redis_bulk_t redis_bulk(void *payload, size_t length) {
+    unsigned char *buffer = (unsigned char *) payload;
     redis_bulk_t bulk = {
         .length = 0,
         .writer = 0,
@@ -56,6 +57,134 @@ static redis_bulk_t redis_bulk(unsigned char *buffer, size_t length) {
     return bulk;
 }
 
+//
+// different SET implementation
+// depending on the running mode
+//
+size_t redis_set_handler_userkey(resp_request_t *request) {
+    // create some easier accessor
+    unsigned char *id = request->argv[1]->buffer;
+    uint8_t idlength = request->argv[1]->length;
+
+    unsigned char *value = request->argv[2]->buffer;
+    uint32_t valuelength = request->argv[2]->length;
+
+    debug("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
+    // printf("[+] set key: %.*s\n", idlength, id);
+    // printf("[+] set value: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
+
+    // insert the data on the datafile
+    // this will returns us the offset where the header is
+    size_t offset = data_insert(value, valuelength, id, idlength);
+
+    // checking for writing error
+    // if we couldn't write the data, we won't add entry on the index
+    // and report to the client an error
+    if(offset == 0) {
+        redis_hardsend(request->fd, "$-1");
+        return 0;
+    }
+
+    debug("[+] userkey: ");
+    debughex(id, idlength);
+    debug("\n");
+
+    debug("[+] data insertion offset: %lu\n", offset);
+
+    // inserting this offset with the id on the index
+    if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
+        // cannot insert index (disk issue)
+        redis_hardsend(request->fd, "$-1");
+        return 0;
+    }
+
+    // building response
+    // here, from original redis protocol, we don't reply with a basic
+    // OK or Error when inserting a key, we reply with the key itself
+    //
+    // this is how the sequential-id can returns the id generated
+    redis_bulk_t response = redis_bulk(id, idlength);
+    if(!response.buffer) {
+        redis_hardsend(request->fd, "$-1");
+        return 0;
+    }
+
+    send(request->fd, response.buffer, response.length, 0);
+    free(response.buffer);
+
+    return offset;
+}
+
+size_t redis_set_handler_sequential(resp_request_t *request) {
+    // create some easier accessor
+    uint32_t id = index_next_id();
+    uint8_t idlength = sizeof(uint32_t);
+
+    unsigned char *value = request->argv[2]->buffer;
+    uint32_t valuelength = request->argv[2]->length;
+
+    debug("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
+    // printf("[+] set key: %.*s\n", idlength, id);
+    // printf("[+] set value: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
+
+    // insert the data on the datafile
+    // this will returns us the offset where the header is
+    // size_t offset = data_insert(value, valuelength, id, idlength);
+    size_t offset = data_insert(value, valuelength, &id, idlength);
+
+    // checking for writing error
+    // if we couldn't write the data, we won't add entry on the index
+    // and report to the client an error
+    if(offset == 0) {
+        redis_hardsend(request->fd, "$-1");
+        return 0;
+    }
+
+    debug("[+] generated key: ");
+    debughex(&id, idlength);
+    debug("\n");
+
+    debug("[+] data insertion offset: %lu\n", offset);
+
+    // inserting this offset with the id on the index
+    // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
+    if(!index_entry_insert(&id, idlength, offset, request->argv[2]->length)) {
+        // cannot insert index (disk issue)
+        redis_hardsend(request->fd, "$-1");
+        return 0;
+    }
+
+    // building response
+    // here, from original redis protocol, we don't reply with a basic
+    // OK or Error when inserting a key, we reply with the key itself
+    //
+    // this is how the sequential-id can returns the id generated
+    // redis_bulk_t response = redis_bulk(id, idlength);
+    redis_bulk_t response = redis_bulk(&id, idlength);
+    if(!response.buffer) {
+        redis_hardsend(request->fd, "$-1");
+        return 0;
+    }
+
+    send(request->fd, response.buffer, response.length, 0);
+    free(response.buffer);
+
+    return offset;
+}
+
+size_t redis_set_handler_test(resp_request_t *request) {
+    (void) request;
+    printf("NOOP\n");
+
+    return 0;
+}
+
+size_t (*redis_set_handlers[])(resp_request_t *request) = {
+    redis_set_handler_userkey,
+    redis_set_handler_sequential,
+    redis_set_handler_test
+};
+
 // main worker when a redis command was successfuly parsed
 int redis_dispatcher(resp_request_t *request) {
     if(request->argv[0]->type != STRING) {
@@ -82,6 +211,11 @@ int redis_dispatcher(resp_request_t *request) {
             return 1;
         }
 
+        size_t offset = redis_set_handlers[rootsettings.mode](request);
+        if(offset == 0)
+            return 0;
+
+#if 0
         // create some easier accessor
         unsigned char *id = request->argv[1]->buffer;
         uint8_t idlength = request->argv[1]->length;
@@ -89,13 +223,17 @@ int redis_dispatcher(resp_request_t *request) {
         unsigned char *value = request->argv[2]->buffer;
         uint32_t valuelength = request->argv[2]->length;
 
+        idlength = sizeof(uint32_t);
+        uint32_t thisid = index_next_id();
+
         debug("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
         // printf("[+] set key: %.*s\n", idlength, id);
         // printf("[+] set value: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
 
         // insert the data on the datafile
         // this will returns us the offset where the header is
-        size_t offset = data_insert(value, valuelength, id, idlength);
+        // size_t offset = data_insert(value, valuelength, id, idlength);
+        size_t offset = data_insert(value, valuelength, &thisid, idlength);
 
         // checking for writing error
         // if we couldn't write the data, we won't add entry on the index
@@ -106,13 +244,15 @@ int redis_dispatcher(resp_request_t *request) {
         }
 
         debug("[+] userkey: ");
-        debughex(id, idlength);
+        // debughex(id, idlength);
+        debughex(&thisid, idlength);
         debug("\n");
 
         debug("[+] data insertion offset: %lu\n", offset);
 
         // inserting this offset with the id on the index
-        if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
+        // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
+        if(!index_entry_insert(&thisid, idlength, offset, request->argv[2]->length)) {
             // cannot insert index (disk issue)
             redis_hardsend(request->fd, "$-1");
             return 0;
@@ -123,7 +263,8 @@ int redis_dispatcher(resp_request_t *request) {
         // OK or Error when inserting a key, we reply with the key itself
         //
         // this is how the sequential-id can returns the id generated
-        redis_bulk_t response = redis_bulk(id, idlength);
+        // redis_bulk_t response = redis_bulk(id, idlength);
+        redis_bulk_t response = redis_bulk(&thisid, idlength);
         if(!response.buffer) {
             redis_hardsend(request->fd, "$-1");
             return 0;
@@ -131,6 +272,7 @@ int redis_dispatcher(resp_request_t *request) {
 
         send(request->fd, response.buffer, response.length, 0);
         free(response.buffer);
+#endif
 
         // checking if we need to jump to the next files
         // we do this check here and not from data (event if this is like a

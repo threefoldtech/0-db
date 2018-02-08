@@ -31,5 +31,5 @@
     void data_emergency();
 
     unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t idlength);
-    size_t data_insert(unsigned char *data, uint32_t datalength, unsigned char *id, uint8_t idlength);
+    size_t data_insert(unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength);
 #endif

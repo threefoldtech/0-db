@@ -82,7 +82,8 @@ void dir_create(char *path) {
 // debug tools
 static char __hex[] = "0123456789abcdef";
 
-void hexdump(unsigned char *buffer, size_t length) {
+void hexdump(void *input, size_t length) {
+    unsigned char *buffer = (unsigned char *) input;
     char *output = calloc((length * 2) + 1, 1);
     char *writer = output;
 
@@ -146,9 +147,8 @@ static void sighandler(int signal) {
 
             if(index_emergency()) {
                 printf("[+] flushing data\n");
-                // only flusing data if index flush
-                // was accepted, if index deny it
-                // we are probably in an initializing stage
+                // only flusing data if index flush was accepted
+                // if index flush returns 0, we are probably in an initializing stage
                 data_emergency();
             }
 

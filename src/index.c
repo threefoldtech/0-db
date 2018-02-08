@@ -199,8 +199,9 @@ static char *index_date(uint32_t epoch, char *target, size_t length) {
 }
 
 static inline void index_dump_entry(index_entry_t *entry) {
-    printf("[+] key %.*s: ", entry->idlength, entry->id);
-    printf("offset %" PRIu64 ", length: %" PRIu64 "\n", entry->offset, entry->length);
+    printf("[+] key [");
+    hexdump(entry->id, entry->idlength);
+    printf("] offset %" PRIu64 ", length: %" PRIu64 "\n", entry->offset, entry->length);
 }
 
 // dumps the current index load
@@ -271,6 +272,7 @@ static index_t index_initialize(int fd, uint16_t indexid) {
     header.created = time(NULL);
     header.fileid = indexid;
     header.opened = time(NULL);
+    header.mode = rootsettings.mode;
 
     if(!index_write(fd, &header, sizeof(index_t)))
         diep("index_initialize: write");
@@ -391,6 +393,13 @@ static size_t index_load_file(index_root_t *root) {
     verbose("[+] index created at: %s\n", index_date(header.created, date, sizeof(date)));
     verbose("[+] index last open: %s\n", index_date(header.opened, date, sizeof(date)));
 
+    if(header.mode != rootsettings.mode) {
+        printf("[-] ========================================\n");
+        printf("[-] WARNING: index created in another mode than running mode\n");
+        printf("[-] WARNING: unexpected result could occures, be careful\n");
+        printf("[-] ========================================\n");
+    }
+
     printf("[+] populating index: %s\n", root->indexfile);
 
     // reading the index, populating memory
@@ -431,6 +440,7 @@ static size_t index_load_file(index_root_t *root) {
         // this allows us to keep a generic way of inserting data and keeping a
         // single point of logic when adding data (logic for overwrite, resize bucket, ...)
         index_entry_insert_memory(entry->id, entry->idlength, entry->offset, entry->length, entry->flags);
+        root->nextentry += 1;
     }
 
     free(entry);
@@ -619,7 +629,8 @@ static index_item_t *transition = NULL;
 // and the on-disk version is appended anyway, when reloading the index
 // we call the same sets of function which overwrite existing key, we
 // will always have the last version in memory
-index_entry_t *index_entry_insert(unsigned char *id, uint8_t idlength, size_t offset, size_t length) {
+index_entry_t *index_entry_insert(void *vid, uint8_t idlength, size_t offset, size_t length) {
+    unsigned char *id = (unsigned char *) vid;
     index_entry_t *entry = NULL;
 
     if(!(entry = index_entry_insert_memory(id, idlength, offset, length, 0)))
