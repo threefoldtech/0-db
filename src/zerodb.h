@@ -51,6 +51,8 @@
 
     } settings_t;
 
+    void hexdump(unsigned char *buffer, size_t length);
+
     #define verbose(...) { if(rootsettings.verbose) { printf(__VA_ARGS__); } }
 
     #ifndef RELEASE

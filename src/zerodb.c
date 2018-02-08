@@ -79,6 +79,22 @@ void dir_create(char *path) {
     mkdir(tmp, S_IRWXU);
 }
 
+// debug tools
+static char __hex[] = "0123456789abcdef";
+
+void hexdump(unsigned char *buffer, size_t length) {
+    char *output = calloc((length * 2) + 1, 1);
+    char *writer = output;
+
+    for(unsigned int i = 0, j = 0; i < length; i++, j += 2) {
+        *writer++ = __hex[(buffer[i] & 0xF0) >> 4];
+        *writer++ = __hex[buffer[i] & 0x0F];
+    }
+
+    printf("0x%s", output);
+    free(output);
+}
+
 //
 // global warning and fatal message
 //
