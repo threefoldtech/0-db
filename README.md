@@ -2,14 +2,24 @@
 0-db is a simple implementation of a key-value store redis-protocol compatible which
 makes data persistant inside an always append index/datafile
 
-# Build and restriction
-For now, only Linux (using `epoll`) and MacOS X/FreeBSD (kqueue) are supported.
+# Build targets
+Currently supported system:
+* Linux (using `epoll`)
+* MacOS / FreeBSD (using `kqueue`)
 
-To build the code, just type `make`.
+Currently supported hardware:
+* Any Intel processor supporting `SSE 4.2`
 
-The binary will be on the `src/zdb`. No dependencies (except a default compiler) are needed.
+This project won't compile on something else, for now.
 
-Note, for now you **NEED** Intel SSE4.2 available to compile and run this project.
+# Build instructions
+To build the project (server, tools):
+* Type `make` on the root directory
+* The binaries will be placed on `bin/` directory
+
+You can build each parts separatly by running `make` in each separated directories.
+
+> By default, the code is compiled in debug mode, in order to use it in production, please use `make release`
 
 # Implementation
 This project doesn't rely on any dependencies, it's from scratch.
@@ -62,5 +72,7 @@ This mode is not possible if you don't have any data/index already available.
 - `GET key`
 - `DEL key`
 - `STOP` (used only for debugging, to check memory leaks)
+
+`SET`, `GET` and `DEL` supports binary keys.
 
 > Compared to real redis protocol, during a `SET`, the key is returned as response.
