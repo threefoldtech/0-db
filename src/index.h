@@ -76,9 +76,10 @@
 
     // index status flags
     // keep some heatly status of the index
-    #define INDEX_HEALTHY    1       // no issue detected
-    #define INDEX_READ_ONLY  1 << 1  // index filesystem is read-only
-    #define INDEX_DEGRADED   1 << 2  // some error occured during index loads
+    #define INDEX_NOT_LOADED 1       // index not initialized yet
+    #define INDEX_HEALTHY    1 << 1  // no issue detected
+    #define INDEX_READ_ONLY  1 << 2  // index filesystem is read-only
+    #define INDEX_DEGRADED   1 << 3  // some error occured during index loads
 
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1
@@ -86,7 +87,7 @@
     uint16_t index_init(settings_t *settings);
     void index_destroy();
     size_t index_jump_next();
-    void index_emergency();
+    int index_emergency();
     uint64_t index_next_id();
 
     index_entry_t *index_entry_get(unsigned char *id, uint8_t length);

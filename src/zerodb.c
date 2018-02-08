@@ -142,9 +142,15 @@ static void sighandler(int signal) {
             // which will try to save and flush buffers
 
         case SIGINT:
-            printf("\n[+] flushing index and data\n");
-            index_emergency();
-            data_emergency();
+            printf("\n[+] flushing index\n");
+
+            if(index_emergency()) {
+                printf("[+] flushing data\n");
+                // only flusing data if index flush
+                // was accepted, if index deny it
+                // we are probably in an initializing stage
+                data_emergency();
+            }
 
         break;
     }

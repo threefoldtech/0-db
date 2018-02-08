@@ -42,7 +42,7 @@ static uint32_t buckets_mask = (1 << 24) - 1;
 static index_root_t *rootindex = NULL;
 
 // allows to works on readonly index (no write allowed)
-static int index_status = INDEX_HEALTHY;
+static int index_status = INDEX_NOT_LOADED;
 
 // set buckets length variables in bits
 // WARNING: this doesn't resize anything, you should calls this
@@ -500,6 +500,9 @@ static void index_load(index_root_t *root) {
     if(index_status & INDEX_HEALTHY)
         verbose("[+] index healthy\n");
 
+    // setting index as loaded (removing flag)
+    index_status &= ~INDEX_NOT_LOADED;
+
     // opening the real active index file in append mode
     index_open_final(root);
 }
@@ -720,6 +723,11 @@ uint16_t index_init(settings_t *settings) {
     return lroot->indexid;
 }
 
-void index_emergency() {
+int index_emergency() {
+    // skipping building index stage
+    if(index_status & INDEX_NOT_LOADED)
+        return 0;
+
     fsync(rootindex->indexfd);
+    return 1;
 }
