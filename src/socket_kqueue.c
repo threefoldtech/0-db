@@ -88,6 +88,8 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
 }
 
 int socket_handler(redis_handler_t *handler) {
+    struct kevent evlist[MAXEVENTS];
+
     // initialize empty struct
     EV_SET(&evset, handler->mainfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
 
@@ -101,7 +103,6 @@ int socket_handler(redis_handler_t *handler) {
     // this is how we supports multi-client using a single thread
     // note that, we will only proceed one request at a time
     // allows multiple client to be connected
-    struct kevent evlist[MAXEVENTS];
 
     while(1) {
         int n = kevent(handler->evfd, NULL, 0, evlist, MAXEVENTS, NULL);
