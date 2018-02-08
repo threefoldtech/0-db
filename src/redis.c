@@ -25,7 +25,8 @@ static void redis_bulk_append(redis_bulk_t *bulk, void *data, size_t length) {
 static redis_bulk_t redis_bulk(unsigned char *buffer, size_t length) {
     redis_bulk_t bulk = {
         .length = 0,
-        .writer = 0
+        .writer = 0,
+        .buffer = NULL,
     };
 
     // convert length to string
@@ -40,7 +41,10 @@ static redis_bulk_t redis_bulk(unsigned char *buffer, size_t length) {
     // 5) \r\n          -- CRLF
     //
     bulk.length = 1 + stroffset + 2 + length + 2;
-    bulk.buffer = malloc(bulk.length);
+    if(!(bulk.buffer = malloc(bulk.length))) {
+        warnp("bulk malloc");
+        return bulk;
+    }
 
     // build redis response
     redis_bulk_append(&bulk, "$", 1);
@@ -120,9 +124,14 @@ int redis_dispatcher(resp_request_t *request) {
         //
         // this is how the sequential-id can returns the id generated
         redis_bulk_t response = redis_bulk(id, idlength);
-        send(request->fd, response.buffer, response.length, 0);
+        if(!response.buffer) {
+            redis_hardsend(request->fd, "$-1");
+            return 0;
+        }
 
+        send(request->fd, response.buffer, response.length, 0);
         free(response.buffer);
+
         // checking if we need to jump to the next files
         // we do this check here and not from data (event if this is like a
         // datafile event) to keep data and index code completly distinct
@@ -176,6 +185,11 @@ int redis_dispatcher(resp_request_t *request) {
         }
 
         redis_bulk_t response = redis_bulk(payload, entry->length);
+        if(!response.buffer) {
+            redis_hardsend(request->fd, "$-1");
+            return 0;
+        }
+
         send(request->fd, response.buffer, response.length, 0);
 
         free(response.buffer);
