@@ -8,6 +8,7 @@
 #include <string.h>
 #include <x86intrin.h>
 #include <sys/stat.h>
+#include "zerodb.h"
 #include "data.h"
 
 void warnp(char *str) {
