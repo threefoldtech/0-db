@@ -7,6 +7,9 @@ LDFLAGS=-rdynamic
 
 all: $(EXEC)
 
+release: CFLAGS+=-DRELEASE
+release: $(EXEC)
+
 integrity-check: integrity-check.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 
