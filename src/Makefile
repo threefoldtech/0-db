@@ -2,7 +2,7 @@ EXEC=zdb
 SRC=$(wildcard *.c)
 OBJ=$(SRC:.c=.o)
 
-CFLAGS=-g -W -Wall -O2 -msse4.2
+CFLAGS=-g -W -Wall -O2 -msse4.2 -Wno-implicit-fallthrough
 LDFLAGS=-rdynamic 
 
 all: $(EXEC)
