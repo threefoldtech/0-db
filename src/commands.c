@@ -185,15 +185,12 @@ static size_t redis_set_handler_directkey(resp_request_t *request) {
     free(response.buffer);
 
     return offset;
-
-    // key = datafile + offset
-    // padding to fit num of files/offset in 6 bytes
 }
 
 static size_t (*redis_set_handlers[])(resp_request_t *request) = {
-    redis_set_handler_userkey,
-    redis_set_handler_sequential,
-    redis_set_handler_directkey
+    redis_set_handler_userkey,    // key-value mode
+    redis_set_handler_sequential, // incremental mode
+    redis_set_handler_directkey,  // direct-key mode
 };
 
 
@@ -229,9 +226,9 @@ static index_entry_t *redis_get_handler_direct(resp_request_t *request) {
 }
 
 static index_entry_t * (*redis_get_handlers[])(resp_request_t *request) = {
-    redis_get_handler_memkey,
-    redis_get_handler_memkey,
-    redis_get_handler_direct
+    redis_get_handler_memkey, // key-value mode
+    redis_get_handler_memkey, // incremental mode
+    redis_get_handler_direct, // direct-key mode
 };
 
 //
