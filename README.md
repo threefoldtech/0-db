@@ -21,6 +21,29 @@ You can build each parts separatly by running `make` in each separated directori
 
 > By default, the code is compiled in debug mode, in order to use it in production, please use `make release`
 
+# Running modes
+On the runtime, you can choose between multiple mode:
+* `user`: user-key mode
+* `seq`: sequential mode
+* `direct`: direct-position key mode
+
+## User Key
+This is a default mode, a simple key-value store. User can `SET` their own keys, like any key-value store.
+
+Even in this mode, the key itself is returned by the `SET` command.
+
+## Sequential
+In this mode, the key is a sequential key autoincremented, whatever the key you provide during the
+`SET` command, the returned key need to be used to fetch the data back. This id is a little-indian integer key.
+
+All the keys are kept in memory.
+
+## Direct Key
+This mode works like the sequential mode, except that returned key contains enough information to fetch the
+data back, without using any index. This mode doesn't use index in memory.
+
+The key returned by the `SET` command is a binary key.
+
 # Implementation
 This project doesn't rely on any dependencies, it's from scratch.
 
