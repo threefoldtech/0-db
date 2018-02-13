@@ -306,65 +306,6 @@ int redis_dispatcher(resp_request_t *request) {
         if(offset == 0)
             return 0;
 
-#if 0
-        // create some easier accessor
-        unsigned char *id = request->argv[1]->buffer;
-        uint8_t idlength = request->argv[1]->length;
-
-        unsigned char *value = request->argv[2]->buffer;
-        uint32_t valuelength = request->argv[2]->length;
-
-        idlength = sizeof(uint32_t);
-        uint32_t thisid = index_next_id();
-
-        debug("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
-        // printf("[+] set key: %.*s\n", idlength, id);
-        // printf("[+] set value: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
-
-        // insert the data on the datafile
-        // this will returns us the offset where the header is
-        // size_t offset = data_insert(value, valuelength, id, idlength);
-        size_t offset = data_insert(value, valuelength, &thisid, idlength);
-
-        // checking for writing error
-        // if we couldn't write the data, we won't add entry on the index
-        // and report to the client an error
-        if(offset == 0) {
-            redis_hardsend(request->fd, "$-1");
-            return 0;
-        }
-
-        debug("[+] userkey: ");
-        // debughex(id, idlength);
-        debughex(&thisid, idlength);
-        debug("\n");
-
-        debug("[+] data insertion offset: %lu\n", offset);
-
-        // inserting this offset with the id on the index
-        // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
-        if(!index_entry_insert(&thisid, idlength, offset, request->argv[2]->length)) {
-            // cannot insert index (disk issue)
-            redis_hardsend(request->fd, "$-1");
-            return 0;
-        }
-
-        // building response
-        // here, from original redis protocol, we don't reply with a basic
-        // OK or Error when inserting a key, we reply with the key itself
-        //
-        // this is how the sequential-id can returns the id generated
-        // redis_bulk_t response = redis_bulk(id, idlength);
-        redis_bulk_t response = redis_bulk(&thisid, idlength);
-        if(!response.buffer) {
-            redis_hardsend(request->fd, "$-1");
-            return 0;
-        }
-
-        send(request->fd, response.buffer, response.length, 0);
-        free(response.buffer);
-#endif
-
         // checking if we need to jump to the next files
         // we do this check here and not from data (event if this is like a
         // datafile event) to keep data and index code completly distinct
