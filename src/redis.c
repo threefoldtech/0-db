@@ -291,8 +291,9 @@ int redis_dispatcher(resp_request_t *request) {
     }
 
     // SET
-    if(!strncmp(request->argv[0]->buffer, "SET", request->argv[0]->length)) {
-        if(request->argc != 3) {
+    // FIXME: rewrite handlers to improve commands
+    if(!strncmp(request->argv[0]->buffer, "SET", request->argv[0]->length) || !strncmp(request->argv[0]->buffer, "SETX", request->argv[0]->length)) {
+        if(request->argc != 3 || request->argv[2]->length == 0) {
             redis_hardsend(request->fd, "-Invalid argument");
             return 1;
         }
