@@ -47,11 +47,13 @@
     } redis_bulk_t;
 
     int redis_listen(char *listenaddr, int port);
-    int redis_dispatcher(resp_request_t *request);
     int redis_response(int fd);
 
     void socket_nonblock(int fd);
     void socket_block(int fd);
+
+    void redis_bulk_append(redis_bulk_t *bulk, void *data, size_t length);
+    redis_bulk_t redis_bulk(void *payload, size_t length);
 
     // abstract handler implemented by a plateform dependent
     // code (see socket_epoll, socket_kqueue, ...)
