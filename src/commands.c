@@ -343,7 +343,6 @@ static int command_del(resp_request_t *request) {
     return 0;
 }
 
-#ifndef RELEASE
 // STOP will be only compiled in debug mode
 // this will force to exit listen loop in order to call
 // all destructors, this is useful to ensure every memory allocation
@@ -351,10 +350,18 @@ static int command_del(resp_request_t *request) {
 //
 // in production, a user should not be able to stop the daemon
 static int command_stop(resp_request_t *request) {
+    #ifndef RELEASE
+
     redis_hardsend(request->fd, "+Stopping");
     return 2;
+
+    #else
+
+    redis_hardsend(request->fd, "-Unauthorized");
+    return 0;
+
+    #endif
 }
-#endif
 
 //
 //
@@ -364,22 +371,24 @@ static int command_stop(resp_request_t *request) {
 //
 
 static command_t commands_handlers[] = {
-    {.command = "PING", .handler = command_ping},
-    {.command = "SET",  .handler = command_set},
-    {.command = "SETX", .handler = command_set},
-    {.command = "GET",  .handler = command_get},
-    {.command = "DEL",  .handler = command_del},
-    {.command = "STOP", .handler = command_stop}
+    {.command = "PING", .handler = command_ping}, // default PING command
+    {.command = "SET",  .handler = command_set},  // default SET command
+    {.command = "SETX", .handler = command_set},  // alias for SET command
+    {.command = "GET",  .handler = command_get},  // default GET command
+    {.command = "DEL",  .handler = command_del},  // default DEL command
+    {.command = "STOP", .handler = command_stop}  // custom command for debug purpose
 };
 
 int redis_dispatcher(resp_request_t *request) {
-    if(request->argv[0]->type != STRING) {
+    resp_object_t *key = request->argv[0];
+
+    if(key->type != STRING) {
         debug("[+] not a string command, ignoring\n");
         return 0;
     }
 
     for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
-        if(strncmp(request->argv[0]->buffer, commands_handlers[i].command, request->argv[0]->length) == 0)
+        if(strncmp(key->buffer, commands_handlers[i].command, key->length) == 0)
             return commands_handlers[i].handler(request);
     }
 
