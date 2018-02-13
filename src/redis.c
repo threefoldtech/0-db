@@ -57,11 +57,12 @@ static redis_bulk_t redis_bulk(void *payload, size_t length) {
     return bulk;
 }
 
+
 //
 // different SET implementation
 // depending on the running mode
 //
-size_t redis_set_handler_userkey(resp_request_t *request) {
+static size_t redis_set_handler_userkey(resp_request_t *request) {
     // create some easier accessor
     unsigned char *id = request->argv[1]->buffer;
     uint8_t idlength = request->argv[1]->length;
@@ -115,7 +116,7 @@ size_t redis_set_handler_userkey(resp_request_t *request) {
     return offset;
 }
 
-size_t redis_set_handler_sequential(resp_request_t *request) {
+static size_t redis_set_handler_sequential(resp_request_t *request) {
     // create some easier accessor
     uint32_t id = index_next_id();
     uint8_t idlength = sizeof(uint32_t);
@@ -124,8 +125,6 @@ size_t redis_set_handler_sequential(resp_request_t *request) {
     uint32_t valuelength = request->argv[2]->length;
 
     debug("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
-    // printf("[+] set key: %.*s\n", idlength, id);
-    // printf("[+] set value: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
 
     // insert the data on the datafile
     // this will returns us the offset where the header is
@@ -140,7 +139,7 @@ size_t redis_set_handler_sequential(resp_request_t *request) {
         return 0;
     }
 
-    debug("[+] generated key: ");
+    debug("[+] generated sequential-key: ");
     debughex(&id, idlength);
     debug("\n");
 
@@ -172,20 +171,112 @@ size_t redis_set_handler_sequential(resp_request_t *request) {
     return offset;
 }
 
-size_t redis_set_handler_test(resp_request_t *request) {
-    (void) request;
-    printf("NOOP\n");
+static size_t redis_set_handler_directkey(resp_request_t *request) {
+    // create some easier accessor
+    index_dkey_t id = {
+        .dataid = data_dataid(), // current data fileid
+        .offset = 0              // will be filled later by data_insert
+    };
+    uint8_t idlength = sizeof(index_dkey_t);
 
-    return 0;
+    unsigned char *value = request->argv[2]->buffer;
+    uint32_t valuelength = request->argv[2]->length;
+
+    debug("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
+
+    // insert the data on the datafile
+    // this will returns us the offset where the header is
+    // size_t offset = data_insert(value, valuelength, id, idlength);
+    size_t offset = data_insert(value, valuelength, &id, idlength);
+    id.offset = offset;
+
+    // checking for writing error
+    // if we couldn't write the data, we won't add entry on the index
+    // and report to the client an error
+    if(offset == 0) {
+        redis_hardsend(request->fd, "$-1");
+        return 0;
+    }
+
+    debug("[+] generated direct-key: ");
+    debughex(&id, idlength);
+    debug("\n");
+
+    debug("[+] data insertion offset: %lu\n", offset);
+
+    // usually, here is where we add the key in the index
+    // we don't use the index in this case since the position
+    // is the key itself
+
+    // building response
+    // here, from original redis protocol, we don't reply with a basic
+    // OK or Error when inserting a key, we reply with the key itself
+    //
+    // this is how the sequential-id can returns the id generated
+    // redis_bulk_t response = redis_bulk(id, idlength);
+    redis_bulk_t response = redis_bulk(&id, idlength);
+    if(!response.buffer) {
+        redis_hardsend(request->fd, "$-1");
+        return 0;
+    }
+
+    send(request->fd, response.buffer, response.length, 0);
+    free(response.buffer);
+
+    return offset;
+
+    // key = datafile + offset
+    // padding to fit num of files/offset in 6 bytes
 }
 
-size_t (*redis_set_handlers[])(resp_request_t *request) = {
+static size_t (*redis_set_handlers[])(resp_request_t *request) = {
     redis_set_handler_userkey,
     redis_set_handler_sequential,
-    redis_set_handler_test
+    redis_set_handler_directkey
 };
 
+
+//
+// different GET implementation
+// depending on the running mode
+//
+static index_entry_t *redis_get_handler_memkey(resp_request_t *request) {
+    return index_entry_get(request->argv[1]->buffer, request->argv[1]->length);
+}
+
+static index_entry_t *redis_get_handler_direct(resp_request_t *request) {
+    // invalid requested key
+    if(request->argv[1]->length != sizeof(index_dkey_t))
+        return NULL;
+
+    // converting binary key to internal struct
+    index_dkey_t directkey;
+
+    memcpy(&directkey, request->argv[1]->buffer, sizeof(index_dkey_t));
+    memcpy(index_reusable_entry->id, request->argv[1]->buffer, sizeof(index_dkey_t));
+
+    index_reusable_entry->idlength = sizeof(index_dkey_t);
+    index_reusable_entry->offset = directkey.offset;
+    index_reusable_entry->dataid = directkey.dataid;
+
+    // when using a zero-length payload
+    // the length will be used from the data header
+    // and not from tne index
+    index_reusable_entry->length = 0;
+
+    return index_reusable_entry;
+}
+
+static index_entry_t * (*redis_get_handlers[])(resp_request_t *request) = {
+    redis_get_handler_memkey,
+    redis_get_handler_memkey,
+    redis_get_handler_direct
+};
+
+
+//
 // main worker when a redis command was successfuly parsed
+//
 int redis_dispatcher(resp_request_t *request) {
     if(request->argv[0]->type != STRING) {
         debug("[+] not a string command, ignoring\n");
@@ -297,7 +388,7 @@ int redis_dispatcher(resp_request_t *request) {
         debughex(request->argv[1]->buffer, request->argv[1]->length);
         debug("\n");
 
-        index_entry_t *entry = index_entry_get(request->argv[1]->buffer, request->argv[1]->length);
+        index_entry_t *entry = redis_get_handlers[rootsettings.mode](request);
 
         // key not found at all
         if(!entry) {
@@ -317,16 +408,16 @@ int redis_dispatcher(resp_request_t *request) {
         debug("[+] entry found, flags: %x, data length: %" PRIu64 "\n", entry->flags, entry->length);
         debug("[+] data file: %d, data offset: %" PRIu64 "\n", entry->dataid, entry->offset);
 
-        unsigned char *payload = data_get(entry->offset, entry->length, entry->dataid, entry->idlength);
+        data_payload_t payload = data_get(entry->offset, entry->length, entry->dataid, entry->idlength);
 
-        if(!payload) {
+        if(!payload.buffer) {
             printf("[-] cannot read payload\n");
             redis_hardsend(request->fd, "-Internal Error");
-            free(payload);
+            free(payload.buffer);
             return 0;
         }
 
-        redis_bulk_t response = redis_bulk(payload, entry->length);
+        redis_bulk_t response = redis_bulk(payload.buffer, payload.length);
         if(!response.buffer) {
             redis_hardsend(request->fd, "$-1");
             return 0;
@@ -335,7 +426,7 @@ int redis_dispatcher(resp_request_t *request) {
         send(request->fd, response.buffer, response.length, 0);
 
         free(response.buffer);
-        free(payload);
+        free(payload.buffer);
 
         return 0;
     }

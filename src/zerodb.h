@@ -9,7 +9,7 @@
         SEQUENTIAL,
 
         // id is hard-fixed data position
-        HARDBLOCK,
+        DIRECTKEY,
 
     } db_mode_t;
 

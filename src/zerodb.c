@@ -40,7 +40,7 @@ static struct option long_options[] = {
     {"sync",      no_argument,       0, 's'},
     {"synctime",  required_argument, 0, 't'},
     {"dump",      no_argument,       0, 'x'},
-    {"sequence",  no_argument,       0, 'q'},
+    {"mode",      required_argument, 0, 'm'},
     {"help",      no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
@@ -48,7 +48,7 @@ static struct option long_options[] = {
 static char *modes[] = {
     "default key-value",
     "sequential keys",
-    "hardcoded blocks position",
+    "direct key position",
 };
 
 //
@@ -114,7 +114,7 @@ static int signal_intercept(int signal, void (*function)(int)) {
 
     sigemptyset(&sig.sa_mask);
     sig.sa_handler = function;
-    sig.sa_flags   = 0;
+    sig.sa_flags = 0;
 
     if((ret = sigaction(signal, &sig, NULL)) == -1)
         diep("sigaction");
@@ -197,6 +197,10 @@ void usage() {
     printf("  --verbose   enable verbose (debug) information\n");
     printf("  --dump      only dump index contents (debug)\n");
     printf("  --sync      force all write to be sync'd\n");
+    printf("  --mode      select mode:\n");
+    printf("               > user: default user key-value mode\n");
+    printf("               > seq: sequential keys generated\n");
+    printf("               > direct: direct position by key\n");
     printf("  --help      print this message\n");
 
     exit(EXIT_FAILURE);
@@ -252,8 +256,22 @@ int main(int argc, char *argv[]) {
                 settings->synctime = atoi(optarg);
                 break;
 
-            case 'q':
-                settings->mode = SEQUENTIAL;
+            case 'm':
+                if(strcmp(optarg, "user") == 0) {
+                    settings->mode = KEYVALUE;
+
+                } else if(strcmp(optarg, "seq") == 0) {
+                    settings->mode = SEQUENTIAL;
+
+                } else if(strcmp(optarg, "direct") == 0) {
+                    settings->mode = DIRECTKEY;
+
+                } else {
+                    danger("[-] invalid mode '%s'", optarg);
+                    fprintf(stderr, "[-] mode 'user', 'seq' or 'direct' expected\n");
+                    exit(EXIT_FAILURE);
+                }
+
                 break;
 
             case 'h':

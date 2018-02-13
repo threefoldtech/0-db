@@ -72,6 +72,13 @@
 
     } index_root_t;
 
+    // key used by direct mode
+    typedef struct index_dkey_t {
+        uint16_t dataid;
+        uint32_t offset;
+
+    } __attribute__((packed)) index_dkey_t;
+
     // flags values
     #define INDEX_ENTRY_DELETED      1  // we keep deleted flags not keep entry in memory
 
@@ -95,4 +102,6 @@
     index_entry_t *index_entry_insert(void *vid, uint8_t idlength, size_t offset, size_t length);
     index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags);
     index_entry_t *index_entry_delete(unsigned char *id, uint8_t length);
+
+    extern index_entry_t *index_reusable_entry;
 #endif

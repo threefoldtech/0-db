@@ -171,27 +171,60 @@ static uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
     return hash;
 }
 
+static size_t data_length_from_offset(int fd, size_t offset) {
+    data_header_t header;
+
+    // moving the the header offset
+    lseek(fd, offset, SEEK_SET);
+
+    if(read(fd, &header, sizeof(data_header_t)) != sizeof(data_header_t)) {
+        warnp("data header read");
+        return 0;
+    }
+
+    return header.datalength;
+}
+
 // get a payload from any datafile
-unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
-    unsigned char *buffer = malloc(length);
+data_payload_t data_get(size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
     int fd = rootdata->datafd;
+    data_payload_t payload = {
+        .buffer = NULL,
+        .length = 0
+    };
 
     if(rootdata->dataid != dataid) {
         // the requested datafile is not the current datafile opened
         // we will re-open the expected datafile temporary
-
-        // printf("[-] current data file: %d, requested: %d, switching\n", rootdata->dataid, dataid);
+        debug("[-] current data file: %d, requested: %d, switching\n", rootdata->dataid, dataid);
         fd = data_open_id(rootdata, dataid);
+    }
+
+    // if we don't know the length in advance, we will read the
+    // data header to know the payload size from it
+    if(length == 0) {
+        debug("[+] fetching length from datafile\n");
+
+        if((length = data_length_from_offset(fd, offset)) == 0)
+            return payload;
+
+        debug("[+] length from datafile: %zu\n", length);
     }
 
     // positioning datafile to expected offset
     // and skiping header (pointing to payload)
     lseek(fd, offset + sizeof(data_header_t) + idlength, SEEK_SET);
-    if(read(fd, buffer, length) != (ssize_t) length) {
+
+    // allocating buffer from length
+    // (from index or data header, we don't care)
+    payload.buffer = malloc(length);
+    payload.length = length;
+
+    if(read(fd, payload.buffer, length) != (ssize_t) length) {
         warnp("data_get: read");
 
-        free(buffer);
-        buffer = NULL;
+        free(payload.buffer);
+        payload.buffer = NULL;
     }
 
     if(rootdata->dataid != dataid) {
@@ -200,7 +233,7 @@ unsigned char *data_get(size_t offset, size_t length, uint16_t dataid, uint8_t i
         close(fd);
     }
 
-    return buffer;
+    return payload;
 }
 
 // insert data on the datafile and returns it's offset
@@ -236,6 +269,10 @@ size_t data_insert(unsigned char *data, uint32_t datalength, void *vid, uint8_t 
     }
 
     return offset;
+}
+
+uint16_t data_dataid() {
+    return rootdata->dataid;
 }
 
 //

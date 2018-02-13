@@ -621,6 +621,7 @@ index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, si
 // useless reallocation
 // this item will be used to move from an index_entry_t (disk) to index_item_t (memory)
 static index_item_t *transition = NULL;
+index_entry_t *index_reusable_entry = NULL;
 
 // main function to insert anything on the index, in memory and on the disk
 // perform at first a memory insertion then disk writing
@@ -708,11 +709,9 @@ void index_destroy() {
 
 // create an index and load files
 uint16_t index_init(settings_t *settings) {
-    index_root_t *lroot = malloc(sizeof(index_root_t));
+    index_root_t *lroot = calloc(sizeof(index_root_t), 1);
 
-    debug("[+] initializing index (%d lazy branches)\n", buckets_branches);
-
-    lroot->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches);
+    debug("[+] initializing index\n");
 
     lroot->indexdir = settings->indexpath;
     lroot->indexid = 0;
@@ -725,11 +724,36 @@ uint16_t index_init(settings_t *settings) {
     // commit variable
     rootindex = lroot;
 
-    // allocating transition variable, 256 is the key limit size
-    transition = malloc(sizeof(index_item_t) + 256);
+    // don't allocate branch on direct-key mode since the
+    // index is not used (no lookup needed)
+    // we don't load index neither, since the index will always
+    // be empty
+    if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL) {
+        debug("[+] allocating index (%d lazy branches)\n", buckets_branches);
 
-    index_load(lroot);
-    index_dump(settings->dump);
+        // allocating minimal branches array
+        if(!(lroot->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches)))
+            diep("calloc");
+
+        // allocating transition variable, 256 is the key limit size
+        if(!(transition = malloc(sizeof(index_item_t) + 256)))
+            diep("malloc");
+
+        index_load(lroot);
+        index_dump(settings->dump);
+
+    } else if(settings->mode == DIRECTKEY) {
+        // in direct key mode, we allocate a re-usable
+        // index_entry_t which will be adapted each time
+        // using the requested key, like this we can use the same
+        // implementation for everything
+        //
+        // in the default mode, the key is always kept in memory
+        // and never free'd, that's why we will allocate a one-time
+        // object now and reuse the same all the time
+        if(!(index_reusable_entry = (index_entry_t *) malloc(sizeof(index_entry_t))))
+            diep("malloc");
+    }
 
     return lroot->indexid;
 }
