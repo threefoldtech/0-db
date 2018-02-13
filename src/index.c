@@ -721,9 +721,6 @@ uint16_t index_init(settings_t *settings) {
     lroot->synctime = settings->synctime;
     lroot->lastsync = 0;
 
-    // commit variable
-    rootindex = lroot;
-
     // don't allocate branch on direct-key mode since the
     // index is not used (no lookup needed)
     // we don't load index neither, since the index will always
@@ -739,9 +736,6 @@ uint16_t index_init(settings_t *settings) {
         if(!(transition = malloc(sizeof(index_item_t) + 256)))
             diep("malloc");
 
-        index_load(lroot);
-        index_dump(settings->dump);
-
     } else if(settings->mode == DIRECTKEY) {
         // in direct key mode, we allocate a re-usable
         // index_entry_t which will be adapted each time
@@ -754,6 +748,14 @@ uint16_t index_init(settings_t *settings) {
         if(!(index_reusable_entry = (index_entry_t *) malloc(sizeof(index_entry_t))))
             diep("malloc");
     }
+
+    // commit variable
+    rootindex = lroot;
+
+    index_load(lroot);
+
+    if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL)
+        index_dump(settings->dump);
 
     return lroot->indexid;
 }
