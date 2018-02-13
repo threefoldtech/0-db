@@ -6,9 +6,18 @@
 #include <sys/socket.h>
 #include <inttypes.h>
 #include "redis.h"
+#include "commands.h"
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
+
+//
+//
+// specific modes implementation
+// some commands does specific stuff in differents modes
+// each of them are implemented in distinct functions
+//
+//
 
 //
 // different SET implementation
@@ -225,134 +234,154 @@ static index_entry_t * (*redis_get_handlers[])(resp_request_t *request) = {
     redis_get_handler_direct
 };
 
+//
+//
+// commands implementation
+// each redis command are implemented in a specific function
+//
+//
+static int command_ping(resp_request_t *request) {
+    verbose("[+] redis: PING\n");
+    redis_hardsend(request->fd, "+PONG");
+    return 0;
+}
+
+static int command_set(resp_request_t *request) {
+    if(request->argc != 3 || request->argv[2]->length == 0) {
+        redis_hardsend(request->fd, "-Invalid argument");
+        return 1;
+    }
+
+    if(request->argv[1]->length > MAX_KEY_LENGTH) {
+        redis_hardsend(request->fd, "-Key too large");
+        return 1;
+    }
+
+    size_t offset = redis_set_handlers[rootsettings.mode](request);
+    if(offset == 0)
+        return 0;
+
+    // checking if we need to jump to the next files
+    // we do this check here and not from data (event if this is like a
+    // datafile event) to keep data and index code completly distinct
+    if(offset + request->argv[2]->length > 256 * 1024 * 1024) { // 256 MB
+        size_t newid = index_jump_next();
+        data_jump_next(newid);
+    }
+
+    return 0;
+}
+
+static int command_get(resp_request_t *request) {
+    if(request->argv[1]->length > MAX_KEY_LENGTH) {
+        printf("[-] invalid key size\n");
+        redis_hardsend(request->fd, "-Invalid key");
+        return 1;
+    }
+
+    debug("[+] lookup key: ");
+    debughex(request->argv[1]->buffer, request->argv[1]->length);
+    debug("\n");
+
+    index_entry_t *entry = redis_get_handlers[rootsettings.mode](request);
+
+    // key not found at all
+    if(!entry) {
+        verbose("[-] key not found\n");
+        redis_hardsend(request->fd, "$-1");
+        return 1;
+    }
+
+    // key found but deleted
+    if(entry->flags & INDEX_ENTRY_DELETED) {
+        verbose("[-] key deleted\n");
+        redis_hardsend(request->fd, "$-1");
+        return 1;
+    }
+
+    // key found and valid, let's checking the contents
+    debug("[+] entry found, flags: %x, data length: %" PRIu64 "\n", entry->flags, entry->length);
+    debug("[+] data file: %d, data offset: %" PRIu64 "\n", entry->dataid, entry->offset);
+
+    data_payload_t payload = data_get(entry->offset, entry->length, entry->dataid, entry->idlength);
+
+    if(!payload.buffer) {
+        printf("[-] cannot read payload\n");
+        redis_hardsend(request->fd, "-Internal Error");
+        free(payload.buffer);
+        return 0;
+    }
+
+    redis_bulk_t response = redis_bulk(payload.buffer, payload.length);
+    if(!response.buffer) {
+        redis_hardsend(request->fd, "$-1");
+        return 0;
+    }
+
+    send(request->fd, response.buffer, response.length, 0);
+
+    free(response.buffer);
+    free(payload.buffer);
+
+    return 0;
+}
+
+static int command_del(resp_request_t *request) {
+    if(request->argv[1]->length > MAX_KEY_LENGTH) {
+        printf("[-] invalid key size\n");
+        redis_hardsend(request->fd, "-Invalid key");
+        return 1;
+    }
+
+    if(!index_entry_delete(request->argv[1]->buffer, request->argv[1]->length)) {
+        redis_hardsend(request->fd, "-Cannot delete key");
+        return 0;
+    }
+
+    redis_hardsend(request->fd, "+OK");
+
+    return 0;
+}
+
+#ifndef RELEASE
+// STOP will be only compiled in debug mode
+// this will force to exit listen loop in order to call
+// all destructors, this is useful to ensure every memory allocation
+// are well tracked and well cleaned
+//
+// in production, a user should not be able to stop the daemon
+static int command_stop(resp_request_t *request) {
+    redis_hardsend(request->fd, "+Stopping");
+    return 2;
+}
+#endif
 
 //
-// main worker when a redis command was successfuly parsed
 //
+// command parser
+// dispatch command to the right handler
+//
+//
+
+static command_t commands_handlers[] = {
+    {.command = "PING", .handler = command_ping},
+    {.command = "SET",  .handler = command_set},
+    {.command = "SETX", .handler = command_set},
+    {.command = "GET",  .handler = command_get},
+    {.command = "DEL",  .handler = command_del},
+    {.command = "STOP", .handler = command_stop}
+};
+
 int redis_dispatcher(resp_request_t *request) {
     if(request->argv[0]->type != STRING) {
         debug("[+] not a string command, ignoring\n");
         return 0;
     }
 
-    // PING
-    if(!strncmp(request->argv[0]->buffer, "PING", request->argv[0]->length)) {
-        verbose("[+] redis: PING\n");
-        redis_hardsend(request->fd, "+PONG");
-        return 0;
+    for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
+        if(strncmp(request->argv[0]->buffer, commands_handlers[i].command, request->argv[0]->length) == 0)
+            return commands_handlers[i].handler(request);
     }
-
-    // SET
-    // FIXME: rewrite handlers to improve commands
-    if(!strncmp(request->argv[0]->buffer, "SET", request->argv[0]->length) || !strncmp(request->argv[0]->buffer, "SETX", request->argv[0]->length)) {
-        if(request->argc != 3 || request->argv[2]->length == 0) {
-            redis_hardsend(request->fd, "-Invalid argument");
-            return 1;
-        }
-
-        if(request->argv[1]->length > MAX_KEY_LENGTH) {
-            redis_hardsend(request->fd, "-Key too large");
-            return 1;
-        }
-
-        size_t offset = redis_set_handlers[rootsettings.mode](request);
-        if(offset == 0)
-            return 0;
-
-        // checking if we need to jump to the next files
-        // we do this check here and not from data (event if this is like a
-        // datafile event) to keep data and index code completly distinct
-        if(offset + request->argv[2]->length > 256 * 1024 * 1024) { // 256 MB
-            size_t newid = index_jump_next();
-            data_jump_next(newid);
-        }
-
-        return 0;
-    }
-
-    // GET
-    if(!strncmp(request->argv[0]->buffer, "GET", request->argv[0]->length)) {
-        if(request->argv[1]->length > MAX_KEY_LENGTH) {
-            printf("[-] invalid key size\n");
-            redis_hardsend(request->fd, "-Invalid key");
-            return 1;
-        }
-
-        debug("[+] lookup key: ");
-        debughex(request->argv[1]->buffer, request->argv[1]->length);
-        debug("\n");
-
-        index_entry_t *entry = redis_get_handlers[rootsettings.mode](request);
-
-        // key not found at all
-        if(!entry) {
-            verbose("[-] key not found\n");
-            redis_hardsend(request->fd, "$-1");
-            return 1;
-        }
-
-        // key found but deleted
-        if(entry->flags & INDEX_ENTRY_DELETED) {
-            verbose("[-] key deleted\n");
-            redis_hardsend(request->fd, "$-1");
-            return 1;
-        }
-
-        // key found and valid, let's checking the contents
-        debug("[+] entry found, flags: %x, data length: %" PRIu64 "\n", entry->flags, entry->length);
-        debug("[+] data file: %d, data offset: %" PRIu64 "\n", entry->dataid, entry->offset);
-
-        data_payload_t payload = data_get(entry->offset, entry->length, entry->dataid, entry->idlength);
-
-        if(!payload.buffer) {
-            printf("[-] cannot read payload\n");
-            redis_hardsend(request->fd, "-Internal Error");
-            free(payload.buffer);
-            return 0;
-        }
-
-        redis_bulk_t response = redis_bulk(payload.buffer, payload.length);
-        if(!response.buffer) {
-            redis_hardsend(request->fd, "$-1");
-            return 0;
-        }
-
-        send(request->fd, response.buffer, response.length, 0);
-
-        free(response.buffer);
-        free(payload.buffer);
-
-        return 0;
-    }
-
-    if(!strncmp(request->argv[0]->buffer, "DEL", request->argv[0]->length)) {
-        if(request->argv[1]->length > MAX_KEY_LENGTH) {
-            printf("[-] invalid key size\n");
-            redis_hardsend(request->fd, "-Invalid key");
-            return 1;
-        }
-
-        if(!index_entry_delete(request->argv[1]->buffer, request->argv[1]->length)) {
-            redis_hardsend(request->fd, "-Cannot delete key");
-            return 0;
-        }
-
-        redis_hardsend(request->fd, "+OK");
-        return 0;
-    }
-
-    #ifndef RELEASE
-    // STOP will be only compiled in debug mode
-    // this will force to exit listen loop in order to call
-    // all destructors, this is useful to ensure every memory allocation
-    // are well tracked and well cleaned
-    //
-    // in production, a user should not be able to stop the daemon
-    if(!strncmp(request->argv[0]->buffer, "STOP", request->argv[0]->length)) {
-        redis_hardsend(request->fd, "+Stopping");
-        return 2;
-    }
-    #endif
 
     // unknown
     printf("[-] unsupported redis command\n");
@@ -360,5 +389,4 @@ int redis_dispatcher(resp_request_t *request) {
 
     return 1;
 }
-
 
