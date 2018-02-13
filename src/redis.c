@@ -356,12 +356,18 @@ int redis_dispatcher(resp_request_t *request) {
         return 0;
     }
 
-
-    // STOP (should only be used as debug, to check memory leaks or so)
+    #ifndef RELEASE
+    // STOP will be only compiled in debug mode
+    // this will force to exit listen loop in order to call
+    // all destructors, this is useful to ensure every memory allocation
+    // are well tracked and well cleaned
+    //
+    // in production, a user should not be able to stop the daemon
     if(!strncmp(request->argv[0]->buffer, "STOP", request->argv[0]->length)) {
         redis_hardsend(request->fd, "+Stopping");
         return 2;
     }
+    #endif
 
     // unknown
     printf("[-] unsupported redis command\n");
