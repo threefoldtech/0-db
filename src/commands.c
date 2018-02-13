@@ -327,6 +327,13 @@ static int command_get(resp_request_t *request) {
 }
 
 static int command_del(resp_request_t *request) {
+    // disallow delete key on direct mode, we don't have index
+    // we can't flag key as deleted and data files are always append
+    if(rootsettings->mode == DIRECTKEY) {
+        redis_hardsend(request->fd, "-Unsupported on this mode");
+        return 0;
+    }
+
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         printf("[-] invalid key size\n");
         redis_hardsend(request->fd, "-Invalid key");
@@ -351,15 +358,11 @@ static int command_del(resp_request_t *request) {
 // in production, a user should not be able to stop the daemon
 static int command_stop(resp_request_t *request) {
     #ifndef RELEASE
-
-    redis_hardsend(request->fd, "+Stopping");
-    return 2;
-
+        redis_hardsend(request->fd, "+Stopping");
+        return 2;
     #else
-
-    redis_hardsend(request->fd, "-Unauthorized");
-    return 0;
-
+        redis_hardsend(request->fd, "-Unauthorized");
+        return 0;
     #endif
 }
 
