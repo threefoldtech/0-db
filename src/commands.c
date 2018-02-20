@@ -326,7 +326,7 @@ static int command_get(resp_request_t *request) {
 static int command_del(resp_request_t *request) {
     // disallow delete key on direct mode, we don't have index
     // we can't flag key as deleted and data files are always append
-    if(rootsettings->mode == DIRECTKEY) {
+    if(rootsettings.mode == DIRECTKEY) {
         redis_hardsend(request->fd, "-Unsupported on this mode");
         return 0;
     }
