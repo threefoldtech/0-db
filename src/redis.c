@@ -230,6 +230,10 @@ redis_client_t *socket_client_new(int fd) {
         if(!(newlist = (redis_client_t **) realloc(clients.list, sizeof(redis_client_t *) * newlength)))
             return NULL;
 
+        // ensure new clients are not set
+        for(size_t i = clients.length; i < newlength; i++)
+            newlist[i] = NULL;
+
         // increase clients list
         clients.list = newlist;
         clients.length = newlength;
