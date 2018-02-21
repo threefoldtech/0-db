@@ -210,7 +210,7 @@ void usage() {
 // main entry: processing arguments
 //
 int main(int argc, char *argv[]) {
-    notice("[*] Zero-DB (0-db), unstable version");
+    notice("[*] Zero-DB (0-db), revision " REVISION);
 
     settings_t *settings = &rootsettings;
     int option_index = 0;

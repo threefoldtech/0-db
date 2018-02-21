@@ -1,6 +1,10 @@
 #ifndef __ZDB_H
     #define __ZDB_H
 
+    #ifndef REVISION
+        #define REVISION "(unknown)"
+    #endif
+
     typedef enum db_mode_t {
         // default key-value store
         KEYVALUE,

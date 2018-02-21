@@ -348,7 +348,7 @@ static int command_del(resp_request_t *request) {
 }
 
 static int command_info(resp_request_t *request) {
-    redis_hardsend(request->client->fd, "+0-db server\n");
+    redis_hardsend(request->client->fd, "+0-db server (" REVISION ")\n");
     return 0;
 }
 
