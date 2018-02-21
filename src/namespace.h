@@ -23,4 +23,17 @@
 
     } __attribute__((packed)) data_header_t;
 
+    typedef struct namespace_t {
+        unsigned char *name;
+        unsigned char *password;
+        int public;
+
+    } namespace_t;
+
+    typedef struct namespaces_t {
+        size_t length;
+        namespace_t **namespaces;
+
+    } namespaces_t;
+
 #endif
