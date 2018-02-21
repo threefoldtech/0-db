@@ -42,7 +42,7 @@ static uint32_t buckets_mask = (1 << 24) - 1;
 static index_root_t *rootindex = NULL;
 
 // allows to works on readonly index (no write allowed)
-static int index_status = INDEX_NOT_LOADED | INDEX_HEALTHY;
+static index_status_t index_status = INDEX_NOT_LOADED | INDEX_HEALTHY;
 
 // set buckets length variables in bits
 // WARNING: this doesn't resize anything, you should calls this

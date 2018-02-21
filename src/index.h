@@ -27,6 +27,11 @@
 
     } __attribute__((packed)) index_item_t;
 
+    typedef enum index_flags_t {
+        INDEX_ENTRY_DELETED = 1,  // we keep entry in memory and flag it as deleted
+
+    } index_flags_t;
+
     typedef struct index_entry_t {
         // linked list pointer
         struct index_entry_t *next;
@@ -34,7 +39,7 @@
         uint8_t idlength;    // length of the id, here uint8_t limits to 256 bytes
         uint64_t offset;     // offset on the corresponding datafile
         uint64_t length;     // length of the payload on the datafile
-        uint8_t flags;       // flags not used yet, could provide information about deletion
+        uint8_t flags;       // keep deleted flags (should be index_flags_t type)
         uint16_t dataid;     // datafile id where is stored the payload
         unsigned char id[];  // the id accessor, dynamically loaded
 
@@ -79,15 +84,15 @@
 
     } __attribute__((packed)) index_dkey_t;
 
-    // flags values
-    #define INDEX_ENTRY_DELETED      1  // we keep deleted flags not keep entry in memory
-
     // index status flags
     // keep some heatly status of the index
-    #define INDEX_NOT_LOADED 1       // index not initialized yet
-    #define INDEX_HEALTHY    1 << 1  // no issue detected
-    #define INDEX_READ_ONLY  1 << 2  // index filesystem is read-only
-    #define INDEX_DEGRADED   1 << 3  // some error occured during index loads
+    typedef enum index_status_t {
+        INDEX_NOT_LOADED = 1,       // index not initialized yet
+        INDEX_HEALTHY    = 1 << 1,  // no issue detected
+        INDEX_READ_ONLY  = 1 << 2,  // index filesystem is read-only
+        INDEX_DEGRADED   = 1 << 3,  // some error occured during index loads
+
+    } index_status_t;
 
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1
