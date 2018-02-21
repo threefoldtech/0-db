@@ -383,6 +383,7 @@ int redis_dispatcher(resp_request_t *request) {
     resp_object_t *key = request->argv[0];
 
     debug("[+] request from fd: %d, namespace: %s\n", request->client->fd, request->client->ns);
+    debug("[+] command <%.*s> (%d argv)\n", key->length, (char *) key->buffer, request->argc);
 
     if(key->type != STRING) {
         debug("[+] not a string command, ignoring\n");
