@@ -25,8 +25,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
         // discarding this client
         if((ev->events & EPOLLERR) || (ev->events & EPOLLHUP) || (!(ev->events & EPOLLIN))) {
             warnp("epoll");
-            close(ev->data.fd);
-
+            socket_client_free(ev->data.fd);
             continue;
         }
 
@@ -44,6 +43,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
                 warnp("accept");
 
             socket_nonblock(clientfd);
+            socket_client_new(clientfd);
 
             clientip = inet_ntoa(addr_client.sin_addr);
             verbose("[+] incoming connection from %s\n", clientip);
@@ -77,7 +77,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 
         // client error, we discard it
         if(ctrl == 3) {
-            close(ev->data.fd);
+            socket_client_free(ev->data.fd);
             continue;
         }
 

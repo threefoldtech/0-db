@@ -43,7 +43,7 @@ static size_t redis_set_handler_userkey(resp_request_t *request) {
     // if we couldn't write the data, we won't add entry on the index
     // and report to the client an error
     if(offset == 0) {
-        redis_hardsend(request->fd, "$-1");
+        redis_hardsend(request->client->fd, "$-1");
         return 0;
     }
 
@@ -56,7 +56,7 @@ static size_t redis_set_handler_userkey(resp_request_t *request) {
     // inserting this offset with the id on the index
     if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
         // cannot insert index (disk issue)
-        redis_hardsend(request->fd, "$-1");
+        redis_hardsend(request->client->fd, "$-1");
         return 0;
     }
 
@@ -67,11 +67,11 @@ static size_t redis_set_handler_userkey(resp_request_t *request) {
     // this is how the sequential-id can returns the id generated
     redis_bulk_t response = redis_bulk(id, idlength);
     if(!response.buffer) {
-        redis_hardsend(request->fd, "$-1");
+        redis_hardsend(request->client->fd, "$-1");
         return 0;
     }
 
-    send(request->fd, response.buffer, response.length, 0);
+    send(request->client->fd, response.buffer, response.length, 0);
     free(response.buffer);
 
     return offset;
@@ -96,7 +96,7 @@ static size_t redis_set_handler_sequential(resp_request_t *request) {
     // if we couldn't write the data, we won't add entry on the index
     // and report to the client an error
     if(offset == 0) {
-        redis_hardsend(request->fd, "$-1");
+        redis_hardsend(request->client->fd, "$-1");
         return 0;
     }
 
@@ -110,7 +110,7 @@ static size_t redis_set_handler_sequential(resp_request_t *request) {
     // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
     if(!index_entry_insert(&id, idlength, offset, request->argv[2]->length)) {
         // cannot insert index (disk issue)
-        redis_hardsend(request->fd, "$-1");
+        redis_hardsend(request->client->fd, "$-1");
         return 0;
     }
 
@@ -122,11 +122,11 @@ static size_t redis_set_handler_sequential(resp_request_t *request) {
     // redis_bulk_t response = redis_bulk(id, idlength);
     redis_bulk_t response = redis_bulk(&id, idlength);
     if(!response.buffer) {
-        redis_hardsend(request->fd, "$-1");
+        redis_hardsend(request->client->fd, "$-1");
         return 0;
     }
 
-    send(request->fd, response.buffer, response.length, 0);
+    send(request->client->fd, response.buffer, response.length, 0);
     free(response.buffer);
 
     return offset;
@@ -155,7 +155,7 @@ static size_t redis_set_handler_directkey(resp_request_t *request) {
     // if we couldn't write the data, we won't add entry on the index
     // and report to the client an error
     if(offset == 0) {
-        redis_hardsend(request->fd, "$-1");
+        redis_hardsend(request->client->fd, "$-1");
         return 0;
     }
 
@@ -177,11 +177,11 @@ static size_t redis_set_handler_directkey(resp_request_t *request) {
     // redis_bulk_t response = redis_bulk(id, idlength);
     redis_bulk_t response = redis_bulk(&id, idlength);
     if(!response.buffer) {
-        redis_hardsend(request->fd, "$-1");
+        redis_hardsend(request->client->fd, "$-1");
         return 0;
     }
 
-    send(request->fd, response.buffer, response.length, 0);
+    send(request->client->fd, response.buffer, response.length, 0);
     free(response.buffer);
 
     return offset;
@@ -239,18 +239,18 @@ static index_entry_t * (*redis_get_handlers[])(resp_request_t *request) = {
 //
 static int command_ping(resp_request_t *request) {
     verbose("[+] redis: PING\n");
-    redis_hardsend(request->fd, "+PONG");
+    redis_hardsend(request->client->fd, "+PONG");
     return 0;
 }
 
 static int command_set(resp_request_t *request) {
     if(request->argc != 3 || request->argv[2]->length == 0) {
-        redis_hardsend(request->fd, "-Invalid argument");
+        redis_hardsend(request->client->fd, "-Invalid argument");
         return 1;
     }
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
-        redis_hardsend(request->fd, "-Key too large");
+        redis_hardsend(request->client->fd, "-Key too large");
         return 1;
     }
 
@@ -272,7 +272,7 @@ static int command_set(resp_request_t *request) {
 static int command_get(resp_request_t *request) {
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         printf("[-] invalid key size\n");
-        redis_hardsend(request->fd, "-Invalid key");
+        redis_hardsend(request->client->fd, "-Invalid key");
         return 1;
     }
 
@@ -285,14 +285,14 @@ static int command_get(resp_request_t *request) {
     // key not found at all
     if(!entry) {
         verbose("[-] key not found\n");
-        redis_hardsend(request->fd, "$-1");
+        redis_hardsend(request->client->fd, "$-1");
         return 1;
     }
 
     // key found but deleted
     if(entry->flags & INDEX_ENTRY_DELETED) {
         verbose("[-] key deleted\n");
-        redis_hardsend(request->fd, "$-1");
+        redis_hardsend(request->client->fd, "$-1");
         return 1;
     }
 
@@ -304,18 +304,18 @@ static int command_get(resp_request_t *request) {
 
     if(!payload.buffer) {
         printf("[-] cannot read payload\n");
-        redis_hardsend(request->fd, "-Internal Error");
+        redis_hardsend(request->client->fd, "-Internal Error");
         free(payload.buffer);
         return 0;
     }
 
     redis_bulk_t response = redis_bulk(payload.buffer, payload.length);
     if(!response.buffer) {
-        redis_hardsend(request->fd, "$-1");
+        redis_hardsend(request->client->fd, "$-1");
         return 0;
     }
 
-    send(request->fd, response.buffer, response.length, 0);
+    send(request->client->fd, response.buffer, response.length, 0);
 
     free(response.buffer);
     free(payload.buffer);
@@ -327,22 +327,22 @@ static int command_del(resp_request_t *request) {
     // disallow delete key on direct mode, we don't have index
     // we can't flag key as deleted and data files are always append
     if(rootsettings.mode == DIRECTKEY) {
-        redis_hardsend(request->fd, "-Unsupported on this mode");
+        redis_hardsend(request->client->fd, "-Unsupported on this mode");
         return 0;
     }
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         printf("[-] invalid key size\n");
-        redis_hardsend(request->fd, "-Invalid key");
+        redis_hardsend(request->client->fd, "-Invalid key");
         return 1;
     }
 
     if(!index_entry_delete(request->argv[1]->buffer, request->argv[1]->length)) {
-        redis_hardsend(request->fd, "-Cannot delete key");
+        redis_hardsend(request->client->fd, "-Cannot delete key");
         return 0;
     }
 
-    redis_hardsend(request->fd, "+OK");
+    redis_hardsend(request->client->fd, "+OK");
 
     return 0;
 }
@@ -355,10 +355,10 @@ static int command_del(resp_request_t *request) {
 // in production, a user should not be able to stop the daemon
 static int command_stop(resp_request_t *request) {
     #ifndef RELEASE
-        redis_hardsend(request->fd, "+Stopping");
+        redis_hardsend(request->client->fd, "+Stopping");
         return 2;
     #else
-        redis_hardsend(request->fd, "-Unauthorized");
+        redis_hardsend(request->client->fd, "-Unauthorized");
         return 0;
     #endif
 }
@@ -382,6 +382,8 @@ static command_t commands_handlers[] = {
 int redis_dispatcher(resp_request_t *request) {
     resp_object_t *key = request->argv[0];
 
+    debug("[+] request from fd: %d, namespace: %s\n", request->client->fd, request->client->ns);
+
     if(key->type != STRING) {
         debug("[+] not a string command, ignoring\n");
         return 0;
@@ -394,7 +396,7 @@ int redis_dispatcher(resp_request_t *request) {
 
     // unknown
     printf("[-] unsupported redis command\n");
-    redis_hardsend(request->fd, "-Command not supported");
+    redis_hardsend(request->client->fd, "-Command not supported");
 
     return 1;
 }

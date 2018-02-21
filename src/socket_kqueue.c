@@ -28,8 +28,7 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
             if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1)
                 diep("kevent");
 
-            close(ev->ident);
-
+            socket_client_free(ev->ident);
             continue;
 
         } else if((int) ev->ident == redis->mainfd) {
@@ -44,6 +43,7 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
                 warnp("accept");
 
             socket_nonblock(clientfd);
+            socket_client_new(clientfd);
 
             clientip = inet_ntoa(addr_client.sin_addr);
             verbose("[+] incoming connection from %s (socket %d)\n", clientip, clientfd);
@@ -71,6 +71,7 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
         // client error, we discard it
         if(ctrl == 3) {
             close(ev->ident);
+            socket_client_free(ev->ident);
             continue;
         }
 

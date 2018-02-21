@@ -13,8 +13,15 @@
 #include "sockets.h"
 #include "zerodb.h"
 #include "commands.h"
+#include "namespace.h"
 
 static int yes = 1;
+
+// list of active clients
+static redis_clients_t clients = {
+    .length = 0,
+    .list = NULL,
+};
 
 void redis_bulk_append(redis_bulk_t *bulk, void *data, size_t length) {
     memcpy(bulk->buffer + bulk->writer, data, length);
@@ -91,7 +98,7 @@ int redis_response(int fd) {
     int length;
     int dvalue = 0;
 
-    command.fd = fd;
+    command.client = clients.list[fd];
 
     while((length = recv(fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
         // array
@@ -121,7 +128,7 @@ int redis_response(int fd) {
             // reading next chunk
             // verifiying it's a string command
             if(*reader != '$') {
-                resp_discard(command.fd, "Malformed request (string)");
+                resp_discard(command.client->fd, "Malformed request (string)");
                 goto cleanup;
             }
 
@@ -131,12 +138,12 @@ int redis_response(int fd) {
 
             // going to the next line for the payload
             if(!(reader = strchr(reader, '\n'))) {
-                resp_discard(command.fd, "Malformed request (payload)");
+                resp_discard(command.client->fd, "Malformed request (payload)");
                 goto cleanup;
             }
 
             if(argument->length > 8 * 1024 * 1024) {
-                resp_discard(command.fd, "Payload too big");
+                resp_discard(command.client->fd, "Payload too big");
                 goto cleanup;
             }
 
@@ -156,9 +163,9 @@ int redis_response(int fd) {
 
             // the buffer doesn't contains enough data, let's read again to fill in the data
             memcpy(argument->buffer, reader + 1, remain);
-            recvto(command.fd, argument->buffer + remain, argument->length - remain);
+            recvto(command.client->fd, argument->buffer + remain, argument->length - remain);
 
-            if(recv(command.fd, buffer, 2, 0) != 2) {
+            if(recv(command.client->fd, buffer, 2, 0) != 2) {
                 fprintf(stderr, "[-] recv failed, ignoring\n");
                 goto cleanup;
             }
@@ -166,7 +173,7 @@ int redis_response(int fd) {
             // we read the rest of the payload, the rest on the socket should
             // be the end-of-line of the redis protocol
             if(strncmp(buffer, "\r\n", 2)) {
-                resp_discard(command.fd, "Protocol malformed");
+                resp_discard(command.client->fd, "Protocol malformed");
                 goto cleanup;
             }
         }
@@ -210,9 +217,59 @@ void socket_block(int fd) {
     fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
 }
 
+// allocate a new client for a new file descriptor
+// used to keep session-life information about clients
+redis_client_t *socket_client_new(int fd) {
+    debug("[+] new client (fd: %d)\n", fd);
+
+    if(fd >= (int) clients.length) {
+        redis_client_t **newlist = NULL;
+        size_t newlength = clients.length + fd;
+
+        // growing up the list
+        if(!(newlist = (redis_client_t **) realloc(clients.list, sizeof(redis_client_t *) * newlength)))
+            return NULL;
+
+        // increase clients list
+        clients.list = newlist;
+        clients.length = newlength;
+    }
+
+    clients.list[fd] = malloc(sizeof(redis_client_t));
+    clients.list[fd]->fd = fd;
+    clients.list[fd]->ns = strdup(NAMESPACE_DEFAULT);
+
+    return clients.list[fd];
+}
+
+// free allocated client when disconnected
+void socket_client_free(int fd) {
+    debug("[+] removing client (fd: %d)\n", fd);
+
+    redis_client_t *client = clients.list[fd];
+
+    // closing socket
+    close(client->fd);
+
+    // cleaning client memory usage
+    free(client->ns);
+    free(client);
+
+    // allow new client on this spot
+    clients.list[fd] = NULL;
+
+    // maybe we could reduce the list usage now
+}
+
 int redis_listen(char *listenaddr, int port) {
     struct sockaddr_in addr_listen;
     redis_handler_t redis;
+
+    // allocating space for clients
+    clients.length = REDIS_CLIENTS_INITIAL_LENGTH;
+
+    if(!(clients.list = calloc(sizeof(redis_client_t *), clients.length)))
+        diep("clients malloc");
 
     // classic basic network socket operation
     addr_listen.sin_family = AF_INET;
@@ -236,5 +293,15 @@ int redis_listen(char *listenaddr, int port) {
     success("[+] listening on %s:%d", listenaddr, port);
 
     // entering the worker loop
-    return socket_handler(&redis);
+    int handler = socket_handler(&redis);
+
+    // cleaning clients list
+    for(size_t i = 0; i < clients.length; i++)
+        if(clients.list[i])
+            socket_client_free(i);
+
+    free(clients.list);
+
+    // notifing source that we are done
+    return handler;
 }

@@ -12,6 +12,31 @@
     // just be +1
     #define redis_hardsend(fd, message) send(fd, message "\r\n", sizeof(message) + 1, 0)
 
+    // tracking each clients in memory
+    // we need to create object per client to keep
+    // some session-life persistant data, such namespace
+    // attached to the socket, and so on
+
+    // represent one client in memory
+    typedef struct redis_client_t {
+        int fd;    // socket file descriptor
+        char *ns;  // connection namespace
+
+    } redis_client_t;
+
+    // represent all clients in memory
+    typedef struct redis_clients_t {
+        size_t length;
+        redis_client_t **list;
+
+    } redis_clients_t;
+
+    // minimum (default) amount of client pre-allocated
+    #define REDIS_CLIENTS_INITIAL_LENGTH 32
+
+    //
+    // redis protocol oriented objects
+    //
     typedef enum resp_type_t {
         INTEGER,
         STRING,
@@ -27,7 +52,7 @@
     } resp_object_t;
 
     typedef struct resp_request_t {
-        int fd;
+        redis_client_t *client;
         int argc;
         resp_object_t **argv;
 
@@ -58,4 +83,8 @@
     // abstract handler implemented by a plateform dependent
     // code (see socket_epoll, socket_kqueue, ...)
     int socket_handler(redis_handler_t *handler);
+
+    // managing clients
+    redis_client_t *socket_client_new(int fd);
+    void socket_client_free(int fd);
 #endif
