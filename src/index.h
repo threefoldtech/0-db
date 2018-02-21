@@ -1,5 +1,5 @@
-#ifndef __RKV_INDEX_H
-    #define __RKV_INDEX_H
+#ifndef __ZDB_INDEX_H
+    #define __ZDB_INDEX_H
 
     // index file header
     // this file is more there for information

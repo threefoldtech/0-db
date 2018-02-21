@@ -454,7 +454,7 @@ static size_t index_load_file(index_root_t *root) {
 
 // set global filename based on the index id
 static void index_set_id(index_root_t *root) {
-    sprintf(root->indexfile, "%s/rkv-index-%05u", root->indexdir, root->indexid);
+    sprintf(root->indexfile, "%s/zdb-index-%05u", root->indexdir, root->indexid);
 }
 
 // open the current filename set on the global struct

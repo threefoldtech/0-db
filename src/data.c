@@ -101,7 +101,7 @@ void data_initialize(char *filename) {
 
 // simply set globaly the current filename based on it's id
 static void data_set_id(data_t *root) {
-    sprintf(root->datafile, "%s/rkv-data-%05u", root->datadir, root->dataid);
+    sprintf(root->datafile, "%s/zdb-data-%05u", root->datadir, root->dataid);
 }
 
 // open the datafile based on it's id
@@ -109,7 +109,7 @@ static int data_open_id(data_t *root, uint16_t id) {
     char temp[PATH_MAX];
     int fd;
 
-    sprintf(temp, "%s/rkv-data-%05u", root->datadir, id);
+    sprintf(temp, "%s/zdb-data-%05u", root->datadir, id);
 
     if((fd = open(temp, O_RDONLY, 0600)) < 0)
         diep(temp);
