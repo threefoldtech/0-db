@@ -45,6 +45,10 @@
 
     } index_entry_t;
 
+    // WARNING: this should be on index_branch.h
+    //          but we can't due to cirtucal dependencies
+    //          in order to fix this, we should put all struct in a dedicated file
+    //
     // the current implementation of the index use rudimental index memory system
     // it's basicly just linked-list of entries
     // to improve performance without changing this basic implementation,

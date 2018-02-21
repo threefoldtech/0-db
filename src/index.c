@@ -15,44 +15,14 @@
 #include <errno.h>
 #include "zerodb.h"
 #include "index.h"
+#include "index_branch.h"
 #include "data.h"
-
-// maximum allowed branch in memory
-//
-// this settings is mainly the most important to
-// determine the keys lookup time
-//
-// the more bits you allows here, the more buckets
-// can be used for lookup without collision
-//
-// the index works like a hash-table and uses crc32 'hash'
-// algorithm, the result of the crc32 is used to point to
-// the bucket, but using a full 32-bits hashlist would
-// consume more than (2^32 * 8) GB of memory (on 64-bits)
-//
-// the default settings sets this to 24 bits, which allows
-// 16 millions direct entries, collisions uses linked-list
-//
-// makes sur mask and amount of branch are always in relation
-// use 'index_set_buckets_bits' to be sure
-static uint32_t buckets_branches = (1 << 24);
-static uint32_t buckets_mask = (1 << 24) - 1;
 
 // main global root index state
 static index_root_t *rootindex = NULL;
 
 // allows to works on readonly index (no write allowed)
 static index_status_t index_status = INDEX_NOT_LOADED | INDEX_HEALTHY;
-
-// set buckets length variables in bits
-// WARNING: this doesn't resize anything, you should calls this
-//          only before initialization
-int index_set_buckets_bits(uint8_t bits) {
-    buckets_branches = 1 << bits;
-    buckets_mask = (1 << bits) - 1;
-
-    return buckets_branches;
-}
 
 // force index to be sync'd with underlaying device
 static inline int index_sync(int fd) {
@@ -105,85 +75,6 @@ static int index_write(int fd, void *buffer, size_t length) {
 
 
 //
-// index branch
-// this implementation use a lazy load of branches
-// this allows us to use lot of branch (buckets_branches) in this case)
-// without consuming all the memory if we don't need it
-//
-index_branch_t *index_branch_init(uint32_t branchid) {
-    // debug("[+] initializing branch id 0x%x\n", branchid);
-
-    rootindex->branches[branchid] = malloc(sizeof(index_branch_t));
-    index_branch_t *branch = rootindex->branches[branchid];
-
-    branch->length = 0;
-    branch->last = NULL;
-    branch->list = NULL;
-
-    return branch;
-}
-
-void index_branch_free(uint32_t branchid) {
-    // this branch was not allocated
-    if(!rootindex->branches[branchid])
-        return;
-
-    index_entry_t *entry = rootindex->branches[branchid]->list;
-    index_entry_t *next = NULL;
-
-    // deleting branch content by
-    // iterate over the linked-list
-    for(; entry; entry = next) {
-        next = entry->next;
-        free(entry);
-    }
-
-    // deleting branch
-    free(rootindex->branches[branchid]);
-}
-
-// returns branch from rootindex, if branch is not allocated yet, returns NULL
-// useful for any read on the index in memory
-index_branch_t *index_branch_get(uint32_t branchid) {
-    return rootindex->branches[branchid];
-}
-
-// returns branch from rootindex, if branch doesn't exists, it will be allocated
-// (useful for any write in the index in memory)
-index_branch_t *index_branch_get_allocate(uint32_t branchid) {
-    if(!rootindex->branches[branchid])
-        return index_branch_init(branchid);
-
-    debug("[+] branch exists: %lu entries\n", rootindex->branches[branchid]->length);
-    return rootindex->branches[branchid];
-}
-
-// append an entry (item) to the memory list
-// since we use a linked-list, the logic of appending
-// only occures here
-index_entry_t *index_branch_append(uint32_t branchid, index_entry_t *entry) {
-    index_branch_t *branch;
-
-    // grabbing the branch
-    branch = index_branch_get_allocate(branchid);
-    branch->length += 1;
-
-    // adding this item and pointing previous last one
-    // to this new one
-    if(!branch->list)
-        branch->list = entry;
-
-    if(branch->last)
-        branch->last->next = entry;
-
-    branch->last = entry;
-    entry->next = NULL;
-
-    return entry;
-}
-
-
-//
 // index initialized
 //
 static char *index_date(uint32_t epoch, char *target, size_t length) {
@@ -219,7 +110,7 @@ static void index_dump(int fulldump) {
 
     // iterating over each buckets
     for(uint32_t b = 0; b < buckets_branches; b++) {
-        index_branch_t *branch = index_branch_get(b);
+        index_branch_t *branch = index_branch_get(rootindex, b);
 
         // skipping empty branch
         if(!branch)
@@ -564,7 +455,7 @@ static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
 // main look-up function, used to get an entry from the memory index
 index_entry_t *index_entry_get(unsigned char *id, uint8_t idlength) {
     uint32_t branchkey = index_key_hash(id, idlength);
-    index_branch_t *branch = index_branch_get(branchkey);
+    index_branch_t *branch = index_branch_get(rootindex, branchkey);
     index_entry_t *entry;
 
     // branch not exists
@@ -612,7 +503,7 @@ index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, si
     uint32_t branchkey = index_key_hash(id, idlength);
 
     // commit entry into memory
-    index_branch_append(branchkey, entry);
+    index_branch_append(rootindex, branchkey, entry);
 
     return entry;
 }
@@ -698,7 +589,7 @@ index_entry_t *index_entry_delete(unsigned char *id, uint8_t idlength) {
 // clean all opened index related stuff
 void index_destroy() {
     for(uint32_t b = 0; b < buckets_branches; b++)
-        index_branch_free(b);
+        index_branch_free(rootindex, b);
 
     // delete root object
     free(rootindex->branches);
