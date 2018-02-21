@@ -709,17 +709,17 @@ void index_destroy() {
 
 // create an index and load files
 uint16_t index_init(settings_t *settings) {
-    index_root_t *lroot = calloc(sizeof(index_root_t), 1);
+    index_root_t *root = calloc(sizeof(index_root_t), 1);
 
     debug("[+] initializing index\n");
 
-    lroot->indexdir = settings->indexpath;
-    lroot->indexid = 0;
-    lroot->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
-    lroot->nextentry = 0;
-    lroot->sync = settings->sync;
-    lroot->synctime = settings->synctime;
-    lroot->lastsync = 0;
+    root->indexdir = settings->indexpath;
+    root->indexid = 0;
+    root->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
+    root->nextentry = 0;
+    root->sync = settings->sync;
+    root->synctime = settings->synctime;
+    root->lastsync = 0;
 
     // don't allocate branch on direct-key mode since the
     // index is not used (no lookup needed)
@@ -729,7 +729,7 @@ uint16_t index_init(settings_t *settings) {
         debug("[+] allocating index (%d lazy branches)\n", buckets_branches);
 
         // allocating minimal branches array
-        if(!(lroot->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches)))
+        if(!(root->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches)))
             diep("calloc");
 
         // allocating transition variable, 256 is the key limit size
@@ -750,14 +750,14 @@ uint16_t index_init(settings_t *settings) {
     }
 
     // commit variable
-    rootindex = lroot;
+    rootindex = root;
 
-    index_load(lroot);
+    index_load(root);
 
     if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL)
         index_dump(settings->dump);
 
-    return lroot->indexid;
+    return root->indexid;
 }
 
 int index_emergency() {
