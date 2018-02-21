@@ -347,6 +347,11 @@ static int command_del(resp_request_t *request) {
     return 0;
 }
 
+static int command_info(resp_request_t *request) {
+    redis_hardsend(request->client->fd, "+0-db server\n");
+    return 0;
+}
+
 // STOP will be only compiled in debug mode
 // this will force to exit listen loop in order to call
 // all destructors, this is useful to ensure every memory allocation
@@ -376,19 +381,21 @@ static command_t commands_handlers[] = {
     {.command = "SETX", .handler = command_set},  // alias for SET command
     {.command = "GET",  .handler = command_get},  // default GET command
     {.command = "DEL",  .handler = command_del},  // default DEL command
-    {.command = "STOP", .handler = command_stop}  // custom command for debug purpose
+    {.command = "INFO", .handler = command_info}, // returns 0-db server name
+    {.command = "STOP", .handler = command_stop}, // custom command for debug purpose
 };
 
 int redis_dispatcher(resp_request_t *request) {
     resp_object_t *key = request->argv[0];
 
     debug("[+] request from fd: %d, namespace: %s\n", request->client->fd, request->client->ns);
-    debug("[+] command <%.*s> (%d argv)\n", key->length, (char *) key->buffer, request->argc);
 
     if(key->type != STRING) {
         debug("[+] not a string command, ignoring\n");
         return 0;
     }
+
+    debug("[+] resp command: %.*s [+%d args]\n", key->length, (char *) key->buffer, request->argc - 1);
 
     for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
         if(strncmp(key->buffer, commands_handlers[i].command, key->length) == 0)
