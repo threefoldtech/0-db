@@ -67,27 +67,6 @@
 
     } index_branch_t;
 
-    // global root memory structure of the index
-    typedef struct index_root_t {
-        char *indexdir;     // directory where index files are
-        char *indexfile;    // current index filename in use
-        uint16_t indexid;   // current index file id in use (sync with data id)
-        int indexfd;        // current file descriptor used
-        uint32_t nextentry; // next-entry is a global id used in sequential mode (next seq-id)
-        index_branch_t **branches; // list of branches explained later
-        int sync;           // flag to force write sync
-        int synctime;       // force sync index after this amount of time
-        time_t lastsync;    // keep track when the last sync was explictly made
-
-    } index_root_t;
-
-    // key used by direct mode
-    typedef struct index_dkey_t {
-        uint16_t dataid;
-        uint32_t offset;
-
-    } __attribute__((packed)) index_dkey_t;
-
     // index status flags
     // keep some heatly status of the index
     typedef enum index_status_t {
@@ -97,6 +76,31 @@
         INDEX_DEGRADED   = 1 << 3,  // some error occured during index loads
 
     } index_status_t;
+
+    //
+    // global root memory structure of the index
+    //
+    typedef struct index_root_t {
+        char *indexdir;     // directory where index files are
+        char *indexfile;    // current index filename in use
+        uint16_t indexid;   // current index file id in use (sync with data id)
+        int indexfd;        // current file descriptor used
+        uint32_t nextentry; // next-entry is a global id used in sequential mode (next seq-id)
+        int sync;           // flag to force write sync
+        int synctime;       // force sync index after this amount of time
+        time_t lastsync;    // keep track when the last sync was explictly made
+
+        index_branch_t **branches; // list of branches explained later
+        index_status_t status;     // index health
+
+    } index_root_t;
+
+    // key used by direct mode
+    typedef struct index_dkey_t {
+        uint16_t dataid;
+        uint32_t offset;
+
+    } __attribute__((packed)) index_dkey_t;
 
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1

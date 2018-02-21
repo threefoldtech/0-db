@@ -21,8 +21,6 @@
 // main global root index state
 static index_root_t *rootindex = NULL;
 
-// allows to works on readonly index (no write allowed)
-static index_status_t index_status = INDEX_NOT_LOADED | INDEX_HEALTHY;
 
 // force index to be sync'd with underlaying device
 static inline int index_sync(int fd) {
@@ -201,7 +199,7 @@ static int index_try_rootindex(index_root_t *root) {
 
         // we keep track that we are on a readonly filesystem
         // we can't live with it, but with restriction
-        index_status |= INDEX_READ_ONLY;
+        root->status |= INDEX_READ_ONLY;
     }
 
     return 1;
@@ -229,7 +227,7 @@ static size_t index_load_file(index_root_t *root) {
             // this is probably an unrecoverable issue, let's skip this
             // index file (this could break consistancy)
             warnp("index: header read");
-            index_status |= INDEX_DEGRADED;
+            root->status |= INDEX_DEGRADED;
             return 1;
         }
 
@@ -258,7 +256,7 @@ static size_t index_load_file(index_root_t *root) {
         // and we are in read-only mode, we can't write on the index
         // and it's empty, there is no goal to do anything
         // let's crash
-        if(index_status & INDEX_READ_ONLY) {
+        if(root->status & INDEX_READ_ONLY) {
             fprintf(stderr, "[-] no index found and readonly filesystem\n");
             fprintf(stderr, "[-] cannot starts correctly\n");
             exit(EXIT_FAILURE);
@@ -271,7 +269,7 @@ static size_t index_load_file(index_root_t *root) {
 
     // re-writing the header, with updated data if the index is writable
     // if the file was just created, it's okay, we have a new struct ready
-    if(!(index_status & INDEX_READ_ONLY)) {
+    if(!(root->status & INDEX_READ_ONLY)) {
         // updating index with latest opening state
         header.opened = time(NULL);
         lseek(root->indexfd, 0, SEEK_SET);
@@ -352,7 +350,7 @@ static void index_set_id(index_root_t *root) {
 static void index_open_final(index_root_t *root) {
     int flags = O_CREAT | O_RDWR | O_APPEND;
 
-    if(index_status & INDEX_READ_ONLY)
+    if(root->status & INDEX_READ_ONLY)
         flags = O_RDONLY;
 
     if((root->indexfd = open(root->indexfile, flags, 0600)) < 0) {
@@ -385,24 +383,24 @@ static void index_load(index_root_t *root) {
         }
     }
 
-    if(index_status & INDEX_READ_ONLY) {
+    if(root->status & INDEX_READ_ONLY) {
         warning("[-] ========================================================");
         warning("[-] WARNING: running in read-only mode");
         warning("[-] WARNING: index filesystem is not writable");
         warning("[-] ========================================================");
     }
 
-    if(index_status & INDEX_DEGRADED) {
+    if(root->status & INDEX_DEGRADED) {
         warning("[-] ========================================================");
         warning("[-] WARNING: index degraded (read errors)");
         warning("[-] ========================================================");
     }
 
-    if(index_status & INDEX_HEALTHY)
+    if(root->status & INDEX_HEALTHY)
         success("[+] index healthy");
 
     // setting index as loaded (removing flag)
-    index_status &= ~INDEX_NOT_LOADED;
+    root->status &= ~INDEX_NOT_LOADED;
 
     // opening the real active index file in append mode
     index_open_final(root);
@@ -611,6 +609,7 @@ uint16_t index_init(settings_t *settings) {
     root->sync = settings->sync;
     root->synctime = settings->synctime;
     root->lastsync = 0;
+    root->status = INDEX_NOT_LOADED | INDEX_HEALTHY;
 
     // don't allocate branch on direct-key mode since the
     // index is not used (no lookup needed)
@@ -653,7 +652,7 @@ uint16_t index_init(settings_t *settings) {
 
 int index_emergency() {
     // skipping building index stage
-    if(index_status & INDEX_NOT_LOADED)
+    if(rootindex && (rootindex->status & INDEX_NOT_LOADED))
         return 0;
 
     fsync(rootindex->indexfd);
