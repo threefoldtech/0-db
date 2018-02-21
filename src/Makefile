@@ -14,7 +14,7 @@ endif
 all: $(EXEC)
 
 release: CFLAGS+=-DRELEASE
-release: $(EXEC)
+release: clean $(EXEC)
 
 $(EXEC): $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
