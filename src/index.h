@@ -117,4 +117,15 @@
     index_entry_t *index_entry_delete(unsigned char *id, uint8_t length);
 
     extern index_entry_t *index_reusable_entry;
+
+    // extern but not really public functions
+    // used by index_loader
+    int index_write(int fd, void *buffer, size_t length);
+    void index_set_id(index_root_t *root);
+    void index_open_final(index_root_t *root);
+
+    extern index_item_t *index_transition;
+    extern index_entry_t *index_reusable_entry;
+
+    void index_set_rootindex(index_root_t *root);
 #endif
