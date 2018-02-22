@@ -84,7 +84,7 @@ void index_open_final(index_root_t *root) {
 
     if((root->indexfd = open(root->indexfile, flags, 0600)) < 0) {
         warnp(root->indexfile);
-        fprintf(stderr, "[-] could not open index file\n");
+        fprintf(stderr, "[-] index: could not open index file\n");
         return;
     }
 
@@ -95,7 +95,7 @@ void index_open_final(index_root_t *root) {
 // data file, we only do this when datafile changes basicly, this is
 // triggered by a datafile too big event
 size_t index_jump_next(index_root_t *root) {
-    verbose("[+] jumping to the next index file\n");
+    verbose("[+] index: jumping to the next file\n");
 
     // closing current file descriptor
     close(root->indexfd);
@@ -164,7 +164,7 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
 
     // item already exists
     if((exists = index_entry_get(root, id, idlength))) {
-        debug("[+] key already exists, overwriting\n");
+        debug("[+] index: key already exists, overwriting\n");
 
         // re-use existing entry
         exists->length = length;
@@ -237,12 +237,12 @@ index_entry_t *index_entry_delete(index_root_t *root, unsigned char *id, uint8_t
     index_entry_t *entry = index_entry_get(root, id, idlength);
 
     if(!entry) {
-        verbose("[-] key not found\n");
+        verbose("[-] index: key not found\n");
         return NULL;
     }
 
     if(entry->flags & INDEX_ENTRY_DELETED) {
-        verbose("[-] key already deleted\n");
+        verbose("[-] index: key already deleted\n");
         return NULL;
     }
 

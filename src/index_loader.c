@@ -45,7 +45,7 @@ static void index_dump(index_root_t *root, int fulldump) {
     size_t indexsize = 0;
     size_t branches = 0;
 
-    printf("[+] verifyfing index populated\n");
+    printf("[+] index: verifyfing populated keys\n");
 
     if(fulldump)
         printf("[+] ===========================\n");
@@ -80,11 +80,11 @@ static void index_dump(index_root_t *root, int fulldump) {
         printf("[+] ===========================\n");
     }
 
-    verbose("[+] index load: %lu entries\n", entries);
-    verbose("[+] index uses: %lu branches\n", branches);
+    verbose("[+] index: load: %lu entries\n", entries);
+    verbose("[+] index: uses: %lu branches\n", branches);
 
-    verbose("[+] datasize expected: %.2f MB (%lu bytes)\n", (datasize / (1024.0 * 1024)), datasize);
-    verbose("[+] index raw usage: %.2f KB (%lu bytes)\n", (indexsize / 1024.0), indexsize);
+    verbose("[+] index: datasize expected: %.2f MB (%lu bytes)\n", (datasize / (1024.0 * 1024)), datasize);
+    verbose("[+] index: raw usage: %.2f KB (%lu bytes)\n", (indexsize / 1024.0), indexsize);
 
     // overhead contains:
     // - the buffer allocated to hold each (futur) branches pointer
@@ -92,7 +92,7 @@ static void index_dump(index_root_t *root, int fulldump) {
     size_t overhead = (buckets_branches * sizeof(index_branch_t **)) +
                       (branches * sizeof(index_branch_t));
 
-    verbose("[+] memory overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
+    verbose("[+] index: memory overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
 }
 
 //
@@ -163,7 +163,7 @@ static size_t index_load_file(index_root_t *root) {
     index_t header;
     ssize_t length;
 
-    verbose("[+] loading index file: %s\n", root->indexfile);
+    verbose("[+] index: loading file: %s\n", root->indexfile);
 
     if(!index_try_rootindex(root))
         return 0;
@@ -194,7 +194,7 @@ static size_t index_load_file(index_root_t *root) {
         // a new file not expected, otherwise if index is zero,
         // this is the initial index file we need to create
         if(root->indexid > 0) {
-            verbose("[+] discarding index file\n");
+            verbose("[+] index: discarding file\n");
             close(root->indexfd);
             return 0;
         }
@@ -209,7 +209,7 @@ static size_t index_load_file(index_root_t *root) {
             exit(EXIT_FAILURE);
         }
 
-        printf("[+] creating empty index file\n");
+        printf("[+] index: creating empty file\n");
         header = index_initialize(root->indexfd, root->indexid, root);
     }
 
@@ -226,8 +226,8 @@ static size_t index_load_file(index_root_t *root) {
     }
 
     char date[256];
-    verbose("[+] index created at: %s\n", index_date(header.created, date, sizeof(date)));
-    verbose("[+] index last open: %s\n", index_date(header.opened, date, sizeof(date)));
+    verbose("[+] index: created at: %s\n", index_date(header.created, date, sizeof(date)));
+    verbose("[+] index: last open: %s\n", index_date(header.opened, date, sizeof(date)));
 
     if(header.mode != rootsettings.mode) {
         danger("[!] ========================================================");
@@ -236,7 +236,7 @@ static size_t index_load_file(index_root_t *root) {
         danger("[!] ========================================================");
     }
 
-    printf("[+] populating index: %s\n", root->indexfile);
+    printf("[+] index: populating: %s\n", root->indexfile);
 
     // reading the index, populating memory
     //
@@ -323,7 +323,7 @@ static void index_load(index_root_t *root) {
     }
 
     if(root->status & INDEX_HEALTHY)
-        success("[+] index healthy");
+        success("[+] index: healthy");
 
     // setting index as loaded (removing flag)
     root->status &= ~INDEX_NOT_LOADED;

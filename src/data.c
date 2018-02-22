@@ -123,19 +123,19 @@ static void data_open_final(data_root_t *root) {
         if((root->datafd = open(root->datafile, O_RDONLY, 0600)) < 0)
             diep(root->datafile);
 
-        debug("[+] data file opened in read-only mode\n");
+        debug("[+] data: file opened in read-only mode\n");
     }
 
     // skipping header
     lseek(root->datafd, 0, SEEK_END);
 
-    printf("[+] active data file: %s\n", root->datafile);
+    printf("[+] data: active file: %s\n", root->datafile);
 }
 
 // jumping to the next id close the current data file
 // and open the next id file, it will create the new file
 size_t data_jump_next(data_root_t *root, uint16_t newid) {
-    verbose("[+] jumping to the next data file\n");
+    verbose("[+] data: jumping to the next file\n");
 
     // closing current file descriptor
     close(root->datafd);
@@ -191,19 +191,19 @@ data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_
     if(root->dataid != dataid) {
         // the requested datafile is not the current datafile opened
         // we will re-open the expected datafile temporary
-        debug("[-] current data file: %d, requested: %d, switching\n", root->dataid, dataid);
+        debug("[-] data: current file: %d, requested: %d, switching\n", root->dataid, dataid);
         fd = data_open_id(root, dataid);
     }
 
     // if we don't know the length in advance, we will read the
     // data header to know the payload size from it
     if(length == 0) {
-        debug("[+] fetching length from datafile\n");
+        debug("[+] data: fetching length from datafile\n");
 
         if((length = data_length_from_offset(fd, offset)) == 0)
             return payload;
 
-        debug("[+] length from datafile: %zu\n", length);
+        debug("[+] data: length from datafile: %zu\n", length);
     }
 
     // positioning datafile to expected offset

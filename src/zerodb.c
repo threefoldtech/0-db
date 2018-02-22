@@ -114,7 +114,7 @@ static void sighandler(int signal) {
             // which will try to save and flush buffers
 
         case SIGINT:
-            printf("\n[+] cleaning namespaces\n");
+            printf("\n[+] signal: request cleaning\n");
             namespace_emergency();
 
         break;
@@ -126,7 +126,7 @@ static void sighandler(int signal) {
 
 
 static int proceed(struct settings_t *settings) {
-    verbose("[+] setting up environments\n");
+    verbose("[+] system: setting up environments\n");
     signal_intercept(SIGSEGV, sighandler);
     signal_intercept(SIGINT, sighandler);
 
@@ -207,7 +207,7 @@ int main(int argc, char *argv[]) {
 
             case 'v':
                 settings->verbose = 1;
-                verbose("[+] verbose mode enabled\n");
+                verbose("[+] system: verbose mode enabled\n");
                 break;
 
             case 'x':
@@ -249,15 +249,15 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    printf("[+] running mode: %s\n", modes[settings->mode]);
+    printf("[+] system: running mode: %s\n", modes[settings->mode]);
 
     if(!dir_exists(settings->datapath)) {
-        verbose("[+] creating datapath: %s\n", settings->datapath);
+        verbose("[+] system: creating datapath: %s\n", settings->datapath);
         dir_create(settings->datapath);
     }
 
     if(!dir_exists(settings->indexpath)) {
-        verbose("[+] creating indexpath: %s\n", settings->indexpath);
+        verbose("[+] system: creating indexpath: %s\n", settings->indexpath);
         dir_create(settings->indexpath);
     }
 

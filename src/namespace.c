@@ -208,6 +208,8 @@ namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
 // this is why it's here we take care about cleaning and emergencies, it's the only
 // place where we __knows__ what we needs to clean
 int namespace_init(settings_t *settings) {
+    verbose("[+] namespaces: initializing\n");
+
     // we start by the default namespace
     if(!(nsroot = (ns_root_t *) malloc(sizeof(ns_root_t))))
         diep("namespaces malloc");
@@ -221,7 +223,7 @@ int namespace_init(settings_t *settings) {
 
     // allocating (if needed, only some modes needs it) the big (single) index branches
     if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL) {
-        debug("[+] pre-allocating index (%d lazy branches)\n", buckets_branches);
+        debug("[+] namespaces: pre-allocating index (%d lazy branches)\n", buckets_branches);
 
         // allocating minimal branches array
         if(!(nsroot->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches)))
@@ -254,7 +256,7 @@ int namespace_destroy() {
     // since branch want an index as argument, let's use
     // the first namespace (default), since they all share
     // the same buffer
-    debug("[+] cleaning branches\n");
+    debug("[+] namespaces: cleaning branches\n");
     for(uint32_t b = 0; b < buckets_branches; b++)
         index_branch_free(nsroot->namespaces[0]->index, b);
 
@@ -262,7 +264,7 @@ int namespace_destroy() {
     free(nsroot->branches);
 
     // freeing each namespace's index and data buffers
-    debug("[+] cleaning index and data\n");
+    debug("[+] namespaces: cleaning index and data\n");
     for(size_t i = 0; i < nsroot->length; i++) {
         index_destroy(nsroot->namespaces[i]->index);
         data_destroy(nsroot->namespaces[i]->data);
@@ -280,10 +282,10 @@ int namespace_destroy() {
 
 int namespace_emergency() {
     for(size_t i = 0; i < nsroot->length; i++) {
-        printf("[+] flushing index [%s]\n", nsroot->namespaces[i]->name);
+        printf("[+] namespaces: flushing index [%s]\n", nsroot->namespaces[i]->name);
 
         if(index_emergency(nsroot->namespaces[i]->index)) {
-            printf("[+] flushing data [%s]\n", nsroot->namespaces[i]->name);
+            printf("[+] namespaces: flushing data [%s]\n", nsroot->namespaces[i]->name);
             // only flusing data if index flush was accepted
             // if index flush returns 0, we are probably in an initializing stage
             data_emergency(nsroot->namespaces[i]->data);
