@@ -332,32 +332,28 @@ static void index_load(index_root_t *root) {
     index_open_final(root);
 }
 
-// create an index and load files
-index_root_t *index_init(settings_t *settings, char *indexdir, index_branch_t **branches) {
-    index_root_t *root = calloc(sizeof(index_root_t), 1);
-
-    debug("[+] initializing index\n");
-
-    root->indexdir = indexdir;
-    root->indexid = 0;
-    root->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
-    root->nextentry = 0;
-    root->sync = settings->sync;
-    root->synctime = settings->synctime;
-    root->lastsync = 0;
-    root->status = INDEX_NOT_LOADED | INDEX_HEALTHY;
-    root->branches = branches;
+static void index_allocate_single(settings_t *settings) {
+    // if variables are already allocated
+    // this process is silently skipped
 
     // don't allocate branch on direct-key mode since the
     // index is not used (no lookup needed)
     // we don't load index neither, since the index will always
     // be empty
     if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL) {
+        // avoid already allocated buffer
+        if(index_transition)
+            return;
+
         // allocating transition variable, a reusable item
         if(!(index_transition = malloc(sizeof(index_item_t) + MAX_KEY_LENGTH + 1)))
             diep("malloc");
 
     } else if(settings->mode == DIRECTKEY) {
+        // avoid already allocated buffer
+        if(index_reusable_entry)
+            return;
+
         // in direct key mode, we allocate a re-usable
         // index_entry_t which will be adapted each time
         // using the requested key, like this we can use the same
@@ -369,7 +365,29 @@ index_root_t *index_init(settings_t *settings, char *indexdir, index_branch_t **
         if(!(index_reusable_entry = (index_entry_t *) malloc(sizeof(index_entry_t))))
             diep("malloc");
     }
+}
 
+// create an index and load files
+index_root_t *index_init(settings_t *settings, char *indexdir, index_branch_t **branches) {
+    index_root_t *root = calloc(sizeof(index_root_t), 1);
+
+    debug("[+] index: initializing\n");
+
+    root->indexdir = indexdir;
+    root->indexid = 0;
+    root->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
+    root->nextentry = 0;
+    root->sync = settings->sync;
+    root->synctime = settings->synctime;
+    root->lastsync = 0;
+    root->status = INDEX_NOT_LOADED | INDEX_HEALTHY;
+    root->branches = branches;
+
+    // since this function will be called for each namespace
+    // we will not allocate all the time the reusable variables
+    // but this is the 'main entry' of index loading, so doing this
+    // here makes sens
+    index_allocate_single(settings);
     index_load(root);
 
     if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL)
