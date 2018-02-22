@@ -33,16 +33,9 @@ static ns_root_t *nsroot = NULL;
 //
 // public namespace endpoint
 //
-int namespace_create(unsigned char *name, unsigned char *secret, int public) {
-    (void) name;
-    (void) secret;
-    (void) public;
-
-    return 0;
-}
-
 void namespace_list() {
-
+    for(size_t i = 0; i < nsroot->length; i++)
+        printf(">> %s\n", nsroot->namespaces[i]->name);
 }
 
 int namespace_delete(unsigned char *name) {
@@ -51,13 +44,20 @@ int namespace_delete(unsigned char *name) {
     return 0;
 }
 
+// be careful with this.
+ns_root_t *namespace_get_list() {
+    return nsroot;
+}
+
 namespace_t *namespace_get_default() {
     return nsroot->namespaces[0];
 }
 
-namespace_t *namespace_get(unsigned char *name, unsigned char *secret) {
-    (void) name;
-    (void) secret;
+namespace_t *namespace_get(char *name) {
+    for(size_t i = 0; i < nsroot->length; i++) {
+        if(strcmp(nsroot->namespaces[i]->name, name) == 0)
+            return nsroot->namespaces[i];
+    }
 
     return NULL;
 }
@@ -72,7 +72,7 @@ int namespace_set(unsigned char *name, int settings) {
 void namespace_update_descriptor(namespace_t *namespace, int fd) {
     ns_header_t header;
 
-    debug("[+] updating the namespace header\n");
+    debug("[+] namespaces: updating header\n");
 
     header.namelength = strlen(namespace->name);
     header.passlength = namespace->password ? strlen(namespace->password) : 0;
@@ -147,13 +147,13 @@ static char *namespace_path(char *prefix, char *name) {
 }
 
 namespace_t *namespace_ensure(namespace_t *namespace) {
-    debug("[+] namespace: checking index [%s]\n", namespace->indexpath);
+    debug("[+] namespaces: checking index [%s]\n", namespace->indexpath);
     if(!dir_exists(namespace->indexpath)) {
         if(dir_create(namespace->indexpath) < 0)
             return warnp("index dir_create");
     }
 
-    debug("[+] namespace: checking data [%s]\n", namespace->datapath);
+    debug("[+] namespaces: checking data [%s]\n", namespace->datapath);
     if(!dir_exists(namespace->datapath)) {
         if(dir_create(namespace->datapath) < 0)
             return warnp("data dir_create");
@@ -163,10 +163,10 @@ namespace_t *namespace_ensure(namespace_t *namespace) {
 }
 
 // load (or create if it doesn't exists) a namespace
-namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
+static namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
     namespace_t *namespace;
 
-    debug("[+] namespace: loading '%s'\n", name);
+    debug("[+] namespaces: loading '%s'\n", name);
 
     if(!(namespace = malloc(sizeof(namespace_t)))) {
         warnp("namespace malloc");
@@ -177,6 +177,7 @@ namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
     namespace->password = NULL;
     namespace->indexpath = namespace_path(nsroot->settings->indexpath, name);
     namespace->datapath = namespace_path(nsroot->settings->datapath, name);
+    namespace->public = 0;
 
     if(!namespace_ensure(namespace))
         return NULL;
@@ -185,10 +186,103 @@ namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
 
     // now, we are sure the namespace exists, but it's maybe empty
     // let's call index and data initializer, they will take care about that
-    namespace->index = index_init(nsroot->settings, namespace->indexpath, nsroot->branches);
+    namespace->index = index_init(nsroot->settings, namespace->indexpath, namespace, nsroot->branches);
     namespace->data = data_init(nsroot->settings, namespace->datapath, namespace->index->indexid);
 
     return namespace;
+}
+
+//
+// add a namespace to the main namespaces list
+//
+static namespace_t *namespace_push(ns_root_t *root, namespace_t *namespace) {
+    size_t newlength = root->length + 1;
+    namespace_t **newlist = NULL;
+
+    if(!(newlist = realloc(root->namespaces, sizeof(namespace_t) * newlength)))
+        return warnp("realloc namespaces list");
+
+    root->namespaces = newlist;
+    root->namespaces[root->length] = namespace;
+    root->length = newlength;
+
+    return namespace;
+}
+
+//
+// create (load) a new namespace
+//
+// note: this function doesn't check if the namespace already exists
+// if it already exists, you could end with duplicate in memory
+// do not call this is you didn't checked the namespace already exists
+// by getting it first
+//
+int namespace_create(char *name, char *secret) {
+    namespace_t *namespace;
+
+    // call the generic namespace loader
+    if(!(namespace = namespace_load(nsroot, name)))
+        return 0;
+
+    // if password is set, applying to the config
+    // and commit the change on the descriptor
+    if(secret) {
+        // set secret ...
+    }
+
+    // append the namespace to the main list
+    if(!namespace_push(nsroot, namespace))
+        return 0;
+
+    return 1;
+}
+
+static int namespace_valid_name(char *name) {
+    if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+        return 0;
+
+    if(strcmp(name, NAMESPACE_DEFAULT) == 0)
+        return 0;
+
+    return 1;
+}
+
+//
+// scan the index directories and load any namespaces found
+//
+static int namespace_scanload(ns_root_t *root) {
+    int loaded = 0;
+    struct dirent *ep;
+    DIR *dp;
+
+    // listing the directory
+    // if this fails, we mark this as fatal since
+    // it's on init-time, if the directory cannot be read
+    // we should not be here at all
+    if(!(dp = opendir(root->settings->indexpath)))
+        diep("opendir");
+
+    while((ep = readdir(dp))) {
+        if(!namespace_valid_name(ep->d_name))
+            continue;
+
+        debug("[+] namespaces: extra found: %s\n", ep->d_name);
+
+        // loading the namespace
+        namespace_t *namespace;
+        if(!(namespace = namespace_load(root, ep->d_name)))
+            continue;
+
+        // commit to the main list
+        namespace_push(root, namespace);
+        loaded += 1;
+    }
+
+    closedir(dp);
+
+    verbose("[+] namespaces: %d extra namespaces loaded\n", loaded);
+
+    return loaded;
 }
 
 // here is where the whole initialization and loader starts
@@ -236,7 +330,7 @@ int namespace_init(settings_t *settings) {
         exit(EXIT_FAILURE);
     }
 
-    // TODO: scanning for others namespaces now
+    namespace_scanload(nsroot);
 
     return 0;
 }

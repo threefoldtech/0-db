@@ -48,6 +48,11 @@
 
     } ns_root_t;
 
+    ns_root_t *namespace_get_list();
+
+    int namespace_create(char *name, char *secret);
+    namespace_t *namespace_get(char *name);
+
     int namespace_init(settings_t *settings);
     int namespace_destroy();
     int namespace_emergency();

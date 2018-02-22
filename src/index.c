@@ -149,6 +149,9 @@ index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t id
         if(entry->idlength != idlength)
             continue;
 
+        if(entry->namespace != root->namespace)
+            continue;
+
         if(memcmp(entry->id, id, idlength) == 0)
             return entry;
     }
@@ -166,6 +169,10 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
     if((exists = index_entry_get(root, id, idlength))) {
         debug("[+] index: key already exists, overwriting\n");
 
+        // update statistics
+        root->datasize -= exists->length;
+        root->datasize += length;
+
         // re-use existing entry
         exists->length = length;
         exists->offset = offset;
@@ -175,9 +182,11 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
     }
 
     // calloc will ensure any unset fields (eg: flags) to zero
-    index_entry_t *entry = calloc(sizeof(index_entry_t) + idlength, 1);
+    size_t entrysize = sizeof(index_entry_t) + idlength;
+    index_entry_t *entry = calloc(entrysize, 1);
 
     memcpy(entry->id, id, idlength);
+    entry->namespace = root->namespace;
     entry->idlength = idlength;
     entry->offset = offset;
     entry->length = length;
@@ -187,6 +196,11 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
 
     // commit entry into memory
     index_branch_append(root, branchkey, entry);
+
+    // update statistics
+    root->entries += 1;
+    root->datasize += length;
+    root->indexsize += entrysize;
 
     return entry;
 }

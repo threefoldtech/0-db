@@ -3,7 +3,7 @@ SRC=$(wildcard *.c)
 OBJ=$(SRC:.c=.o)
 
 CFLAGS=-g -W -Wall -O2 -msse4.2 -Wno-implicit-fallthrough
-LDFLAGS=-rdynamic 
+LDFLAGS=-rdynamic
 
 # grab version from git, if possible
 REVISION := $(shell git describe --abbrev=8 --dirty --always --tags)

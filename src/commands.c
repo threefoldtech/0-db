@@ -403,6 +403,155 @@ static int command_info(resp_request_t *request) {
     return 0;
 }
 
+static int command_nsnew(resp_request_t *request) {
+    char *target = NULL;
+
+    if(!command_args_validate(request, 2))
+        return 1;
+
+    if(request->argv[1]->length > 128) {
+        redis_hardsend(request->client->fd, "-Namespace too long");
+        return 1;
+    }
+
+    // get name as usable string
+    if(!(target = command_strargv(request, 1)))
+        return 1;
+
+    // deny already existing namespace
+    if(namespace_get(target)) {
+        debug("[-] command: mkns: namespace already exists\n");
+        redis_hardsend(request->client->fd, "-This namespace is not available");
+        free(target);
+        return 1;
+    }
+
+    // creating the new namespace
+    if(!namespace_create(target, NULL)) { // FIXME: support password
+        redis_hardsend(request->client->fd, "-Could not create namespace");
+        free(target);
+        return 1;
+    }
+
+    redis_hardsend(request->client->fd, "+OK");
+
+    free(target);
+
+    return 0;
+}
+
+static int command_select(resp_request_t *request) {
+    char *target = NULL;
+    namespace_t *namespace = NULL;
+
+    if(!command_args_validate(request, 2))
+        return 1;
+
+    if(request->argv[1]->length > 128) {
+        redis_hardsend(request->client->fd, "-Namespace too long");
+        return 1;
+    }
+
+    // get name as usable string
+    if(!(target = command_strargv(request, 1)))
+        return 1;
+
+
+    // checking for existing namespace
+    if(!(namespace = namespace_get(target))) {
+        debug("[-] command: select: namespace not found\n");
+        redis_hardsend(request->client->fd, "-Namespace not found");
+        free(target);
+        return 1;
+    }
+
+    // FIXME: check password
+    if(namespace->password) {
+        // ...
+    }
+
+    // switching client's active namespace
+    debug("[+] command: select: moving user to namespace '%s'\n", namespace->name);
+    request->client->ns = namespace;
+
+    // return confirmation
+    redis_hardsend(request->client->fd, "+OK");
+
+    free(target);
+
+    return 0;
+}
+
+static int command_nslist(resp_request_t *request) {
+    char line[512];
+    ns_root_t *nsroot = namespace_get_list();
+
+    // streaming list to the client
+    sprintf(line, "*%lu\r\n", nsroot->length);
+    send(request->client->fd, line, strlen(line), 0);
+
+    debug("[+] command: nslist: sending %lu items\n", nsroot->length);
+
+    // sending each namespace line by line
+    for(size_t i = 0; i < nsroot->length; i++) {
+        namespace_t *ns = nsroot->namespaces[i];
+
+        sprintf(line, "$%ld\r\n%s\r\n", strlen(ns->name), ns->name);
+        send(request->client->fd, line, strlen(line), 0);
+    }
+
+    return 0;
+}
+
+static int command_nsinfo(resp_request_t *request) {
+    char info[1024];
+    char *target = NULL;
+    namespace_t *namespace;
+
+    if(!command_args_validate(request, 2))
+        return 1;
+
+    if(request->argv[1]->length > 128) {
+        redis_hardsend(request->client->fd, "-Namespace too long");
+        return 1;
+    }
+
+    // get name as usable string
+    if(!(target = command_strargv(request, 1)))
+        return 1;
+
+    // checking for existing namespace
+    if(!(namespace = namespace_get(target))) {
+        debug("[-] command: nsinfo: namespace not found\n");
+        redis_hardsend(request->client->fd, "-Namespace not found");
+        free(target);
+        return 1;
+    }
+
+    sprintf(info, "# namespace\n");
+    sprintf(info + strlen(info), "name: %s\n", namespace->name);
+    sprintf(info + strlen(info), "entries: %lu\n", namespace->index->entries);
+    sprintf(info + strlen(info), "public: %s\n", namespace->public ? "yes" : "no");
+    sprintf(info + strlen(info), "data_size_bytes: %lu\n", namespace->index->datasize);
+    sprintf(info + strlen(info), "data_size_mb: %.2f\n", namespace->index->datasize / (1024 * 1024.0));
+    sprintf(info + strlen(info), "data_limits_bytes: %lu\n", namespace->maxsize);
+    sprintf(info + strlen(info), "index_size_bytes: %lu\n", namespace->index->indexsize);
+    sprintf(info + strlen(info), "index_size_kb: %.2f\n", namespace->index->indexsize / 1024.0);
+
+    redis_bulk_t response = redis_bulk(info, strlen(info));
+    if(!response.buffer) {
+        redis_hardsend(request->client->fd, "$-1");
+        return 0;
+    }
+
+    send(request->client->fd, response.buffer, response.length, 0);
+
+    free(response.buffer);
+
+    return 0;
+}
+
+
 // STOP will be only compiled in debug mode
 // this will force to exit listen loop in order to call
 // all destructors, this is useful to ensure every memory allocation
@@ -434,6 +583,11 @@ static command_t commands_handlers[] = {
     {.command = "DEL",  .handler = command_del},  // default DEL command
     {.command = "INFO", .handler = command_info}, // returns 0-db server name
     {.command = "STOP", .handler = command_stop}, // custom command for debug purpose
+
+    {.command = "NSNEW",  .handler = command_nsnew},   // custom command to create a namespace
+    {.command = "NSLIST", .handler = command_nslist},  // custom command to list namespaces
+    {.command = "NSINFO", .handler = command_nsinfo},  // custom command to get namespace information
+    {.command = "SELECT", .handler = command_select},  // switching namespace
 };
 
 int redis_dispatcher(resp_request_t *request) {

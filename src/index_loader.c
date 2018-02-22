@@ -40,9 +40,6 @@ static inline void index_dump_entry(index_entry_t *entry) {
 // dumps the current index load
 // fulldump flags enable printing each entry
 static void index_dump(index_root_t *root, int fulldump) {
-    size_t datasize = 0;
-    size_t entries = 0;
-    size_t indexsize = 0;
     size_t branches = 0;
 
     printf("[+] index: verifyfing populated keys\n");
@@ -66,25 +63,30 @@ static void index_dump(index_root_t *root, int fulldump) {
             if(fulldump)
                 index_dump_entry(entry);
 
-            indexsize += sizeof(index_entry_t) + entry->idlength;
-            datasize += entry->length;
-
+            /*
+            root->indexsize += sizeof(index_entry_t) + entry->idlength;
+            root->datasize += entry->length;
+            root->entries += 1;
             entries += 1;
+            */
         }
     }
 
     if(fulldump) {
-        if(entries == 0)
+        if(root->entries == 0)
             printf("[+] index is empty\n");
 
         printf("[+] ===========================\n");
     }
 
-    verbose("[+] index: load: %lu entries\n", entries);
+    verbose("[+] index: load: %lu entries\n", root->entries);
     verbose("[+] index: uses: %lu branches\n", branches);
 
-    verbose("[+] index: datasize expected: %.2f MB (%lu bytes)\n", (datasize / (1024.0 * 1024)), datasize);
-    verbose("[+] index: raw usage: %.2f KB (%lu bytes)\n", (indexsize / 1024.0), indexsize);
+    double datamb = root->datasize / (1024.0 * 1024);
+    double indexkb = root->indexsize / 1024.0;
+
+    verbose("[+] index: datasize expected: %.2f MB (%lu bytes)\n", datamb, root->datasize);
+    verbose("[+] index: raw usage: %.2f KB (%lu bytes)\n", indexkb, root->indexsize);
 
     // overhead contains:
     // - the buffer allocated to hold each (futur) branches pointer
@@ -368,7 +370,7 @@ static void index_allocate_single(settings_t *settings) {
 }
 
 // create an index and load files
-index_root_t *index_init(settings_t *settings, char *indexdir, index_branch_t **branches) {
+index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches) {
     index_root_t *root = calloc(sizeof(index_root_t), 1);
 
     debug("[+] index: initializing\n");
@@ -382,6 +384,7 @@ index_root_t *index_init(settings_t *settings, char *indexdir, index_branch_t **
     root->lastsync = 0;
     root->status = INDEX_NOT_LOADED | INDEX_HEALTHY;
     root->branches = branches;
+    root->namespace = namespace;
 
     // since this function will be called for each namespace
     // we will not allocate all the time the reusable variables

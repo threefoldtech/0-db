@@ -5,7 +5,7 @@
     index_t index_initialize(int fd, uint16_t indexid, index_root_t *root);
 
     // initialize the whole index system
-    index_root_t *index_init(settings_t *settings, char *indexdir, index_branch_t **branches);
+    index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches);
 
     // gracefully clean everything
     void index_destroy(index_root_t *root);

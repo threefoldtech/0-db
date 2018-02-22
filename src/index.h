@@ -36,6 +36,16 @@
         // linked list pointer
         struct index_entry_t *next;
 
+        // pointer to source namespace
+        // index should not be aware of his namespace
+        // but since we use a single big index, we need to
+        // be able to make namespace distinction
+        // note: another approch could be separate branch-list per namespace
+        // note 2: we keep a void pointer, we will only compare address and not
+        //         the object itself, this make some opacity later if we change
+        //         and reduce issue with circular inclusion
+        void *namespace;
+
         uint8_t idlength;    // length of the id, here uint8_t limits to 256 bytes
         uint64_t offset;     // offset on the corresponding datafile
         uint64_t length;     // length of the payload on the datafile
@@ -90,8 +100,14 @@
         int synctime;       // force sync index after this amount of time
         time_t lastsync;    // keep track when the last sync was explictly made
 
+        void *namespace;    // see index_entry_t, same reason
+
         index_branch_t **branches; // list of branches explained later
         index_status_t status;     // index health
+
+        size_t datasize;    // statistics about size of data on disk
+        size_t indexsize;   // statistics about index in-memory size
+        size_t entries;     // statistics about number of keys for this index
 
     } index_root_t;
 
