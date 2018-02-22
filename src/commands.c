@@ -36,7 +36,7 @@ static size_t redis_set_handler_userkey(resp_request_t *request) {
     index_root_t *index = request->client->ns->index;
     data_root_t *data = request->client->ns->data;
 
-    debug("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
+    debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
     // printf("[+] set key: %.*s\n", idlength, id);
     // printf("[+] set value: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
 
@@ -52,11 +52,11 @@ static size_t redis_set_handler_userkey(resp_request_t *request) {
         return 0;
     }
 
-    debug("[+] userkey: ");
+    debug("[+] command: set: userkey: ");
     debughex(id, idlength);
     debug("\n");
 
-    debug("[+] data insertion offset: %lu\n", offset);
+    debug("[+] command: set: offset: %lu\n", offset);
 
     // inserting this offset with the id on the index
     if(!index_entry_insert(index, id, idlength, offset, request->argv[2]->length)) {
@@ -94,7 +94,7 @@ static size_t redis_set_handler_sequential(resp_request_t *request) {
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
 
-    debug("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
+    debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
 
     // insert the data on the datafile
     // this will returns us the offset where the header is
@@ -109,11 +109,11 @@ static size_t redis_set_handler_sequential(resp_request_t *request) {
         return 0;
     }
 
-    debug("[+] generated sequential-key: ");
+    debug("[+] command: set: sequential-key: ");
     debughex(&id, idlength);
     debug("\n");
 
-    debug("[+] data insertion offset: %lu\n", offset);
+    debug("[+] command: set: offset: %lu\n", offset);
 
     // inserting this offset with the id on the index
     // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
@@ -156,7 +156,7 @@ static size_t redis_set_handler_directkey(resp_request_t *request) {
     uint32_t valuelength = request->argv[2]->length;
 
 
-    debug("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
+    debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
 
     // insert the data on the datafile
     // this will returns us the offset where the header is
@@ -172,11 +172,11 @@ static size_t redis_set_handler_directkey(resp_request_t *request) {
         return 0;
     }
 
-    debug("[+] generated direct-key: ");
+    debug("[+] command: set: direct-key: ");
     debughex(&id, idlength);
     debug("\n");
 
-    debug("[+] data insertion offset: %lu\n", offset);
+    debug("[+] command: set: offset: %lu\n", offset);
 
     // usually, here is where we add the key in the index
     // we don't use the index in this case since the position
@@ -252,7 +252,6 @@ static index_entry_t * (*redis_get_handlers[])(resp_request_t *request) = {
 //
 //
 static int command_ping(resp_request_t *request) {
-    verbose("[+] redis: PING\n");
     redis_hardsend(request->client->fd, "+PONG");
     return 0;
 }
@@ -290,7 +289,7 @@ static int command_get(resp_request_t *request) {
         return 1;
     }
 
-    debug("[+] lookup key: ");
+    debug("[+] command: get: lookup key: ");
     debughex(request->argv[1]->buffer, request->argv[1]->length);
     debug("\n");
 
@@ -298,27 +297,27 @@ static int command_get(resp_request_t *request) {
 
     // key not found at all
     if(!entry) {
-        verbose("[-] key not found\n");
+        verbose("[-] command: get: key not found\n");
         redis_hardsend(request->client->fd, "$-1");
         return 1;
     }
 
     // key found but deleted
     if(entry->flags & INDEX_ENTRY_DELETED) {
-        verbose("[-] key deleted\n");
+        verbose("[-] command: get: key deleted\n");
         redis_hardsend(request->client->fd, "$-1");
         return 1;
     }
 
     // key found and valid, let's checking the contents
-    debug("[+] entry found, flags: %x, data length: %" PRIu64 "\n", entry->flags, entry->length);
-    debug("[+] data file: %d, data offset: %" PRIu64 "\n", entry->dataid, entry->offset);
+    debug("[+] command: get: entry found, flags: %x, data length: %" PRIu64 "\n", entry->flags, entry->length);
+    debug("[+] command: get: data file: %d, data offset: %" PRIu64 "\n", entry->dataid, entry->offset);
 
     data_root_t *data = request->client->ns->data;
     data_payload_t payload = data_get(data, entry->offset, entry->length, entry->dataid, entry->idlength);
 
     if(!payload.buffer) {
-        printf("[-] cannot read payload\n");
+        printf("[-] command: get: cannot read payload\n");
         redis_hardsend(request->client->fd, "-Internal Error");
         free(payload.buffer);
         return 0;
@@ -347,7 +346,7 @@ static int command_del(resp_request_t *request) {
     }
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
-        printf("[-] invalid key size\n");
+        printf("[-] command: del: invalid key size\n");
         redis_hardsend(request->client->fd, "-Invalid key");
         return 1;
     }
@@ -405,15 +404,15 @@ static command_t commands_handlers[] = {
 int redis_dispatcher(resp_request_t *request) {
     resp_object_t *key = request->argv[0];
 
-    debug("[+] request from fd: %d, namespace: %s\n", request->client->fd, request->client->ns->name);
+    debug("[+] command: request fd: %d, namespace: %s\n", request->client->fd, request->client->ns->name);
     request->client->commands += 1;
 
     if(key->type != STRING) {
-        debug("[+] not a string command, ignoring\n");
+        debug("[-] command: not a string command, ignoring\n");
         return 0;
     }
 
-    debug("[+] resp command: %.*s [+%d args]\n", key->length, (char *) key->buffer, request->argc - 1);
+    debug("[+] command: '%.*s' [+%d args]\n", key->length, (char *) key->buffer, request->argc - 1);
 
     for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
         if(strncmp(key->buffer, commands_handlers[i].command, key->length) == 0)
@@ -421,7 +420,7 @@ int redis_dispatcher(resp_request_t *request) {
     }
 
     // unknown
-    printf("[-] unsupported redis command\n");
+    printf("[-] command: unsupported redis command\n");
     redis_hardsend(request->client->fd, "-Command not supported");
 
     return 1;
