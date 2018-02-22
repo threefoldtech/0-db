@@ -13,6 +13,7 @@
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
+#include "namespace.h"
 #include "redis.h"
 
 #define MAXEVENTS 64
