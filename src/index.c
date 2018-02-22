@@ -652,7 +652,7 @@ uint16_t index_init(settings_t *settings) {
 
 int index_emergency() {
     // skipping building index stage
-    if(rootindex && (rootindex->status & INDEX_NOT_LOADED))
+    if(!rootindex || (rootindex->status & INDEX_NOT_LOADED))
         return 0;
 
     fsync(rootindex->indexfd);

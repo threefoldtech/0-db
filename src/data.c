@@ -307,5 +307,8 @@ void data_init(uint16_t dataid, settings_t *settings) {
 }
 
 void data_emergency() {
+    if(!rootdata)
+        return;
+
     fsync(rootdata->datafd);
 }
