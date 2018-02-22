@@ -69,6 +69,76 @@ int namespace_set(unsigned char *name, int settings) {
     return 0;
 }
 
+void namespace_update_descriptor(namespace_t *namespace, int fd) {
+    ns_header_t header;
+
+    debug("[+] updating the namespace header\n");
+
+    header.namelength = strlen(namespace->name);
+    header.passlength = namespace->password ? strlen(namespace->password) : 0;
+    header.maxsize = 131072; // DEBUG PURPOSE
+    header.flags = 0;
+
+    if(namespace->public)
+        header.flags |= NS_FLAGS_PUBLIC;
+
+    if(write(fd, &header, sizeof(ns_header_t)) != sizeof(ns_header_t))
+        warnp("namespace header write");
+
+    if(write(fd, namespace->name, header.namelength) != (ssize_t) header.namelength)
+        warnp("namespace header name write");
+
+    if(namespace->password) {
+        if(write(fd, namespace->password, header.passlength) != (ssize_t) header.passlength)
+            warnp("namespace header pass write");
+    }
+}
+
+// read (or create) a namespace descriptor
+// namespace descriptor is a binary file containing namespace
+// specification such password, maxsize, etc. (see header)
+static void namespace_load_descriptor(namespace_t *namespace) {
+    char pathname[PATH_MAX];
+    ns_header_t header;
+    int fd;
+
+    snprintf(pathname, PATH_MAX, "%s/zdb-namespace", namespace->indexpath);
+
+    if((fd = open(pathname, O_CREAT | O_RDWR, 0600)) < 0) {
+        warning("[-] cannot create or open in read-write the namespace file\n");
+        return;
+    }
+
+    if(read(fd, &header, sizeof(ns_header_t)) != sizeof(ns_header_t)) {
+        // probably new file, let's write initial namespace information
+        namespace_update_descriptor(namespace, fd);
+        close(fd);
+        return;
+    }
+
+    namespace->maxsize = header.maxsize;
+    namespace->public = (header.flags & NS_FLAGS_PUBLIC);
+
+    if(header.passlength) {
+        if(!(namespace->password = malloc(sizeof(char) * header.passlength))) {
+            warnp("namespace password malloc");
+            return;
+        }
+
+        // skipping the namespace name, jumping to password
+        lseek(fd, header.namelength, SEEK_CUR);
+
+        if(read(fd, namespace->password, header.passlength) != (ssize_t) header.passlength)
+            warnp("namespace password read");
+    }
+
+    debug("[+] namespace '%s': maxsize: %lu\n", namespace->name, namespace->maxsize);
+    debug("[+] -> password protection: %s\n", namespace->password ? "yes" : "no");
+    debug("[+] -> public access: %s\n", namespace->public ? "yes" : "no");
+
+    close(fd);
+}
+
 static char *namespace_path(char *prefix, char *name) {
     char pathname[PATH_MAX];
     snprintf(pathname, PATH_MAX, "%s/%s", prefix, name);
@@ -110,6 +180,8 @@ namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
 
     if(!namespace_ensure(namespace))
         return NULL;
+
+    namespace_load_descriptor(namespace);
 
     // now, we are sure the namespace exists, but it's maybe empty
     // let's call index and data initializer, they will take care about that

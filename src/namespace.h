@@ -7,30 +7,29 @@
     #define NAMESPACE_DEFAULT  "default"
 
     typedef enum ns_flags_t {
-        NS_FLAGS_PUBLIC = 1,  // public read-only namespace
+        NS_FLAGS_PUBLIC = 1,   // public read-only namespace
 
     } ns_flags_t;
 
     // ns_header_t contains header about a specific namespace
     // this header will be the only contents of the namespace descriptor file
     typedef struct ns_header_t {
-        uint8_t namelength;       // length of the namespace name
-        uint8_t passlength;       // length of the password
-        uint32_t maxsize;         // maximum datasize allowed on that namespace
-        uint8_t flags;            // some flags (see define below)
-        unsigned char *name;      // accessor to the name
-        unsigned char *password;  // accessor to the password
+        uint8_t namelength;    // length of the namespace name
+        uint8_t passlength;    // length of the password
+        uint32_t maxsize;      // maximum datasize allowed on that namespace
+        uint8_t flags;         // some flags (see define below)
 
     } __attribute__((packed)) ns_header_t;
 
     typedef struct namespace_t {
-        char *name;
-        char *password;
-        char *indexpath;
-        char *datapath;
-        index_root_t *index;
-        data_root_t *data;
-        int public;
+        char *name;            // namespace string-name
+        char *password;        // optional password
+        char *indexpath;       // index root directory
+        char *datapath;        // data root directory
+        index_root_t *index;   // index structure-pointer
+        data_root_t *data;     // data structure-pointer
+        char public;           // publicly readable (read without password)
+        size_t maxsize;        // maximum size allowed
 
     } namespace_t;
 
