@@ -16,6 +16,9 @@ all: $(EXEC)
 release: CFLAGS+=-DRELEASE
 release: clean $(EXEC)
 
+static: LDFLAGS+=-static
+static: clean $(EXEC)
+
 $(EXEC): $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
