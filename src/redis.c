@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
+#include <time.h>
 #include <inttypes.h>
 #include "sockets.h"
 #include "zerodb.h"
@@ -243,6 +244,8 @@ redis_client_t *socket_client_new(int fd) {
 
     clients.list[fd] = malloc(sizeof(redis_client_t));
     clients.list[fd]->fd = fd;
+    clients.list[fd]->connected = time(NULL);
+    clients.list[fd]->commands = 0;
 
     // attaching default namespace to this client
     clients.list[fd]->ns = namespace_get_default();
@@ -252,9 +255,12 @@ redis_client_t *socket_client_new(int fd) {
 
 // free allocated client when disconnected
 void socket_client_free(int fd) {
-    debug("[+] removing client (fd: %d)\n", fd);
-
     redis_client_t *client = clients.list[fd];
+
+    debug("[+] client: closing (fd: %d)\n", fd);
+
+    double elapsed = difftime(time(NULL), client->connected);
+    debug("[+] client: stayed %.f seconds, %lu commands\n", elapsed, client->commands);
 
     // closing socket
     close(client->fd);

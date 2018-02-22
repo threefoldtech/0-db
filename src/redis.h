@@ -21,6 +21,8 @@
     typedef struct redis_client_t {
         int fd;           // socket file descriptor
         namespace_t *ns;  // connection namespace
+        time_t connected; // connection time
+        size_t commands;  // request (commands) counter
 
     } redis_client_t;
 
