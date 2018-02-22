@@ -12,6 +12,37 @@
 #include "redis.h"
 #include "commands.h"
 
+// tools
+
+// convert one request argument to a real null-terminated string
+static char *command_strargv(resp_request_t *request, int argid) {
+    char *target = NULL;
+
+    if(!(target = strndup(request->argv[argid]->buffer, request->argv[argid]->length))) {
+        warnp("command: strargv: strndup");
+        redis_hardsend(request->client->fd, "-Internal memory issue");
+    }
+
+    return target;
+}
+
+// ensure number of argument and their validity
+static int command_args_validate(resp_request_t *request, int expected) {
+    if(request->argc != expected) {
+        redis_hardsend(request->client->fd, "-Unexpected arguments");
+        return 0;
+    }
+
+    for(int i = 0; i < expected; i++) {
+        if(request->argv[i]->length == 0) {
+            redis_hardsend(request->client->fd, "-Invalid argument");
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 //
 //
 // specific modes implementation
@@ -257,10 +288,8 @@ static int command_ping(resp_request_t *request) {
 }
 
 static int command_set(resp_request_t *request) {
-    if(request->argc != 3 || request->argv[2]->length == 0) {
-        redis_hardsend(request->client->fd, "-Invalid argument");
+    if(!command_args_validate(request, 3))
         return 1;
-    }
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         redis_hardsend(request->client->fd, "-Key too large");
@@ -283,6 +312,9 @@ static int command_set(resp_request_t *request) {
 }
 
 static int command_get(resp_request_t *request) {
+    if(!command_args_validate(request, 2))
+        return 1;
+
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         printf("[-] invalid key size\n");
         redis_hardsend(request->client->fd, "-Invalid key");
@@ -338,6 +370,9 @@ static int command_get(resp_request_t *request) {
 }
 
 static int command_del(resp_request_t *request) {
+    if(!command_args_validate(request, 2))
+        return 1;
+
     // disallow delete key on direct mode, we don't have index
     // we can't flag key as deleted and data files are always append
     if(rootsettings.mode == DIRECTKEY) {
