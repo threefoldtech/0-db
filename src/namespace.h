@@ -21,7 +21,7 @@
         unsigned char *name;      // accessor to the name
         unsigned char *password;  // accessor to the password
 
-    } __attribute__((packed)) data_header_t;
+    } __attribute__((packed)) ns_header_t;
 
     typedef struct namespace_t {
         unsigned char *name;
@@ -33,7 +33,12 @@
     typedef struct namespaces_t {
         size_t length;
         namespace_t **namespaces;
+        settings_t *settings;
 
     } namespaces_t;
+
+    int namespace_init(settings_t *settings);
+    int namespace_destroy();
+    int namespace_emergency();
 
 #endif

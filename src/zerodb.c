@@ -111,14 +111,8 @@ static void sighandler(int signal) {
             // which will try to save and flush buffers
 
         case SIGINT:
-            printf("\n[+] flushing index\n");
-
-            if(index_emergency()) {
-                printf("[+] flushing data\n");
-                // only flusing data if index flush was accepted
-                // if index flush returns 0, we are probably in an initializing stage
-                data_emergency();
-            }
+            printf("\n[+] cleaning namespaces\n");
+            namespace_emergency();
 
         break;
     }
@@ -133,12 +127,14 @@ static int proceed(struct settings_t *settings) {
     signal_intercept(SIGSEGV, sighandler);
     signal_intercept(SIGINT, sighandler);
 
-    // creating the index in memory
-    // this will returns us the id of the index
-    // file currently used, this is needed by the data
-    // storage to keep files linked (index-0067 <> data-0067)
-    uint16_t indexid = index_init(settings);
-    data_init(indexid, settings);
+    // namespace is the root of the whole index/data system
+    // anything related to data is always attached to at least
+    // one namespace (the default) one, and all the others
+    // are based on a fork of namespace
+    //
+    // the namespace system will take care about all the loading
+    // and the destruction
+    namespace_init(settings);
 
     // main worker point
     redis_listen(settings->listen, settings->port);
@@ -150,8 +146,7 @@ static int proceed(struct settings_t *settings) {
     // this is useful when profiling to ensure there
     // is no memory leaks, if everything is cleaned as
     // expected.
-    index_destroy();
-    data_destroy();
+    namespace_destroy();
 
     return 0;
 }
