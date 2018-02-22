@@ -5,11 +5,12 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <inttypes.h>
-#include "redis.h"
-#include "commands.h"
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
+#include "namespace.h"
+#include "redis.h"
+#include "commands.h"
 
 //
 //
@@ -31,13 +32,17 @@ static size_t redis_set_handler_userkey(resp_request_t *request) {
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
 
+    // shortcut to index and data
+    index_root_t *index = request->client->ns->index;
+    data_root_t *data = request->client->ns->data;
+
     debug("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
     // printf("[+] set key: %.*s\n", idlength, id);
     // printf("[+] set value: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
 
     // insert the data on the datafile
     // this will returns us the offset where the header is
-    size_t offset = data_insert(value, valuelength, id, idlength);
+    size_t offset = data_insert(data, value, valuelength, id, idlength);
 
     // checking for writing error
     // if we couldn't write the data, we won't add entry on the index
@@ -54,7 +59,7 @@ static size_t redis_set_handler_userkey(resp_request_t *request) {
     debug("[+] data insertion offset: %lu\n", offset);
 
     // inserting this offset with the id on the index
-    if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
+    if(!index_entry_insert(index, id, idlength, offset, request->argv[2]->length)) {
         // cannot insert index (disk issue)
         redis_hardsend(request->client->fd, "$-1");
         return 0;
@@ -78,8 +83,12 @@ static size_t redis_set_handler_userkey(resp_request_t *request) {
 }
 
 static size_t redis_set_handler_sequential(resp_request_t *request) {
+    // shortcut to index and data
+    index_root_t *index = request->client->ns->index;
+    data_root_t *data = request->client->ns->data;
+
     // create some easier accessor
-    uint32_t id = index_next_id();
+    uint32_t id = index_next_id(index);
     uint8_t idlength = sizeof(uint32_t);
 
     unsigned char *value = request->argv[2]->buffer;
@@ -90,7 +99,7 @@ static size_t redis_set_handler_sequential(resp_request_t *request) {
     // insert the data on the datafile
     // this will returns us the offset where the header is
     // size_t offset = data_insert(value, valuelength, id, idlength);
-    size_t offset = data_insert(value, valuelength, &id, idlength);
+    size_t offset = data_insert(data, value, valuelength, &id, idlength);
 
     // checking for writing error
     // if we couldn't write the data, we won't add entry on the index
@@ -108,7 +117,7 @@ static size_t redis_set_handler_sequential(resp_request_t *request) {
 
     // inserting this offset with the id on the index
     // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
-    if(!index_entry_insert(&id, idlength, offset, request->argv[2]->length)) {
+    if(!index_entry_insert(index, &id, idlength, offset, request->argv[2]->length)) {
         // cannot insert index (disk issue)
         redis_hardsend(request->client->fd, "$-1");
         return 0;
@@ -133,22 +142,26 @@ static size_t redis_set_handler_sequential(resp_request_t *request) {
 }
 
 static size_t redis_set_handler_directkey(resp_request_t *request) {
+    // shortcut to data
+    data_root_t *data = request->client->ns->data;
+
     // create some easier accessor
     index_dkey_t id = {
-        .dataid = data_dataid(), // current data fileid
-        .offset = 0              // will be filled later by data_insert
+        .dataid = data_dataid(data), // current data fileid
+        .offset = 0                  // will be filled later by data_insert
     };
     uint8_t idlength = sizeof(index_dkey_t);
 
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
 
+
     debug("[+] set command: %u bytes key, %u bytes data\n", idlength, valuelength);
 
     // insert the data on the datafile
     // this will returns us the offset where the header is
     // size_t offset = data_insert(value, valuelength, id, idlength);
-    size_t offset = data_insert(value, valuelength, &id, idlength);
+    size_t offset = data_insert(data, value, valuelength, &id, idlength);
     id.offset = offset;
 
     // checking for writing error
@@ -199,7 +212,8 @@ static size_t (*redis_set_handlers[])(resp_request_t *request) = {
 // depending on the running mode
 //
 static index_entry_t *redis_get_handler_memkey(resp_request_t *request) {
-    return index_entry_get(request->argv[1]->buffer, request->argv[1]->length);
+    index_root_t *index = request->client->ns->index;
+    return index_entry_get(index, request->argv[1]->buffer, request->argv[1]->length);
 }
 
 static index_entry_t *redis_get_handler_direct(resp_request_t *request) {
@@ -262,8 +276,8 @@ static int command_set(resp_request_t *request) {
     // we do this check here and not from data (event if this is like a
     // datafile event) to keep data and index code completly distinct
     if(offset + request->argv[2]->length > 256 * 1024 * 1024) { // 256 MB
-        size_t newid = index_jump_next();
-        data_jump_next(newid);
+        size_t newid = index_jump_next(request->client->ns->index);
+        data_jump_next(request->client->ns->data, newid);
     }
 
     return 0;
@@ -300,7 +314,8 @@ static int command_get(resp_request_t *request) {
     debug("[+] entry found, flags: %x, data length: %" PRIu64 "\n", entry->flags, entry->length);
     debug("[+] data file: %d, data offset: %" PRIu64 "\n", entry->dataid, entry->offset);
 
-    data_payload_t payload = data_get(entry->offset, entry->length, entry->dataid, entry->idlength);
+    data_root_t *data = request->client->ns->data;
+    data_payload_t payload = data_get(data, entry->offset, entry->length, entry->dataid, entry->idlength);
 
     if(!payload.buffer) {
         printf("[-] cannot read payload\n");
@@ -337,7 +352,9 @@ static int command_del(resp_request_t *request) {
         return 1;
     }
 
-    if(!index_entry_delete(request->argv[1]->buffer, request->argv[1]->length)) {
+    index_root_t *index = request->client->ns->index;
+
+    if(!index_entry_delete(index, request->argv[1]->buffer, request->argv[1]->length)) {
         redis_hardsend(request->client->fd, "-Cannot delete key");
         return 0;
     }
@@ -388,7 +405,7 @@ static command_t commands_handlers[] = {
 int redis_dispatcher(resp_request_t *request) {
     resp_object_t *key = request->argv[0];
 
-    debug("[+] request from fd: %d, namespace: %s\n", request->client->fd, request->client->ns);
+    debug("[+] request from fd: %d, namespace: %s\n", request->client->fd, request->client->ns->name);
 
     if(key->type != STRING) {
         debug("[+] not a string command, ignoring\n");

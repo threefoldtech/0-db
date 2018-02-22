@@ -14,15 +14,10 @@
 #include "zerodb.h"
 #include "data.h"
 
-// global pointer of the main data object
-// we are single-threaded by design and this is mostly
-// only changed during initializing and file-swap
-static data_t *rootdata = NULL;
-
 // force to sync data buffer into the underlaying device
-static inline int data_sync(int fd) {
+static inline int data_sync(data_root_t *root, int fd) {
     fsync(fd);
-    rootdata->lastsync = time(NULL);
+    root->lastsync = time(NULL);
     return 1;
 }
 
@@ -31,16 +26,16 @@ static inline int data_sync(int fd) {
 // - we set --sync option on runtime, and each write is sync forced
 // - we set --synctime on runtime and after this amount of seconds
 //   we force to sync the last write
-static inline int data_sync_check(int fd) {
-    if(rootdata->sync)
-        return data_sync(fd);
+static inline int data_sync_check(data_root_t *root, int fd) {
+    if(root->sync)
+        return data_sync(root, fd);
 
-    if(!rootdata->synctime)
+    if(!root->synctime)
         return 0;
 
-    if((time(NULL) - rootdata->lastsync) > rootdata->synctime) {
+    if((time(NULL) - root->lastsync) > root->synctime) {
         debug("[+] data: last sync expired, force sync\n");
-        return data_sync(fd);
+        return data_sync(root, fd);
     }
 
     return 0;
@@ -53,7 +48,7 @@ static inline int data_sync_check(int fd) {
 // ask to check if we need to do some sync-check or not
 // this is useful when writing data, we write header then payload
 // and we can avoid to do two sync (only one when done)
-static int data_write(int fd, void *buffer, size_t length, int syncer) {
+static int data_write(int fd, void *buffer, size_t length, int syncer, data_root_t *root) {
     ssize_t response;
 
     if((response = write(fd, buffer, length)) < 0) {
@@ -67,7 +62,7 @@ static int data_write(int fd, void *buffer, size_t length, int syncer) {
     }
 
     if(syncer)
-        data_sync_check(fd);
+        data_sync_check(root, fd);
 
     return 1;
 }
@@ -75,7 +70,7 @@ static int data_write(int fd, void *buffer, size_t length, int syncer) {
 //
 // data management
 //
-void data_initialize(char *filename) {
+void data_initialize(char *filename, data_root_t *root) {
     int fd;
 
     if((fd = open(filename, O_CREAT | O_RDWR, 0600)) < 0) {
@@ -93,19 +88,19 @@ void data_initialize(char *filename) {
     // anyway, it's important for the implementation to have
     // at least 1 byte already written, we use 0 as error when
     // expecting an offset
-    if(!data_write(fd, "X", 1, 1))
+    if(!data_write(fd, "X", 1, 1, root))
         diep(filename);
 
     close(fd);
 }
 
 // simply set globaly the current filename based on it's id
-static void data_set_id(data_t *root) {
+static void data_set_id(data_root_t *root) {
     sprintf(root->datafile, "%s/zdb-data-%05u", root->datadir, root->dataid);
 }
 
 // open the datafile based on it's id
-static int data_open_id(data_t *root, uint16_t id) {
+static int data_open_id(data_root_t *root, uint16_t id) {
     char temp[PATH_MAX];
     int fd;
 
@@ -117,7 +112,7 @@ static int data_open_id(data_t *root, uint16_t id) {
     return fd;
 }
 
-static void data_open_final(data_t *root) {
+static void data_open_final(data_root_t *root) {
     // try to open the datafile in write mode to append new data
     if((root->datafd = open(root->datafile, O_CREAT | O_RDWR | O_APPEND, 0600)) < 0) {
         // maybe we are on a read-only filesystem
@@ -139,20 +134,20 @@ static void data_open_final(data_t *root) {
 
 // jumping to the next id close the current data file
 // and open the next id file, it will create the new file
-size_t data_jump_next() {
+size_t data_jump_next(data_root_t *root, uint16_t newid) {
     verbose("[+] jumping to the next data file\n");
 
     // closing current file descriptor
-    close(rootdata->datafd);
+    close(root->datafd);
 
     // moving to the next file
-    rootdata->dataid += 1;
-    data_set_id(rootdata);
+    root->dataid = newid;
+    data_set_id(root);
 
-    data_initialize(rootdata->datafile);
-    data_open_final(rootdata);
+    data_initialize(root->datafile, root);
+    data_open_final(root);
 
-    return rootdata->dataid;
+    return root->dataid;
 }
 
 // compute a crc32 of the payload
@@ -186,18 +181,18 @@ static size_t data_length_from_offset(int fd, size_t offset) {
 }
 
 // get a payload from any datafile
-data_payload_t data_get(size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
-    int fd = rootdata->datafd;
+data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
+    int fd = root->datafd;
     data_payload_t payload = {
         .buffer = NULL,
         .length = 0
     };
 
-    if(rootdata->dataid != dataid) {
+    if(root->dataid != dataid) {
         // the requested datafile is not the current datafile opened
         // we will re-open the expected datafile temporary
-        debug("[-] current data file: %d, requested: %d, switching\n", rootdata->dataid, dataid);
-        fd = data_open_id(rootdata, dataid);
+        debug("[-] current data file: %d, requested: %d, switching\n", root->dataid, dataid);
+        fd = data_open_id(root, dataid);
     }
 
     // if we don't know the length in advance, we will read the
@@ -227,7 +222,7 @@ data_payload_t data_get(size_t offset, size_t length, uint16_t dataid, uint8_t i
         payload.buffer = NULL;
     }
 
-    if(rootdata->dataid != dataid) {
+    if(root->dataid != dataid) {
         // closing the temporary file descriptor
         // we only keep the current one
         close(fd);
@@ -237,9 +232,9 @@ data_payload_t data_get(size_t offset, size_t length, uint16_t dataid, uint8_t i
 }
 
 // insert data on the datafile and returns it's offset
-size_t data_insert(unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength) {
+size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength) {
     unsigned char *id = (unsigned char *) vid;
-    size_t offset = lseek(rootdata->datafd, 0, SEEK_END);
+    size_t offset = lseek(root->datafd, 0, SEEK_END);
     size_t headerlength = sizeof(data_header_t) + idlength;
     data_header_t *header;
 
@@ -255,7 +250,7 @@ size_t data_insert(unsigned char *data, uint32_t datalength, void *vid, uint8_t 
     // data offset will always be >= 1 (see initializer notes)
     // we can use 0 as error detection
 
-    if(!data_write(rootdata->datafd, header, headerlength, 0)) {
+    if(!data_write(root->datafd, header, headerlength, 0, root)) {
         verbose("[-] data header: write failed\n");
         free(header);
         return 0;
@@ -263,7 +258,7 @@ size_t data_insert(unsigned char *data, uint32_t datalength, void *vid, uint8_t 
 
     free(header);
 
-    if(!data_write(rootdata->datafd, data, datalength, 1)) {
+    if(!data_write(root->datafd, data, datalength, 1, root)) {
         verbose("[-] data payload: write failed\n");
         return 0;
     }
@@ -271,44 +266,42 @@ size_t data_insert(unsigned char *data, uint32_t datalength, void *vid, uint8_t 
     return offset;
 }
 
-uint16_t data_dataid() {
-    return rootdata->dataid;
+uint16_t data_dataid(data_root_t *root) {
+    return root->dataid;
 }
 
 //
 // data constructor and destructor
 //
-void data_destroy() {
-    free(rootdata->datafile);
-    free(rootdata);
+void data_destroy(data_root_t *root) {
+    free(root->datafile);
+    free(root);
 }
 
-void data_init(uint16_t dataid, settings_t *settings) {
-    data_t *lroot = (data_t *) malloc(sizeof(data_t));
+data_root_t *data_init(settings_t *settings, char *datapath, uint16_t dataid) {
+    data_root_t *root = (data_root_t *) malloc(sizeof(data_root_t));
 
-    lroot->datadir = settings->datapath;
-    lroot->datafile = malloc(sizeof(char) * (PATH_MAX + 1));
-    lroot->dataid = dataid;
-    lroot->sync = settings->sync;
-    lroot->synctime = settings->synctime;
-    lroot->lastsync = 0;
+    root->datadir = datapath;
+    root->datafile = malloc(sizeof(char) * (PATH_MAX + 1));
+    root->dataid = dataid;
+    root->sync = settings->sync;
+    root->synctime = settings->synctime;
+    root->lastsync = 0;
 
-    // commit variable
-    rootdata = lroot;
-
-    data_set_id(lroot);
+    data_set_id(root);
 
     // opening the file and creating it if needed
-    data_initialize(lroot->datafile);
+    data_initialize(root->datafile, root);
 
     // opening the final file for appending only
-    data_open_final(lroot);
+    data_open_final(root);
 
+    return root;
 }
 
-void data_emergency() {
-    if(!rootdata)
+void data_emergency(data_root_t *root) {
+    if(!root)
         return;
 
-    fsync(rootdata->datafd);
+    fsync(root->datafd);
 }

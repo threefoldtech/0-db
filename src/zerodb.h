@@ -75,5 +75,5 @@
     extern settings_t rootsettings;
 
     void diep(char *str);
-    void warnp(char *str);
+    void *warnp(char *str);
 #endif

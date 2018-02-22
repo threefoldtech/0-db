@@ -8,8 +8,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
-#include <dirent.h>
-#include <sys/stat.h>
 #include <limits.h>
 #include <errno.h>
 #include "zerodb.h"
@@ -101,7 +99,7 @@ static void index_dump(index_root_t *root, int fulldump) {
 // initialize an index file
 // this basicly create the header and write it
 //
-index_t index_initialize(int fd, uint16_t indexid) {
+index_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
     index_t header;
 
     memcpy(header.magic, "IDX0", 4);
@@ -111,7 +109,7 @@ index_t index_initialize(int fd, uint16_t indexid) {
     header.opened = time(NULL);
     header.mode = rootsettings.mode;
 
-    if(!index_write(fd, &header, sizeof(index_t)))
+    if(!index_write(fd, &header, sizeof(index_t), root))
         diep("index_initialize: write");
 
     return header;
@@ -212,7 +210,7 @@ static size_t index_load_file(index_root_t *root) {
         }
 
         printf("[+] creating empty index file\n");
-        header = index_initialize(root->indexfd, root->indexid);
+        header = index_initialize(root->indexfd, root->indexid, root);
     }
 
 
@@ -223,7 +221,7 @@ static size_t index_load_file(index_root_t *root) {
         header.opened = time(NULL);
         lseek(root->indexfd, 0, SEEK_SET);
 
-        if(!index_write(root->indexfd, &header, sizeof(index_t)))
+        if(!index_write(root->indexfd, &header, sizeof(index_t), root))
             diep(root->indexfile);
     }
 
@@ -277,7 +275,7 @@ static size_t index_load_file(index_root_t *root) {
         // insert this entry like it was inserted by a user
         // this allows us to keep a generic way of inserting data and keeping a
         // single point of logic when adding data (logic for overwrite, resize bucket, ...)
-        index_entry_insert_memory(entry->id, entry->idlength, entry->offset, entry->length, entry->flags);
+        index_entry_insert_memory(root, entry->id, entry->idlength, entry->offset, entry->length, entry->flags);
         root->nextentry += 1;
     }
 
@@ -335,12 +333,12 @@ static void index_load(index_root_t *root) {
 }
 
 // create an index and load files
-uint16_t index_init(settings_t *settings) {
+index_root_t *index_init(settings_t *settings, char *indexdir, index_branch_t **branches) {
     index_root_t *root = calloc(sizeof(index_root_t), 1);
 
     debug("[+] initializing index\n");
 
-    root->indexdir = settings->indexpath;
+    root->indexdir = indexdir;
     root->indexid = 0;
     root->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
     root->nextentry = 0;
@@ -348,18 +346,13 @@ uint16_t index_init(settings_t *settings) {
     root->synctime = settings->synctime;
     root->lastsync = 0;
     root->status = INDEX_NOT_LOADED | INDEX_HEALTHY;
+    root->branches = branches;
 
     // don't allocate branch on direct-key mode since the
     // index is not used (no lookup needed)
     // we don't load index neither, since the index will always
     // be empty
     if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL) {
-        debug("[+] allocating index (%d lazy branches)\n", buckets_branches);
-
-        // allocating minimal branches array
-        if(!(root->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches)))
-            diep("calloc");
-
         // allocating transition variable, a reusable item
         if(!(index_transition = malloc(sizeof(index_item_t) + MAX_KEY_LENGTH + 1)))
             diep("malloc");
@@ -377,16 +370,24 @@ uint16_t index_init(settings_t *settings) {
             diep("malloc");
     }
 
-    // commit variable
-    // FIXME: this needs to get away, no more global
-    //        variable for index/data management
-    index_set_rootindex(root);
-
     index_load(root);
 
     if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL)
         index_dump(root, settings->dump);
 
-    return root->indexid;
+    return root;
 }
 
+// graceful clean everything allocated
+// by this loader
+void index_destroy(index_root_t *root) {
+    // delete root object
+    free(root->indexfile);
+    free(root);
+
+    // this function could be called multiple time for any index
+    // and then index_transition could be free'd multiple time
+    // we set it as NULL to ensure next call will not fails
+    free(index_transition);
+    index_transition = NULL;
+}

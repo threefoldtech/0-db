@@ -105,27 +105,23 @@
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1
 
-    uint16_t index_init(settings_t *settings);
-    void index_destroy();
-    size_t index_jump_next();
-    int index_emergency();
-    uint64_t index_next_id();
+    size_t index_jump_next(index_root_t *root);
+    int index_emergency(index_root_t *root);
+    uint64_t index_next_id(index_root_t *root);
 
-    index_entry_t *index_entry_get(unsigned char *id, uint8_t length);
-    index_entry_t *index_entry_insert(void *vid, uint8_t idlength, size_t offset, size_t length);
-    index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags);
-    index_entry_t *index_entry_delete(unsigned char *id, uint8_t length);
+    index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t length);
+    index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlength, size_t offset, size_t length);
+    index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags);
+    index_entry_t *index_entry_delete(index_root_t *root, unsigned char *id, uint8_t length);
 
     extern index_entry_t *index_reusable_entry;
 
     // extern but not really public functions
     // used by index_loader
-    int index_write(int fd, void *buffer, size_t length);
+    int index_write(int fd, void *buffer, size_t length, index_root_t *root);
     void index_set_id(index_root_t *root);
     void index_open_final(index_root_t *root);
 
     extern index_item_t *index_transition;
     extern index_entry_t *index_reusable_entry;
-
-    void index_set_rootindex(index_root_t *root);
 #endif

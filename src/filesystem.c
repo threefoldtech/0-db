@@ -15,7 +15,7 @@ int dir_exists(char *path) {
     return (stat(path, &sb) == 0 && S_ISDIR(sb.st_mode));
 }
 
-void dir_create(char *path) {
+int dir_create(char *path) {
     char tmp[PATH_MAX], *p = NULL;
     size_t len;
 
@@ -32,6 +32,6 @@ void dir_create(char *path) {
         }
     }
 
-    mkdir(tmp, S_IRWXU);
+    return mkdir(tmp, S_IRWXU);
 }
 

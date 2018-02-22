@@ -3,7 +3,7 @@
 
     // root point of the memory handler
     // used by the data manager
-    typedef struct data_t {
+    typedef struct data_root_t {
         char *datadir;    // root path of the data files
         char *datafile;   // pointer to the current datafile used
         uint16_t dataid;  // id of the datafile currently in use
@@ -12,7 +12,7 @@
         int synctime;     // force to sync data after this timeout (on next write)
         time_t lastsync;  // keep track when the last sync was explictly made
 
-    } data_t;
+    } data_root_t;
 
     // data_header_t contains header of each entry on the datafile
     // this header doesn't contains the payload, we assume the payload
@@ -35,12 +35,12 @@
 
     } data_payload_t;
 
-    void data_init(uint16_t dataid, settings_t *settings);
-    void data_destroy();
-    size_t data_jump_next();
-    void data_emergency();
-    uint16_t data_dataid();
+    data_root_t *data_init(settings_t *settings, char *datapath, uint16_t dataid);
+    void data_destroy(data_root_t *root);
+    size_t data_jump_next(data_root_t *root, uint16_t newid);
+    void data_emergency(data_root_t *root);
+    uint16_t data_dataid(data_root_t *root);
 
-    data_payload_t data_get(size_t offset, size_t length, uint16_t dataid, uint8_t idlength);
-    size_t data_insert(unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength);
+    data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_t dataid, uint8_t idlength);
+    size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength);
 #endif

@@ -9,11 +9,13 @@
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <inttypes.h>
-#include "redis.h"
 #include "sockets.h"
 #include "zerodb.h"
-#include "commands.h"
+#include "index.h"
+#include "data.h"
 #include "namespace.h"
+#include "redis.h"
+#include "commands.h"
 
 static int yes = 1;
 
@@ -241,7 +243,9 @@ redis_client_t *socket_client_new(int fd) {
 
     clients.list[fd] = malloc(sizeof(redis_client_t));
     clients.list[fd]->fd = fd;
-    clients.list[fd]->ns = strdup(NAMESPACE_DEFAULT);
+
+    // attaching default namespace to this client
+    clients.list[fd]->ns = namespace_get_default();
 
     return clients.list[fd];
 }
@@ -256,7 +260,6 @@ void socket_client_free(int fd) {
     close(client->fd);
 
     // cleaning client memory usage
-    free(client->ns);
     free(client);
 
     // allow new client on this spot

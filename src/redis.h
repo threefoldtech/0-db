@@ -19,8 +19,8 @@
 
     // represent one client in memory
     typedef struct redis_client_t {
-        int fd;    // socket file descriptor
-        char *ns;  // connection namespace
+        int fd;           // socket file descriptor
+        namespace_t *ns;  // connection namespace
 
     } redis_client_t;
 

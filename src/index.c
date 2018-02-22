@@ -8,25 +8,22 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
-#include <dirent.h>
-#include <sys/stat.h>
 #include <limits.h>
 #include <x86intrin.h>
-#include <errno.h>
 #include "zerodb.h"
 #include "index.h"
 #include "index_loader.h"
 #include "index_branch.h"
 #include "data.h"
 
-// main global root index state
-static index_root_t *rootindex = NULL;
-
+// NOTE: there is no more a global variable for the index
+//       since each namespace have their own index, now
+//       we need to pass the index to each function
 
 // force index to be sync'd with underlaying device
-static inline int index_sync(int fd) {
+static inline int index_sync(index_root_t *root, int fd) {
     fsync(fd);
-    rootindex->lastsync = time(NULL);
+    root->lastsync = time(NULL);
     return 1;
 }
 
@@ -35,16 +32,16 @@ static inline int index_sync(int fd) {
 // - we set --sync option on runtime, and each write is sync forced
 // - we set --synctime on runtime and after this amount of seconds
 //   we force to sync the last write
-static inline int index_sync_check(int fd) {
-    if(rootindex->sync)
-        return index_sync(fd);
+static inline int index_sync_check(index_root_t *root, int fd) {
+    if(root->sync)
+        return index_sync(root, fd);
 
-    if(!rootindex->synctime)
+    if(!root->synctime)
         return 0;
 
-    if((time(NULL) - rootindex->lastsync) > rootindex->synctime) {
+    if((time(NULL) - root->lastsync) > root->synctime) {
         debug("[+] index: last sync expired, force sync\n");
-        return index_sync(fd);
+        return index_sync(root, fd);
     }
 
     return 0;
@@ -54,7 +51,7 @@ static inline int index_sync_check(int fd) {
 // wrap (mostly) all write operation on indexfile
 // it's easier to keep a single logic with error handling
 // related to write check
-int index_write(int fd, void *buffer, size_t length) {
+int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
     ssize_t response;
 
     if((response = write(fd, buffer, length)) < 0) {
@@ -67,7 +64,7 @@ int index_write(int fd, void *buffer, size_t length) {
         return 0;
     }
 
-    index_sync_check(fd);
+    index_sync_check(root, fd);
 
     return 1;
 }
@@ -97,29 +94,29 @@ void index_open_final(index_root_t *root) {
 // jumping to the next index id file, this needs to be sync'd with
 // data file, we only do this when datafile changes basicly, this is
 // triggered by a datafile too big event
-size_t index_jump_next() {
+size_t index_jump_next(index_root_t *root) {
     verbose("[+] jumping to the next index file\n");
 
     // closing current file descriptor
-    close(rootindex->indexfd);
+    close(root->indexfd);
 
     // moving to the next file
-    rootindex->indexid += 1;
-    index_set_id(rootindex);
+    root->indexid += 1;
+    index_set_id(root);
 
-    index_open_final(rootindex);
-    index_initialize(rootindex->indexfd, rootindex->indexid);
+    index_open_final(root);
+    index_initialize(root->indexfd, root->indexid, root);
 
-    return rootindex->indexid;
+    return root->indexid;
 }
 
 //
 // index manipulation
 //
-uint64_t index_next_id() {
+uint64_t index_next_id(index_root_t *root) {
     // this is only used on sequential-id
     // it gives the next id
-    return rootindex->nextentry++;
+    return root->nextentry++;
 }
 
 // perform the basic "hashing" (crc based) used to point to the expected branch
@@ -139,9 +136,9 @@ static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
 }
 
 // main look-up function, used to get an entry from the memory index
-index_entry_t *index_entry_get(unsigned char *id, uint8_t idlength) {
+index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t idlength) {
     uint32_t branchkey = index_key_hash(id, idlength);
-    index_branch_t *branch = index_branch_get(rootindex, branchkey);
+    index_branch_t *branch = index_branch_get(root, branchkey);
     index_entry_t *entry;
 
     // branch not exists
@@ -162,11 +159,11 @@ index_entry_t *index_entry_get(unsigned char *id, uint8_t idlength) {
 // insert a key, only in memory, no disk is touched
 // this function should be called externaly only when populating something
 // if we need to add something new on the index, we should write it on disk
-index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags) {
+index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags) {
     index_entry_t *exists = NULL;
 
     // item already exists
-    if((exists = index_entry_get(id, idlength))) {
+    if((exists = index_entry_get(root, id, idlength))) {
         debug("[+] key already exists, overwriting\n");
 
         // re-use existing entry
@@ -184,12 +181,12 @@ index_entry_t *index_entry_insert_memory(unsigned char *id, uint8_t idlength, si
     entry->idlength = idlength;
     entry->offset = offset;
     entry->length = length;
-    entry->dataid = rootindex->indexid;
+    entry->dataid = root->indexid;
 
     uint32_t branchkey = index_key_hash(id, idlength);
 
     // commit entry into memory
-    index_branch_append(rootindex, branchkey, entry);
+    index_branch_append(root, branchkey, entry);
 
     return entry;
 }
@@ -207,11 +204,11 @@ index_entry_t *index_reusable_entry = NULL;
 // and the on-disk version is appended anyway, when reloading the index
 // we call the same sets of function which overwrite existing key, we
 // will always have the last version in memory
-index_entry_t *index_entry_insert(void *vid, uint8_t idlength, size_t offset, size_t length) {
+index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlength, size_t offset, size_t length) {
     unsigned char *id = (unsigned char *) vid;
     index_entry_t *entry = NULL;
 
-    if(!(entry = index_entry_insert_memory(id, idlength, offset, length, 0)))
+    if(!(entry = index_entry_insert_memory(root, id, idlength, offset, length, 0)))
         return NULL;
 
     size_t entrylength = sizeof(index_item_t) + entry->idlength;
@@ -223,7 +220,7 @@ index_entry_t *index_entry_insert(void *vid, uint8_t idlength, size_t offset, si
     index_transition->flags = entry->flags;
     index_transition->dataid = entry->dataid;
 
-    if(!index_write(rootindex->indexfd, index_transition, entrylength)) {
+    if(!index_write(root->indexfd, index_transition, entrylength, root)) {
         fprintf(stderr, "[-] index: cannot write index entry on disk\n");
 
         // it's easier to flag the entry as deleted than
@@ -236,8 +233,8 @@ index_entry_t *index_entry_insert(void *vid, uint8_t idlength, size_t offset, si
     return entry;
 }
 
-index_entry_t *index_entry_delete(unsigned char *id, uint8_t idlength) {
-    index_entry_t *entry = index_entry_get(id, idlength);
+index_entry_t *index_entry_delete(index_root_t *root, unsigned char *id, uint8_t idlength) {
+    index_entry_t *entry = index_entry_get(root, id, idlength);
 
     if(!entry) {
         verbose("[-] key not found\n");
@@ -262,7 +259,7 @@ index_entry_t *index_entry_delete(unsigned char *id, uint8_t idlength) {
     index_transition->flags = entry->flags;
     index_transition->dataid = entry->dataid;
 
-    if(!index_write(rootindex->indexfd, index_transition, entrylength))
+    if(!index_write(root->indexfd, index_transition, entrylength, root))
         return NULL;
 
     return entry;
@@ -271,31 +268,11 @@ index_entry_t *index_entry_delete(unsigned char *id, uint8_t idlength) {
 //
 // index constructor and destructor
 //
-
-// FIXME: will be moved to loader
-int index_emergency() {
+int index_emergency(index_root_t *root) {
     // skipping building index stage
-    if(!rootindex || (rootindex->status & INDEX_NOT_LOADED))
+    if(!root || (root->status & INDEX_NOT_LOADED))
         return 0;
 
-    fsync(rootindex->indexfd);
+    fsync(root->indexfd);
     return 1;
-}
-
-// FIXME: should move to index_loader
-// clean all opened index related stuff
-void index_destroy() {
-    for(uint32_t b = 0; b < buckets_branches; b++)
-        index_branch_free(rootindex, b);
-
-    // delete root object
-    free(rootindex->branches);
-    free(rootindex->indexfile);
-    free(rootindex);
-    free(index_transition);
-}
-
-// FIXME: need to be removed in the futur, no more global !
-void index_set_rootindex(index_root_t *root) {
-    rootindex = root;
 }

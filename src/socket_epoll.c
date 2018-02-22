@@ -10,8 +10,11 @@
 #ifdef __linux__
 
 #include <sys/epoll.h>
-#include "redis.h"
 #include "zerodb.h"
+#include "index.h"
+#include "data.h"
+#include "namespace.h"
+#include "redis.h"
 
 #define MAXEVENTS 64
 

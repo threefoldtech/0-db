@@ -10,8 +10,10 @@
 #ifdef __APPLE__
 
 #include <sys/event.h>
-#include "redis.h"
 #include "zerodb.h"
+#include "index.h"
+#include "data.h"
+#include "redis.h"
 
 #define MAXEVENTS 64
 struct kevent evset;

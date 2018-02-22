@@ -8,8 +8,10 @@
 #include <execinfo.h>
 #include <getopt.h>
 #include "zerodb.h"
-#include "redis.h"
+#include "index.h"
+#include "data.h"
 #include "namespace.h"
+#include "redis.h"
 #include "filesystem.h"
 
 //
@@ -67,8 +69,9 @@ void hexdump(void *input, size_t length) {
 //
 // global warning and fatal message
 //
-void warnp(char *str) {
+void *warnp(char *str) {
     fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
+    return NULL;
 }
 
 void diep(char *str) {
