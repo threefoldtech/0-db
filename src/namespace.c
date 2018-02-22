@@ -207,13 +207,15 @@ int namespace_destroy() {
 }
 
 int namespace_emergency() {
-    printf("[+] flushing index\n");
+    for(size_t i = 0; i < nsroot->length; i++) {
+        printf("[+] flushing index [%s]\n", nsroot->namespaces[i]->name);
 
-    if(index_emergency(nsroot->namespaces[0]->index)) {
-        printf("[+] flushing data\n");
-        // only flusing data if index flush was accepted
-        // if index flush returns 0, we are probably in an initializing stage
-        data_emergency(nsroot->namespaces[0]->data);
+        if(index_emergency(nsroot->namespaces[i]->index)) {
+            printf("[+] flushing data [%s]\n", nsroot->namespaces[i]->name);
+            // only flusing data if index flush was accepted
+            // if index flush returns 0, we are probably in an initializing stage
+            data_emergency(nsroot->namespaces[i]->data);
+        }
     }
 
     return 0;
