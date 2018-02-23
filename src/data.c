@@ -236,7 +236,7 @@ data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_
     return payload;
 }
 
-// get a payload from any datafile
+// check payload integrity from any datafile
 int data_check(data_root_t *root, size_t offset, uint16_t dataid) {
     int fd = root->datafd;
     unsigned char *buffer;
@@ -279,6 +279,7 @@ int data_check(data_root_t *root, size_t offset, uint16_t dataid) {
 
     // checking integrity of the payload
     uint32_t integrity = data_crc32(buffer, header.datalength);
+    free(buffer);
 
     debug("[+] data: checker: %08x <> %08x\n", integrity, header.integrity);
 
