@@ -99,3 +99,42 @@ This mode is not possible if you don't have any data/index already available.
 `SET`, `GET` and `DEL` supports binary keys.
 
 > Compared to real redis protocol, during a `SET`, the key is returned as response.
+
+# Namespace (in progress)
+New commands are implemented to support **Namespaces** notion.
+
+Each namespace can be optionally protected by a password. A namespace is an isolated key-space.
+
+You are always attached to a namespace, by default, it's namespace `default`.
+
+Quick demo and exemple how to use namespaces:
+```
+127.0.0.1:9900> NSNEW demo
+OK
+
+127.0.0.1:9900> SET hello foo
+"hello"
+
+127.0.0.1:9900> GET hello
+"foo"
+
+[... switching namespace ...]
+
+127.0.0.1:9900> SELECT demo
+OK
+
+127.0.0.1:9900> SET hello bar
+"hello"
+
+127.0.0.1:9900> GET hello
+"bar"
+
+[... rolling back to first namespace ...]
+
+127.0.0.1:9900> SELECT default
+OK
+
+127.0.0.1:9900> GET hello
+"foo"
+
+```
