@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <inttypes.h>
 #include "zerodb.h"
 #include "index.h"
@@ -676,6 +677,31 @@ static int command_dbsize(resp_request_t *request) {
 
     return 0;
 }
+
+static int command_time(resp_request_t *request) {
+    struct timeval now;
+    char response[256];
+    char sec[64], usec[64];
+
+    gettimeofday(&now, NULL);
+
+    // default redis protocol returns values as string
+    // not as integer
+    sprintf(sec, "%lu", now.tv_sec);
+    sprintf(usec, "%ld", now.tv_usec);
+
+    // *2             \r\n  -- array of two values
+    // $[sec-length]  \r\n  -- first header, string value
+    // [seconds]      \r\n  -- first value payload
+    // $[usec-length] \r\n  -- second header, string value
+    // [usec]         \r\n  -- second value payload
+    sprintf(response, "*2\r\n$%lu\r\n%s\r\n$%lu\r\n%s\r\n", strlen(sec), sec, strlen(usec), usec);
+
+    send(request->client->fd, response, strlen(response), 0);
+
+    return 0;
+}
+
 // STOP will be only compiled in debug mode
 // this will force to exit listen loop in order to call
 // all destructors, this is useful to ensure every memory allocation
@@ -702,6 +728,7 @@ static int command_stop(resp_request_t *request) {
 static command_t commands_handlers[] = {
     // system
     {.command = "PING", .handler = command_ping}, // default PING command
+    {.command = "TIME", .handler = command_time}, // default TIME command
 
     // dataset
     {.command = "SET",    .handler = command_set},    // default SET command
