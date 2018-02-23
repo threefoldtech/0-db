@@ -67,6 +67,58 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
     return 1;
 }
 
+// open one datafile based on it's id
+// in case of error, the reason will be printed and -1 will be returned
+// otherwise the file descriptor is returned
+//
+// this function open the data file in read only and should
+// not be used to edit or open the current effective current file
+static int data_open_id(data_root_t *root, uint16_t id) {
+    char temp[PATH_MAX];
+    int fd;
+
+    sprintf(temp, "%s/zdb-data-%05u", root->datadir, id);
+
+    if((fd = open(temp, O_RDONLY, 0600)) < 0) {
+        warnp(temp);
+        return -1;
+    }
+
+    return fd;
+}
+
+
+// main function to call when you need to deal with data id
+// this function takes care to open the right file id:
+//  - if you want the current opened file id, you have thid fd
+//  - if the file is not opened yet, you'll receive a new fd
+// you need to call the .... to be consistant about cleaning this
+// file open, if a new one was opened
+//
+// if the data id could not be opened, -1 is returned
+static inline int data_grab_dataid(data_root_t *root, uint16_t dataid) {
+    int fd = root->datafd;
+
+    if(root->dataid != dataid) {
+        // the requested datafile is not the current datafile opened
+        // we will re-open the expected datafile temporary
+        debug("[-] data: switching file: %d, requested: %d\n", root->dataid, dataid);
+        if((fd = data_open_id(root, dataid)) < 0)
+            return -1;
+    }
+
+    return fd;
+}
+
+static inline void data_release_dataid(data_root_t *root, uint16_t dataid, int fd) {
+    // if the requested data id (or fd) is not the one
+    // currently used by the main structure, we close it
+    // since it was temporary
+    if(root->dataid != dataid) {
+        close(fd);
+    }
+}
+
 //
 // data management
 //
@@ -99,21 +151,6 @@ void data_initialize(char *filename, data_root_t *root) {
 // simply set globaly the current filename based on it's id
 static void data_set_id(data_root_t *root) {
     sprintf(root->datafile, "%s/zdb-data-%05u", root->datadir, root->dataid);
-}
-
-// open the datafile based on it's id
-static int data_open_id(data_root_t *root, uint16_t id) {
-    char temp[PATH_MAX];
-    int fd;
-
-    sprintf(temp, "%s/zdb-data-%05u", root->datadir, id);
-
-    if((fd = open(temp, O_RDONLY, 0600)) < 0) {
-        warnp(temp);
-        return -1;
-    }
-
-    return fd;
 }
 
 static void data_open_final(data_root_t *root) {
@@ -184,21 +221,12 @@ static size_t data_length_from_offset(int fd, size_t offset) {
     return header.datalength;
 }
 
-// get a payload from any datafile
-data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
-    int fd = root->datafd;
+// real data_get implementation
+static inline data_payload_t data_get_real(int fd, size_t offset, size_t length, uint8_t idlength) {
     data_payload_t payload = {
         .buffer = NULL,
         .length = 0
     };
-
-    if(root->dataid != dataid) {
-        // the requested datafile is not the current datafile opened
-        // we will re-open the expected datafile temporary
-        debug("[-] data: current file: %d, requested: %d, switching\n", root->dataid, dataid);
-        if((fd = data_open_id(root, dataid)) < 0)
-            return payload;
-    }
 
     // if we don't know the length in advance, we will read the
     // data header to know the payload size from it
@@ -227,31 +255,38 @@ data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_
         payload.buffer = NULL;
     }
 
-    if(root->dataid != dataid) {
-        // closing the temporary file descriptor
-        // we only keep the current one
-        close(fd);
-    }
+    return payload;
+}
+
+// wrapper for data_get_real, which open the right dataid
+// which allows to do only the needed and this wrapper prepare the right data id
+data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
+    int fd;
+    data_payload_t payload = {
+        .buffer = NULL,
+        .length = 0
+    };
+
+    // acquire data id fd
+    if((fd = data_grab_dataid(root, dataid)) < 0)
+        return payload;
+
+    payload = data_get_real(fd, offset, length, idlength);
+
+    // release dataid
+    data_release_dataid(root, dataid, fd);
 
     return payload;
 }
 
+
 // check payload integrity from any datafile
-int data_check(data_root_t *root, size_t offset, uint16_t dataid) {
-    int fd = root->datafd;
+// real implementation
+static inline int data_check_real(int fd, size_t offset) {
     unsigned char *buffer;
     data_entry_header_t header;
 
-    if(root->dataid != dataid) {
-        // the requested datafile is not the current datafile opened
-        // we will re-open the expected datafile temporary
-        debug("[-] data: checker: current file: %d, requested: %d, switching\n", root->dataid, dataid);
-        if((fd = data_open_id(root, dataid)) < 0)
-            return -1;
-    }
-
     // positioning datafile to expected offset
-    // and skiping header (pointing to payload)
     lseek(fd, offset, SEEK_SET);
 
     if(read(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
@@ -269,12 +304,6 @@ int data_check(data_root_t *root, size_t offset, uint16_t dataid) {
         warnp("data: checker: payload read");
         free(buffer);
         return -1;
-    }
-
-    if(root->dataid != dataid) {
-        // closing the temporary file descriptor
-        // we only keep the current one
-        close(fd);
     }
 
     // checking integrity of the payload
