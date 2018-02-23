@@ -292,7 +292,7 @@ static int command_set(resp_request_t *request) {
     // checking if we need to jump to the next files
     // we do this check here and not from data (event if this is like a
     // datafile event) to keep data and index code completly distinct
-    if(offset + request->argv[2]->length > 256 * 1024 * 1024) { // 256 MB
+    if(offset + request->argv[2]->length > DATA_MAXSIZE) {
         size_t newid = index_jump_next(request->client->ns->index);
         data_jump_next(request->client->ns->data, newid);
     }
