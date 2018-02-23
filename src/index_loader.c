@@ -58,18 +58,12 @@ static void index_dump(index_root_t *root, int fulldump) {
         branches += 1;
         index_entry_t *entry = branch->list;
 
-        // iterating over the linked-list
-        for(; entry; entry = entry->next) {
-            if(fulldump)
-                index_dump_entry(entry);
+        if(!fulldump)
+            continue;
 
-            /*
-            root->indexsize += sizeof(index_entry_t) + entry->idlength;
-            root->datasize += entry->length;
-            root->entries += 1;
-            entries += 1;
-            */
-        }
+        // iterating over the linked-list
+        for(; entry; entry = entry->next)
+            index_dump_entry(entry);
     }
 
     if(fulldump) {
