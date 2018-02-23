@@ -58,4 +58,5 @@
     int data_check(data_root_t *root, size_t offset, uint16_t dataid);
 
     size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength);
+    size_t data_next_offset(data_root_t *root);
 #endif

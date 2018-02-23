@@ -167,8 +167,8 @@ static size_t redis_set_handler_directkey(resp_request_t *request) {
 
     // create some easier accessor
     index_dkey_t id = {
-        .dataid = data_dataid(data), // current data fileid
-        .offset = 0                  // will be filled later by data_insert
+        .dataid = data_dataid(data),      // current data fileid
+        .offset = data_next_offset(data), // needed now, we write it to the datafile
     };
     uint8_t idlength = sizeof(index_dkey_t);
 

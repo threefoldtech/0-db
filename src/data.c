@@ -323,6 +323,15 @@ size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, 
     return offset;
 }
 
+// return the offset of the next entry which will be added
+// you probably don't need this, you should get the offset back
+// when data is really inserted, but this could be needed, for
+// exemple in direct key mode, when the key depends of the offset
+// itself
+size_t data_next_offset(data_root_t *root) {
+    return lseek(root->datafd, 0, SEEK_END);
+}
+
 uint16_t data_dataid(data_root_t *root) {
     return root->dataid;
 }
