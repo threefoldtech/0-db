@@ -357,6 +357,35 @@ static int command_get(resp_request_t *request) {
     return 0;
 }
 
+static int command_exists(resp_request_t *request) {
+    if(!command_args_validate(request, 2))
+        return 1;
+
+    if(request->argv[1]->length > MAX_KEY_LENGTH) {
+        printf("[-] invalid key size\n");
+        redis_hardsend(request->client->fd, "-Invalid key");
+        return 1;
+    }
+
+    debug("[+] command: exists: lookup key: ");
+    debughex(request->argv[1]->buffer, request->argv[1]->length);
+    debug("\n");
+
+    index_entry_t *entry = redis_get_handlers[rootsettings.mode](request);
+
+    // FIXME: will gives fake positive on direct-mode
+
+    debug("[+] command: exists: entry found: %s\n", (entry ? "yes" : "no"));
+    int found = (entry == NULL) ? 0 : 1;
+
+    char response[32];
+    sprintf(response, ":%d\r\n", found);
+
+    send(request->client->fd, response, strlen(response), 0);
+
+    return 0;
+}
+
 static int command_del(resp_request_t *request) {
     if(!command_args_validate(request, 2))
         return 1;
@@ -671,20 +700,27 @@ static int command_stop(resp_request_t *request) {
 //
 
 static command_t commands_handlers[] = {
+    // system
     {.command = "PING", .handler = command_ping}, // default PING command
-    {.command = "SET",  .handler = command_set},  // default SET command
-    {.command = "SETX", .handler = command_set},  // alias for SET command
-    {.command = "GET",  .handler = command_get},  // default GET command
-    {.command = "DEL",  .handler = command_del},  // default DEL command
+
+    // dataset
+    {.command = "SET",    .handler = command_set},    // default SET command
+    {.command = "SETX",   .handler = command_set},    // alias for SET command
+    {.command = "GET",    .handler = command_get},    // default GET command
+    {.command = "DEL",    .handler = command_del},    // default DEL command
+    {.command = "EXISTS", .handler = command_exists}, // default EXISTS command
+
+    // query
     {.command = "INFO", .handler = command_info}, // returns 0-db server name
     {.command = "STOP", .handler = command_stop}, // custom command for debug purpose
 
-    {.command = "DBSIZE", .handler = command_dbsize},  // default dbsize command
+    // namespace
+    {.command = "DBSIZE", .handler = command_dbsize},  // default DBSIZE command
     {.command = "NSNEW",  .handler = command_nsnew},   // custom command to create a namespace
     {.command = "NSLIST", .handler = command_nslist},  // custom command to list namespaces
     {.command = "NSSET",  .handler = command_nsset},   // custom command to edit namespace settings
     {.command = "NSINFO", .handler = command_nsinfo},  // custom command to get namespace information
-    {.command = "SELECT", .handler = command_select},  // switching namespace
+    {.command = "SELECT", .handler = command_select},  // default SELECT (with pwd) namespace switch
 };
 
 int redis_dispatcher(resp_request_t *request) {

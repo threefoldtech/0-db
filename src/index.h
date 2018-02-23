@@ -109,6 +109,9 @@
         size_t indexsize;   // statistics about index in-memory size
         size_t entries;     // statistics about number of keys for this index
 
+        // FIXME: statistics won't be used for direct mode since there is no index
+        //        this needs to be fixed in order to have a propre NSINFO working
+
     } index_root_t;
 
     // key used by direct mode
