@@ -73,14 +73,7 @@ static void index_dump(index_root_t *root, int fulldump) {
         printf("[+] ===========================\n");
     }
 
-    verbose("[+] index: load: %lu entries\n", root->entries);
     verbose("[+] index: uses: %lu branches\n", branches);
-
-    double datamb = root->datasize / (1024.0 * 1024);
-    double indexkb = root->indexsize / 1024.0;
-
-    verbose("[+] index: datasize expected: %.2f MB (%lu bytes)\n", datamb, root->datasize);
-    verbose("[+] index: raw usage: %.2f KB (%lu bytes)\n", indexkb, root->indexsize);
 
     // overhead contains:
     // - the buffer allocated to hold each (futur) branches pointer
@@ -89,6 +82,17 @@ static void index_dump(index_root_t *root, int fulldump) {
                       (branches * sizeof(index_branch_t));
 
     verbose("[+] index: memory overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
+
+}
+
+static void index_dump_statistics(index_root_t *root) {
+    verbose("[+] index: load: %lu entries\n", root->entries);
+
+    double datamb = root->datasize / (1024.0 * 1024);
+    double indexkb = root->indexsize / 1024.0;
+
+    verbose("[+] index: datasize expected: %.2f MB (%lu bytes)\n", datamb, root->datasize);
+    verbose("[+] index: raw usage: %.2f KB (%lu bytes)\n", indexkb, root->indexsize);
 }
 
 //
@@ -389,6 +393,8 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
 
     if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL)
         index_dump(root, settings->dump);
+
+    index_dump_statistics(root);
 
     return root;
 }

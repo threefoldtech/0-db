@@ -175,7 +175,6 @@ static size_t redis_set_handler_directkey(resp_request_t *request) {
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
 
-
     debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
 
     // insert the data on the datafile
@@ -201,13 +200,13 @@ static size_t redis_set_handler_directkey(resp_request_t *request) {
     // usually, here is where we add the key in the index
     // we don't use the index in this case since the position
     // is the key itself
+    // FIXME: we need to use an index for data statistics
 
     // building response
     // here, from original redis protocol, we don't reply with a basic
     // OK or Error when inserting a key, we reply with the key itself
     //
-    // this is how the sequential-id can returns the id generated
-    // redis_bulk_t response = redis_bulk(id, idlength);
+    // this is how the direct-id can returns the id generated
     redis_bulk_t response = redis_bulk(&id, idlength);
     if(!response.buffer) {
         redis_hardsend(request->client->fd, "$-1");
