@@ -33,11 +33,6 @@ static ns_root_t *nsroot = NULL;
 //
 // public namespace endpoint
 //
-void namespace_list() {
-    for(size_t i = 0; i < nsroot->length; i++)
-        printf(">> %s\n", nsroot->namespaces[i]->name);
-}
-
 int namespace_delete(unsigned char *name) {
     (void) name;
 
@@ -69,14 +64,14 @@ int namespace_set(unsigned char *name, int settings) {
     return 0;
 }
 
-void namespace_update_descriptor(namespace_t *namespace, int fd) {
+void namespace_descriptor_update(namespace_t *namespace, int fd) {
     ns_header_t header;
 
     debug("[+] namespaces: updating header\n");
 
     header.namelength = strlen(namespace->name);
     header.passlength = namespace->password ? strlen(namespace->password) : 0;
-    header.maxsize = 131072; // DEBUG PURPOSE
+    header.maxsize = namespace->maxsize;
     header.flags = 0;
 
     if(namespace->public)
@@ -92,26 +87,38 @@ void namespace_update_descriptor(namespace_t *namespace, int fd) {
         if(write(fd, namespace->password, header.passlength) != (ssize_t) header.passlength)
             warnp("namespace header pass write");
     }
+
+    // ensure metadata are written
+    fsync(fd);
 }
 
-// read (or create) a namespace descriptor
-// namespace descriptor is a binary file containing namespace
-// specification such password, maxsize, etc. (see header)
-static void namespace_load_descriptor(namespace_t *namespace) {
+static int namespace_descriptor_open(namespace_t *namespace) {
     char pathname[PATH_MAX];
-    ns_header_t header;
     int fd;
 
     snprintf(pathname, PATH_MAX, "%s/zdb-namespace", namespace->indexpath);
 
     if((fd = open(pathname, O_CREAT | O_RDWR, 0600)) < 0) {
         warning("[-] cannot create or open in read-write the namespace file\n");
-        return;
+        return -1;
     }
+
+    return fd;
+}
+
+// read (or create) a namespace descriptor
+// namespace descriptor is a binary file containing namespace
+// specification such password, maxsize, etc. (see header)
+static void namespace_descriptor_load(namespace_t *namespace) {
+    ns_header_t header;
+    int fd;
+
+    if((fd = namespace_descriptor_open(namespace)) < 0)
+        return;
 
     if(read(fd, &header, sizeof(ns_header_t)) != sizeof(ns_header_t)) {
         // probably new file, let's write initial namespace information
-        namespace_update_descriptor(namespace, fd);
+        namespace_descriptor_update(namespace, fd);
         close(fd);
         return;
     }
@@ -135,6 +142,20 @@ static void namespace_load_descriptor(namespace_t *namespace) {
     debug("[+] namespace '%s': maxsize: %lu\n", namespace->name, namespace->maxsize);
     debug("[+] -> password protection: %s\n", namespace->password ? "yes" : "no");
     debug("[+] -> public access: %s\n", namespace->public ? "yes" : "no");
+
+    close(fd);
+}
+
+// update persistance data of a namespace
+// basicly, this rewrite it's metadata on disk
+void namespace_commit(namespace_t *namespace) {
+    int fd;
+
+    if((fd = namespace_descriptor_open(namespace)) < 0)
+        return;
+
+    // update metadata
+    namespace_descriptor_update(namespace, fd);
 
     close(fd);
 }
@@ -174,15 +195,16 @@ static namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
     }
 
     namespace->name = strdup(name);
-    namespace->password = NULL;
+    namespace->password = NULL;  // no password by default, need to be set later
     namespace->indexpath = namespace_path(nsroot->settings->indexpath, name);
     namespace->datapath = namespace_path(nsroot->settings->datapath, name);
-    namespace->public = 0;
+    namespace->public = 1;  // by default, namespace are public (no password)
+    namespace->maxsize = 0; // by default, there is no limits
 
     if(!namespace_ensure(namespace))
         return NULL;
 
-    namespace_load_descriptor(namespace);
+    namespace_descriptor_load(namespace);
 
     // now, we are sure the namespace exists, but it's maybe empty
     // let's call index and data initializer, they will take care about that
@@ -217,18 +239,12 @@ static namespace_t *namespace_push(ns_root_t *root, namespace_t *namespace) {
 // do not call this is you didn't checked the namespace already exists
 // by getting it first
 //
-int namespace_create(char *name, char *secret) {
+int namespace_create(char *name) {
     namespace_t *namespace;
 
     // call the generic namespace loader
     if(!(namespace = namespace_load(nsroot, name)))
         return 0;
-
-    // if password is set, applying to the config
-    // and commit the change on the descriptor
-    if(secret) {
-        // set secret ...
-    }
 
     // append the namespace to the main list
     if(!namespace_push(nsroot, namespace))

@@ -50,8 +50,10 @@
 
     ns_root_t *namespace_get_list();
 
-    int namespace_create(char *name, char *secret);
+    int namespace_create(char *name);
     namespace_t *namespace_get(char *name);
+
+    void namespace_commit(namespace_t *namespace);
 
     int namespace_init(settings_t *settings);
     int namespace_destroy();
