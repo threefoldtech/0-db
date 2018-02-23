@@ -82,13 +82,15 @@ void data_initialize(char *filename, data_root_t *root) {
     }
 
     // writing initial header
-    // this header is, right now, not used and not useful
-    // we should probably improve it
-    //
-    // anyway, it's important for the implementation to have
-    // at least 1 byte already written, we use 0 as error when
-    // expecting an offset
-    if(!data_write(fd, "X", 1, 1, root))
+    data_header_t header;
+
+    memcpy(header.magic, "DAT0", 4);
+    header.version = 1;
+    header.created = time(NULL);
+    header.opened = 0; // not supported yet
+    header.fileid = root->dataid;
+
+    if(!data_write(fd, &header, sizeof(data_header_t), 1, root))
         diep(filename);
 
     close(fd);
@@ -167,12 +169,12 @@ static uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
 }
 
 static size_t data_length_from_offset(int fd, size_t offset) {
-    data_header_t header;
+    data_entry_header_t header;
 
     // moving the the header offset
     lseek(fd, offset, SEEK_SET);
 
-    if(read(fd, &header, sizeof(data_header_t)) != sizeof(data_header_t)) {
+    if(read(fd, &header, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
         warnp("data header read");
         return 0;
     }
@@ -208,7 +210,7 @@ data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_
 
     // positioning datafile to expected offset
     // and skiping header (pointing to payload)
-    lseek(fd, offset + sizeof(data_header_t) + idlength, SEEK_SET);
+    lseek(fd, offset + sizeof(data_entry_header_t) + idlength, SEEK_SET);
 
     // allocating buffer from length
     // (from index or data header, we don't care)
@@ -235,8 +237,8 @@ data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_
 size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength) {
     unsigned char *id = (unsigned char *) vid;
     size_t offset = lseek(root->datafd, 0, SEEK_END);
-    size_t headerlength = sizeof(data_header_t) + idlength;
-    data_header_t *header;
+    size_t headerlength = sizeof(data_entry_header_t) + idlength;
+    data_entry_header_t *header;
 
     if(!(header = malloc(headerlength)))
         diep("malloc");

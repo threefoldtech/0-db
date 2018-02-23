@@ -14,16 +14,29 @@
 
     } data_root_t;
 
+    // data file header
+    // this file is more there for information
+    // this is not really relevant but can be used
+    // to validate contents and detect type with the magic
+    typedef struct data_header_t {
+        char magic[4];     // four bytes magic bytes to recognize the file
+        uint32_t version;  // file version, for possible upgrade compatibility
+        uint64_t created;  // unix timestamp of creation time
+        uint64_t opened;   // unix timestamp of last opened time
+        uint16_t fileid;   // current index file id (sync with dataid)
+
+    } __attribute__((packed)) data_header_t;
+
     // data_header_t contains header of each entry on the datafile
     // this header doesn't contains the payload, we assume the payload
     // follows the header
-    typedef struct data_header_t {
+    typedef struct data_entry_header_t {
         uint8_t idlength;     // length of the id
         uint32_t datalength;  // length of the payload
         uint32_t integrity;   // simple integrity check (crc32)
         char id[];            // accessor to the id, dynamically
 
-    } __attribute__((packed)) data_header_t;
+    } __attribute__((packed)) data_entry_header_t;
 
     // struct used to return data from datafile
     // this struct contains length, which can be filled

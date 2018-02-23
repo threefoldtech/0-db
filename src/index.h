@@ -7,7 +7,7 @@
     // to validate contents and detect type with the magic
     typedef struct index_t {
         char magic[4];     // four bytes magic bytes to recognize the file
-        uint32_t version;
+        uint32_t version;  // file version, for possible upgrade compatibility
         uint64_t created;  // unix timestamp of creation time
         uint64_t opened;   // unix timestamp of last opened time
         uint16_t fileid;   // current index file id (sync with dataid)
