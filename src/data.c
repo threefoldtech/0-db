@@ -108,8 +108,10 @@ static int data_open_id(data_root_t *root, uint16_t id) {
 
     sprintf(temp, "%s/zdb-data-%05u", root->datadir, id);
 
-    if((fd = open(temp, O_RDONLY, 0600)) < 0)
-        diep(temp);
+    if((fd = open(temp, O_RDONLY, 0600)) < 0) {
+        warnp(temp);
+        return -1;
+    }
 
     return fd;
 }
@@ -194,7 +196,8 @@ data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_
         // the requested datafile is not the current datafile opened
         // we will re-open the expected datafile temporary
         debug("[-] data: current file: %d, requested: %d, switching\n", root->dataid, dataid);
-        fd = data_open_id(root, dataid);
+        if((fd = data_open_id(root, dataid)) < 0)
+            return payload;
     }
 
     // if we don't know the length in advance, we will read the
@@ -232,6 +235,57 @@ data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_
 
     return payload;
 }
+
+// get a payload from any datafile
+int data_check(data_root_t *root, size_t offset, uint16_t dataid) {
+    int fd = root->datafd;
+    unsigned char *buffer;
+    data_entry_header_t header;
+
+    if(root->dataid != dataid) {
+        // the requested datafile is not the current datafile opened
+        // we will re-open the expected datafile temporary
+        debug("[-] data: checker: current file: %d, requested: %d, switching\n", root->dataid, dataid);
+        if((fd = data_open_id(root, dataid)) < 0)
+            return -1;
+    }
+
+    // positioning datafile to expected offset
+    // and skiping header (pointing to payload)
+    lseek(fd, offset, SEEK_SET);
+
+    if(read(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
+        warnp("data: checker: header read");
+        return -1;
+    }
+
+    // skipping the key, set buffer to payload point
+    lseek(fd, header.idlength, SEEK_CUR);
+
+    // allocating buffer from header's length
+    buffer = malloc(header.datalength);
+
+    if(read(fd, buffer, header.datalength) != (ssize_t) header.datalength) {
+        warnp("data: checker: payload read");
+        free(buffer);
+        return -1;
+    }
+
+    if(root->dataid != dataid) {
+        // closing the temporary file descriptor
+        // we only keep the current one
+        close(fd);
+    }
+
+    // checking integrity of the payload
+    uint32_t integrity = data_crc32(buffer, header.datalength);
+
+    debug("[+] data: checker: %08x <> %08x\n", integrity, header.integrity);
+
+    // comparing with header
+    return (integrity == header.integrity);
+}
+
 
 // insert data on the datafile and returns it's offset
 size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength) {

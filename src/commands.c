@@ -387,6 +387,54 @@ static int command_exists(resp_request_t *request) {
     return 0;
 }
 
+static int command_check(resp_request_t *request) {
+    if(!command_args_validate(request, 2))
+        return 1;
+
+    if(request->argv[1]->length > MAX_KEY_LENGTH) {
+        printf("[-] invalid key size\n");
+        redis_hardsend(request->client->fd, "-Invalid key");
+        return 1;
+    }
+
+    debug("[+] command: check: lookup key: ");
+    debughex(request->argv[1]->buffer, request->argv[1]->length);
+    debug("\n");
+
+    index_entry_t *entry = redis_get_handlers[rootsettings.mode](request);
+
+    // key not found at all
+    if(!entry) {
+        verbose("[-] command: check: key not found\n");
+        redis_hardsend(request->client->fd, "$-1");
+        return 1;
+    }
+
+    // key found but deleted
+    if(entry->flags & INDEX_ENTRY_DELETED) {
+        verbose("[-] command: check: key deleted\n");
+        redis_hardsend(request->client->fd, "$-1");
+        return 1;
+    }
+
+    // key found and valid, let's checking the contents
+    debug("[+] command: get: entry found, flags: %x, data length: %" PRIu64 "\n", entry->flags, entry->length);
+    debug("[+] command: get: data file: %d, data offset: %" PRIu64 "\n", entry->dataid, entry->offset);
+
+    data_root_t *data = request->client->ns->data;
+    int status = data_check(data, entry->offset, entry->dataid);
+
+    //
+    //
+
+    char response[32];
+    sprintf(response, ":%d\r\n", status);
+
+    send(request->client->fd, response, strlen(response), 0);
+
+    return 0;
+}
+
 static int command_del(resp_request_t *request) {
     if(!command_args_validate(request, 2))
         return 1;
@@ -736,6 +784,7 @@ static command_t commands_handlers[] = {
     {.command = "GET",    .handler = command_get},    // default GET command
     {.command = "DEL",    .handler = command_del},    // default DEL command
     {.command = "EXISTS", .handler = command_exists}, // default EXISTS command
+    {.command = "CHECK",  .handler = command_check},  // custom command to verify data integrity
 
     // query
     {.command = "INFO", .handler = command_info}, // returns 0-db server name
