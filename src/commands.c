@@ -256,6 +256,21 @@ static index_entry_t *redis_get_handler_direct(resp_request_t *request) {
     // and not from tne index
     index_reusable_entry->length = 0;
 
+    // since the user can provide any offset, he could potentially
+    // get data not expected and maybe get sensitive data
+    //
+    // we don't have an exact way to ensure that this entry is effectivly
+    // a valid entry, but we can be pretty sure
+    //
+    // the data header contains the key, if the offset points to one
+    // header + the key just after, and that key match, we can conclude
+    // the request is legitime
+    data_root_t *data = request->client->ns->data;
+    if(!data_match(data, &directkey, sizeof(index_dkey_t), directkey.offset, directkey.dataid)) {
+        debug("[-] command: get: validator refused the requested key access\n");
+        return NULL;
+    }
+
     return index_reusable_entry;
 }
 

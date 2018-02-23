@@ -13,6 +13,7 @@
 #include <time.h>
 #include "zerodb.h"
 #include "data.h"
+#include "index.h" // for key max length
 
 // force to sync data buffer into the underlaying device
 static inline int data_sync(data_root_t *root, int fd) {
@@ -316,6 +317,24 @@ static inline int data_check_real(int fd, size_t offset) {
     return (integrity == header.integrity);
 }
 
+// check payload integrity from any datafile
+// function wrapper to load the correct file id
+int data_check(data_root_t *root, size_t offset, uint16_t dataid) {
+    int fd;
+
+    // acquire data id fd
+    if((fd = data_grab_dataid(root, dataid)) < 0)
+        return -1;
+
+    int value = data_check_real(fd, offset);
+
+    // release dataid
+    data_release_dataid(root, dataid, fd);
+
+    return value;
+}
+
+
 
 // insert data on the datafile and returns it's offset
 size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength) {
@@ -359,6 +378,75 @@ size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, 
 // itself
 size_t data_next_offset(data_root_t *root) {
     return lseek(root->datafd, 0, SEEK_END);
+}
+
+// this function will check for a legitime request inside the data set
+// to estimate if a request is legitimate, we assume that
+//  - if the offset provided point to a header
+//  - we can't ensure what we read is, for sure, a header
+//  - to improve probability:
+//    - if the length of the key in the header match expected key length
+//    - if the data length is not more than the maximum allowed size
+//    - if the key in the header match the key requested
+//    if all of theses conditions match, the probability of a fake request
+//    are nearly null
+static inline int data_match_real(int fd, void *id, uint8_t idlength, size_t offset) {
+    data_entry_header_t header;
+    char keycheck[MAX_KEY_LENGTH];
+
+    // positioning datafile to expected offset
+    lseek(fd, offset, SEEK_SET);
+
+    // reading the header
+    if(read(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
+        warnp("data: validator: header read");
+        return 0;
+    }
+
+    // preliminary check: does key length match
+    if(header.idlength != idlength) {
+        debug("[-] data: validator: key-length mismatch\n");
+        return 0;
+    }
+
+    // preliminary check: does the payload fit on the file
+    if(header.datalength > DATA_MAXSIZE) {
+        debug("[-] data: validator: payload length too big\n");
+        return 0;
+    }
+
+    // comparing the key
+    if(read(fd, keycheck, idlength) != (ssize_t) idlength) {
+        warnp("data: validator: key read");
+        return 0;
+    }
+
+    if(memcmp(keycheck, id, idlength) != 0) {
+        debug("[-] data: validator: key mismatch\n");
+        return 0;
+    }
+
+    return 1;
+}
+
+// wrapper for data_match_real which load the correct file id
+// this function is made to ensure the key requested is legitimate
+// we need to be careful, we cannot trust anything (file id, offset, ...)
+int data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, uint16_t dataid) {
+    int fd;
+
+    // acquire data id fd
+    if((fd = data_grab_dataid(root, dataid)) < 0) {
+        debug("[-] data: validator: could not open requested file id (%u)\n", dataid);
+        return 0;
+    }
+
+    int value = data_match_real(fd, id, idlength, offset);
+
+    // release dataid
+    data_release_dataid(root, dataid, fd);
+
+    return value;
 }
 
 uint16_t data_dataid(data_root_t *root) {
