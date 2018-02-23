@@ -259,8 +259,10 @@ void socket_client_free(int fd) {
 
     debug("[+] client: closing (fd: %d)\n", fd);
 
+    #ifndef RELEASE
     double elapsed = difftime(time(NULL), client->connected);
     debug("[+] client: stayed %.f seconds, %lu commands\n", elapsed, client->commands);
+    #endif
 
     // closing socket
     close(client->fd);

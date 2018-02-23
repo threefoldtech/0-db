@@ -265,6 +265,9 @@ static index_entry_t *redis_get_handler_direct(resp_request_t *request) {
     // the data header contains the key, if the offset points to one
     // header + the key just after, and that key match, we can conclude
     // the request is legitime
+    //
+    // sadly, this have some impact on read performance
+    // FIXME: optimize this by changing when the security check is done
     data_root_t *data = request->client->ns->data;
     if(!data_match(data, &directkey, sizeof(index_dkey_t), directkey.offset, directkey.dataid)) {
         debug("[-] command: get: validator refused the requested key access\n");
