@@ -639,6 +639,14 @@ static int command_nsset(resp_request_t *request) {
     return 0;
 }
 
+static int command_dbsize(resp_request_t *request) {
+    char response[64];
+
+    sprintf(response, ":%lu\r\n", request->client->ns->index->entries);
+    send(request->client->fd, response, strlen(response), 0);
+
+    return 0;
+}
 // STOP will be only compiled in debug mode
 // this will force to exit listen loop in order to call
 // all destructors, this is useful to ensure every memory allocation
@@ -671,6 +679,7 @@ static command_t commands_handlers[] = {
     {.command = "INFO", .handler = command_info}, // returns 0-db server name
     {.command = "STOP", .handler = command_stop}, // custom command for debug purpose
 
+    {.command = "DBSIZE", .handler = command_dbsize},  // default dbsize command
     {.command = "NSNEW",  .handler = command_nsnew},   // custom command to create a namespace
     {.command = "NSLIST", .handler = command_nslist},  // custom command to list namespaces
     {.command = "NSSET",  .handler = command_nsset},   // custom command to edit namespace settings
