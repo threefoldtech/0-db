@@ -244,11 +244,6 @@ static index_entry_t *redis_get_handler_direct(resp_request_t *request) {
     index_reusable_entry->offset = directkey.offset;
     index_reusable_entry->dataid = directkey.dataid;
 
-    // when using a zero-length payload
-    // the length will be used from the data header
-    // and not from tne index
-    index_reusable_entry->length = 0;
-
     // since the user can provide any offset, he could potentially
     // get data not expected and maybe get sensitive data
     //
@@ -298,6 +293,12 @@ static int command_set(resp_request_t *request) {
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         redis_hardsend(request->client->fd, "-Key too large");
+        return 1;
+    }
+
+    if(!request->client->writable) {
+        debug("[-] command: set: denied, read-only namespace\n");
+        redis_hardsend(request->client->fd, "-Namespace is in read-only mode");
         return 1;
     }
 
@@ -491,6 +492,12 @@ static int command_del(resp_request_t *request) {
         return 1;
     }
 
+    if(!request->client->writable) {
+        debug("[-] command: set: denied, read-only namespace\n");
+        redis_hardsend(request->client->fd, "-Namespace is in read-only mode");
+        return 1;
+    }
+
     index_root_t *index = request->client->ns->index;
 
     if(!index_entry_delete(index, request->argv[1]->buffer, request->argv[1]->length)) {
@@ -570,16 +577,35 @@ static int command_select(resp_request_t *request) {
         return 1;
     }
 
+    // by default, we arrume the namespace will be read-write allowed
+    int writable = 1;
+
     // checking if password is set
     if(namespace->password) {
-        if(request->argc != 3) {
-            redis_hardsend(request->client->fd, "-Namespace protected");
-            return 1;
-        }
+        if(request->argc < 3) {
+            // no password provided
+            // if the namespace allows public access, we authorize it
+            // but in read-only mode
+            if(!namespace->public) {
+                debug("[-] command: select: namespace not public and password not provided\n");
+                redis_hardsend(request->client->fd, "-Namespace protected and private");
+                return 1;
+            }
 
-        if(strncmp(request->argv[2]->buffer, namespace->password, request->argv[2]->length) != 0) {
-            redis_hardsend(request->client->fd, "-Access denied");
-            return 1;
+            // namespace is public, which means we are
+            // in a read-only mode now
+            debug("[-] command: select: protected namespace, no password set, setting read-only\n");
+            writable = 0;
+
+        } else {
+            if(strncmp(request->argv[2]->buffer, namespace->password, request->argv[2]->length) != 0) {
+                redis_hardsend(request->client->fd, "-Access denied");
+                return 1;
+            }
+
+            debug("[-] command: select: protected and password match, access granted\n");
+
+            // password provided and match
         }
 
         // access granted
@@ -588,6 +614,7 @@ static int command_select(resp_request_t *request) {
     // switching client's active namespace
     debug("[+] command: select: moving user to namespace '%s'\n", namespace->name);
     request->client->ns = namespace;
+    request->client->writable = writable;
 
     // return confirmation
     redis_hardsend(request->client->fd, "+OK");
@@ -647,6 +674,7 @@ static int command_nsinfo(resp_request_t *request) {
     sprintf(info + strlen(info), "name: %s\n", namespace->name);
     sprintf(info + strlen(info), "entries: %lu\n", namespace->index->entries);
     sprintf(info + strlen(info), "public: %s\n", namespace->public ? "yes" : "no");
+    sprintf(info + strlen(info), "password: %s\n", namespace->password ? "yes" : "no");
     sprintf(info + strlen(info), "data_size_bytes: %lu\n", namespace->index->datasize);
     sprintf(info + strlen(info), "data_size_mb: %.2f\n", namespace->index->datasize / (1024 * 1024.0));
     sprintf(info + strlen(info), "data_limits_bytes: %lu\n", namespace->maxsize);

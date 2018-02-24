@@ -23,6 +23,7 @@
         namespace_t *ns;  // connection namespace
         time_t connected; // connection time
         size_t commands;  // request (commands) counter
+        int writable;     // does the client can write on the namespace
 
     } redis_client_t;
 

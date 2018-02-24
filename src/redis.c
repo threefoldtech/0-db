@@ -250,6 +250,9 @@ redis_client_t *socket_client_new(int fd) {
     // attaching default namespace to this client
     clients.list[fd]->ns = namespace_get_default();
 
+    // by default, the default namespace is writable
+    clients.list[fd]->writable = 1;
+
     return clients.list[fd];
 }
 
