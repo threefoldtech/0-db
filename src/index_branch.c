@@ -78,6 +78,9 @@ void index_branch_free(index_root_t *root, uint32_t branchid) {
 // returns branch from rootindex, if branch is not allocated yet, returns NULL
 // useful for any read on the index in memory
 index_branch_t *index_branch_get(index_root_t *root, uint32_t branchid) {
+    if(!root->branches)
+        return NULL;
+
     return root->branches[branchid];
 }
 
@@ -94,8 +97,13 @@ index_branch_t *index_branch_get_allocate(index_root_t *root, uint32_t branchid)
 // append an entry (item) to the memory list
 // since we use a linked-list, the logic of appending
 // only occures here
+//
+// if there is no index, we just skip the appending
 index_entry_t *index_branch_append(index_root_t *root, uint32_t branchid, index_entry_t *entry) {
     index_branch_t *branch;
+
+    if(!root->branches)
+        return NULL;
 
     // grabbing the branch
     branch = index_branch_get_allocate(root, branchid);

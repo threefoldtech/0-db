@@ -164,6 +164,7 @@ static size_t redis_set_handler_sequential(resp_request_t *request) {
 static size_t redis_set_handler_directkey(resp_request_t *request) {
     // shortcut to data
     data_root_t *data = request->client->ns->data;
+    index_root_t *index = request->client->ns->index;
 
     // create some easier accessor
     index_dkey_t id = {
@@ -197,10 +198,15 @@ static size_t redis_set_handler_directkey(resp_request_t *request) {
 
     debug("[+] command: set: offset: %lu\n", offset);
 
-    // usually, here is where we add the key in the index
-    // we don't use the index in this case since the position
-    // is the key itself
-    // FIXME: we need to use an index for data statistics
+    // previously, we was skipping index at all on this mode
+    // since there was no index, but now we use the index as statistics
+    // manager, we use index, on the branch code, if there is no index in
+    // memory, the memory part is skipped but index is still written
+    if(!index_entry_insert(index, &id, idlength, offset, request->argv[2]->length)) {
+        // cannot insert index (disk issue)
+        redis_hardsend(request->client->fd, "$-1");
+        return 0;
+    }
 
     // building response
     // here, from original redis protocol, we don't reply with a basic
@@ -267,6 +273,7 @@ static index_entry_t *redis_get_handler_direct(resp_request_t *request) {
     //
     // sadly, this have some impact on read performance
     // FIXME: optimize this by changing when the security check is done
+    //        but in the meantime, this fix the EXISTS command
     data_root_t *data = request->client->ns->data;
     if(!data_match(data, &directkey, sizeof(index_dkey_t), directkey.offset, directkey.dataid)) {
         debug("[-] command: get: validator refused the requested key access\n");
@@ -390,8 +397,6 @@ static int command_exists(resp_request_t *request) {
     debug("\n");
 
     index_entry_t *entry = redis_get_handlers[rootsettings.mode](request);
-
-    // FIXME: will gives fake positive on direct-mode
 
     debug("[+] command: exists: entry found: %s\n", (entry ? "yes" : "no"));
     int found = (entry == NULL) ? 0 : 1;

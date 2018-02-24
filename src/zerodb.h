@@ -59,10 +59,16 @@
 
     #define verbose(...) { if(rootsettings.verbose) { printf(__VA_ARGS__); } }
 
-    #define danger(fmt, ...) { printf("\033[31;1m" fmt "\033[0m\n", ##__VA_ARGS__); }
-    #define warning(fmt, ...) { printf("\033[33;1m" fmt "\033[0m\n", ##__VA_ARGS__); }
-    #define success(fmt, ...) { printf("\033[32;1m" fmt "\033[0m\n", ##__VA_ARGS__); }
-    #define notice(fmt, ...) { printf("\033[36;1m" fmt "\033[0m\n", ##__VA_ARGS__); }
+    #define COLOR_RED    "\033[31;1m"
+    #define COLOR_YELLOW "\033[33;1m"
+    #define COLOR_GREEN  "\033[32;1m"
+    #define COLOR_CYAN   "\033[36;1m"
+    #define COLOR_RESET  "\033[0m"
+
+    #define danger(fmt, ...)  { printf(COLOR_RED    fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define warning(fmt, ...) { printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define success(fmt, ...) { printf(COLOR_GREEN  fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define notice(fmt, ...)  { printf(COLOR_CYAN   fmt COLOR_RESET "\n", ##__VA_ARGS__); }
 
     #ifndef RELEASE
         #define debug(...) { printf(__VA_ARGS__); }

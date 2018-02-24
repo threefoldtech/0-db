@@ -366,12 +366,14 @@ int namespace_destroy() {
     // since branch want an index as argument, let's use
     // the first namespace (default), since they all share
     // the same buffer
-    debug("[+] namespaces: cleaning branches\n");
-    for(uint32_t b = 0; b < buckets_branches; b++)
-        index_branch_free(nsroot->namespaces[0]->index, b);
+    if(nsroot->branches) {
+        debug("[+] namespaces: cleaning branches\n");
+        for(uint32_t b = 0; b < buckets_branches; b++)
+            index_branch_free(nsroot->namespaces[0]->index, b);
 
-    // freeing the big index array
-    free(nsroot->branches);
+        // freeing the big index array
+        free(nsroot->branches);
+    }
 
     // freeing each namespace's index and data buffers
     debug("[+] namespaces: cleaning index and data\n");

@@ -82,7 +82,6 @@ static void index_dump(index_root_t *root, int fulldump) {
                       (branches * sizeof(index_branch_t));
 
     verbose("[+] index: memory overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
-
 }
 
 static void index_dump_statistics(index_root_t *root) {
@@ -91,8 +90,8 @@ static void index_dump_statistics(index_root_t *root) {
     double datamb = root->datasize / (1024.0 * 1024);
     double indexkb = root->indexsize / 1024.0;
 
-    verbose("[+] index: datasize expected: %.2f MB (%lu bytes)\n", datamb, root->datasize);
-    verbose("[+] index: raw usage: %.2f KB (%lu bytes)\n", indexkb, root->indexsize);
+    verbose("[+] index: datasize: " COLOR_CYAN "%.2f MB" COLOR_RESET " (%lu bytes)\n", datamb, root->datasize);
+    verbose("[+] index: raw usage: %.1f KB (%lu bytes)\n", indexkb, root->indexsize);
 }
 
 //
@@ -336,25 +335,24 @@ static void index_allocate_single(settings_t *settings) {
     // if variables are already allocated
     // this process is silently skipped
 
-    // don't allocate branch on direct-key mode since the
-    // index is not used (no lookup needed)
-    // we don't load index neither, since the index will always
-    // be empty
-    if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL) {
-        // avoid already allocated buffer
-        if(index_transition)
-            return;
+    // always allocating the transition keys, since all mode use at
+    // least the index handlers (all the work to avoid index branch in
+    // direct-key mode is done on the branch code)
 
-        // allocating transition variable, a reusable item
-        if(!(index_transition = malloc(sizeof(index_item_t) + MAX_KEY_LENGTH + 1)))
-            diep("malloc");
+    // avoid already allocated buffer
+    if(index_transition)
+        return;
 
-    } else if(settings->mode == DIRECTKEY) {
+    // allocating transition variable, a reusable item
+    if(!(index_transition = malloc(sizeof(index_item_t) + MAX_KEY_LENGTH + 1)))
+        diep("malloc");
+
+    if(settings->mode == DIRECTKEY) {
         // avoid already allocated buffer
         if(index_reusable_entry)
             return;
 
-        // in direct key mode, we allocate a re-usable
+        // in direct key mode, more over, we allocate a re-usable
         // index_entry_t which will be adapted each time
         // using the requested key, like this we can use the same
         // implementation for everything
