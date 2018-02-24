@@ -44,17 +44,13 @@ static int command_args_validate(resp_request_t *request, int expected) {
 // different SET implementation
 // depending on the running mode
 //
-static size_t redis_set_handler_userkey(resp_request_t *request) {
+static size_t redis_set_handler_userkey(resp_request_t *request, index_root_t *index, data_root_t *data) {
     // create some easier accessor
     unsigned char *id = request->argv[1]->buffer;
     uint8_t idlength = request->argv[1]->length;
 
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
-
-    // shortcut to index and data
-    index_root_t *index = request->client->ns->index;
-    data_root_t *data = request->client->ns->data;
 
     debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
     // printf("[+] set key: %.*s\n", idlength, id);
@@ -102,11 +98,7 @@ static size_t redis_set_handler_userkey(resp_request_t *request) {
     return offset;
 }
 
-static size_t redis_set_handler_sequential(resp_request_t *request) {
-    // shortcut to index and data
-    index_root_t *index = request->client->ns->index;
-    data_root_t *data = request->client->ns->data;
-
+static size_t redis_set_handler_sequential(resp_request_t *request, index_root_t *index, data_root_t *data) {
     // create some easier accessor
     uint32_t id = index_next_id(index);
     uint8_t idlength = sizeof(uint32_t);
@@ -161,11 +153,7 @@ static size_t redis_set_handler_sequential(resp_request_t *request) {
     return offset;
 }
 
-static size_t redis_set_handler_directkey(resp_request_t *request) {
-    // shortcut to data
-    data_root_t *data = request->client->ns->data;
-    index_root_t *index = request->client->ns->index;
-
+static size_t redis_set_handler_directkey(resp_request_t *request, index_root_t *index, data_root_t *data) {
     // create some easier accessor
     index_dkey_t id = {
         .dataid = data_dataid(data),      // current data fileid
@@ -225,7 +213,7 @@ static size_t redis_set_handler_directkey(resp_request_t *request) {
     return offset;
 }
 
-static size_t (*redis_set_handlers[])(resp_request_t *request) = {
+static size_t (*redis_set_handlers[])(resp_request_t *request, index_root_t *index, data_root_t *data) = {
     redis_set_handler_userkey,    // key-value mode
     redis_set_handler_sequential, // incremental mode
     redis_set_handler_directkey,  // direct-key mode
@@ -313,7 +301,32 @@ static int command_set(resp_request_t *request) {
         return 1;
     }
 
-    size_t offset = redis_set_handlers[rootsettings.mode](request);
+    // shortcut to data
+    index_root_t *index = request->client->ns->index;
+    data_root_t *data = request->client->ns->data;
+    index_entry_t *entry = NULL;
+    size_t floating = 0;
+
+    // if the user want to override an existing key
+    // and the maxsize of the namespace is reached, we need
+    // to know if the replacement data is shorter, this is
+    // a valid and legitimate insert request
+    if((entry = redis_get_handlers[rootsettings.mode](request))) {
+        floating = entry->length;
+    }
+
+    // check if namespace limitation is set
+    if(request->client->ns->maxsize) {
+        size_t limits = request->client->ns->maxsize + floating;
+
+        // check if there is still enough space
+        if(index->datasize + request->argv[2]->length > limits) {
+            redis_hardsend(request->client->fd, "-No space left on this namespace");
+            return 1;
+        }
+    }
+
+    size_t offset = redis_set_handlers[rootsettings.mode](request, index, data);
     if(offset == 0)
         return 0;
 
