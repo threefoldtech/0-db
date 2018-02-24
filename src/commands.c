@@ -275,10 +275,14 @@ static index_entry_t *redis_get_handler_direct(resp_request_t *request) {
     // FIXME: optimize this by changing when the security check is done
     //        but in the meantime, this fix the EXISTS command
     data_root_t *data = request->client->ns->data;
-    if(!data_match(data, &directkey, sizeof(index_dkey_t), directkey.offset, directkey.dataid)) {
+    size_t length;
+
+    if(!(length = data_match(data, &directkey, sizeof(index_dkey_t), directkey.offset, directkey.dataid))) {
         debug("[-] command: get: validator refused the requested key access\n");
         return NULL;
     }
+
+    index_reusable_entry->length = length;
 
     return index_reusable_entry;
 }

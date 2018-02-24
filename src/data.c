@@ -390,7 +390,9 @@ size_t data_next_offset(data_root_t *root) {
 //    - if the key in the header match the key requested
 //    if all of theses conditions match, the probability of a fake request
 //    are nearly null
-static inline int data_match_real(int fd, void *id, uint8_t idlength, size_t offset) {
+//
+// if everything is good, returns the datalength from the header, 0 otherwise
+static inline size_t data_match_real(int fd, void *id, uint8_t idlength, size_t offset) {
     data_entry_header_t header;
     char keycheck[MAX_KEY_LENGTH];
 
@@ -426,13 +428,16 @@ static inline int data_match_real(int fd, void *id, uint8_t idlength, size_t off
         return 0;
     }
 
-    return 1;
+    return header.datalength;
 }
 
 // wrapper for data_match_real which load the correct file id
 // this function is made to ensure the key requested is legitimate
 // we need to be careful, we cannot trust anything (file id, offset, ...)
-int data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, uint16_t dataid) {
+//
+// if the header matchs, returns the datalength, which is mostly the only
+// missing data we have in direct-key mode
+size_t data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, uint16_t dataid) {
     int fd;
 
     // acquire data id fd
@@ -441,12 +446,12 @@ int data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, uin
         return 0;
     }
 
-    int value = data_match_real(fd, id, idlength, offset);
+    size_t length = data_match_real(fd, id, idlength, offset);
 
     // release dataid
     data_release_dataid(root, dataid, fd);
 
-    return value;
+    return length;
 }
 
 uint16_t data_dataid(data_root_t *root) {
