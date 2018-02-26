@@ -24,6 +24,7 @@
         time_t connected; // connection time
         size_t commands;  // request (commands) counter
         int writable;     // does the client can write on the namespace
+        int admin;        // does the client is admin
 
     } redis_client_t;
 

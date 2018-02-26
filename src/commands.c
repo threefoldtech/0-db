@@ -32,6 +32,15 @@ static int command_args_validate(resp_request_t *request, int expected) {
     return 1;
 }
 
+static int command_admin_authorized(resp_request_t *request) {
+    if(!request->client->admin) {
+        redis_hardsend(request->client->fd, "-Permission denied");
+        return 0;
+    }
+
+    return 1;
+}
+
 //
 //
 // specific modes implementation
@@ -520,6 +529,9 @@ static int command_info(resp_request_t *request) {
 static int command_nsnew(resp_request_t *request) {
     char target[COMMAND_MAXLEN];
 
+    if(!command_admin_authorized(request))
+        return 1;
+
     if(!command_args_validate(request, 2))
         return 1;
 
@@ -707,6 +719,9 @@ static int command_nsset(resp_request_t *request) {
     char command[COMMAND_MAXLEN];
     char value[COMMAND_MAXLEN];
 
+    if(!command_admin_authorized(request))
+        return 1;
+
     if(!command_args_validate(request, 4))
         return 1;
 
@@ -817,6 +832,33 @@ static int command_time(resp_request_t *request) {
     return 0;
 }
 
+static int command_auth(resp_request_t *request) {
+    if(!command_args_validate(request, 2))
+        return 1;
+
+    if(!rootsettings.adminpwd) {
+        redis_hardsend(request->client->fd, "-Authentification disabled");
+        return 0;
+    }
+
+    if(request->argv[1]->length > 128) {
+        redis_hardsend(request->client->fd, "-Password too long");
+        return 1;
+    }
+
+    char password[192];
+    sprintf(password, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
+
+    if(strcmp(password, rootsettings.adminpwd) == 0) {
+        request->client->admin = 1;
+        redis_hardsend(request->client->fd, "+OK");
+        return 0;
+    }
+
+    redis_hardsend(request->client->fd, "-Access denied");
+    return 1;
+}
+
 // STOP will be only compiled in debug mode
 // this will force to exit listen loop in order to call
 // all destructors, this is useful to ensure every memory allocation
@@ -844,6 +886,7 @@ static command_t commands_handlers[] = {
     // system
     {.command = "PING", .handler = command_ping}, // default PING command
     {.command = "TIME", .handler = command_time}, // default TIME command
+    {.command = "AUTH", .handler = command_auth}, // custom AUTH command to authentifcate admin
 
     // dataset
     {.command = "SET",    .handler = command_set},    // default SET command

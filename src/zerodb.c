@@ -27,6 +27,7 @@ settings_t rootsettings = {
     .sync = 0,
     .synctime = 0,
     .mode = KEYVALUE,
+    .adminpwd = NULL,
 };
 
 static struct option long_options[] = {
@@ -39,6 +40,7 @@ static struct option long_options[] = {
     {"synctime",  required_argument, 0, 't'},
     {"dump",      no_argument,       0, 'x'},
     {"mode",      required_argument, 0, 'm'},
+    {"admin",     required_argument, 0, 'a'},
     {"help",      no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
@@ -220,6 +222,11 @@ int main(int argc, char *argv[]) {
 
             case 't':
                 settings->synctime = atoi(optarg);
+                break;
+
+            case 'a':
+                settings->adminpwd = optarg;
+                verbose("[+] system: admin password set\n");
                 break;
 
             case 'm':
