@@ -169,6 +169,7 @@ void usage() {
     printf("               > user: default user key-value mode\n");
     printf("               > seq: sequential keys generated\n");
     printf("               > direct: direct position by key\n");
+    printf("  --admin     set admin password\n");
     printf("  --help      print this message\n");
 
     exit(EXIT_FAILURE);
