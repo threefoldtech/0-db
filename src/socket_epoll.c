@@ -42,8 +42,10 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 
             addr_client_len = sizeof(addr_client);
 
-            if((clientfd = accept(redis->mainfd, (struct sockaddr *)&addr_client, &addr_client_len)) == -1)
+            if((clientfd = accept(redis->mainfd, (struct sockaddr *)&addr_client, &addr_client_len)) == -1) {
                 warnp("accept");
+                continue;
+            }
 
             socket_nonblock(clientfd);
             socket_client_new(clientfd);
@@ -59,8 +61,10 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             event.data.fd = clientfd;
             event.events = EPOLLIN;
 
-            if(epoll_ctl(redis->evfd, EPOLL_CTL_ADD, clientfd, &event) < 0)
+            if(epoll_ctl(redis->evfd, EPOLL_CTL_ADD, clientfd, &event) < 0) {
                 warnp("epoll_ctl");
+                continue;
+            }
 
             continue;
         }
