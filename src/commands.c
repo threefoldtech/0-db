@@ -240,8 +240,10 @@ static index_entry_t *redis_get_handler_memkey(resp_request_t *request) {
 
 static index_entry_t *redis_get_handler_direct(resp_request_t *request) {
     // invalid requested key
-    if(request->argv[1]->length != sizeof(index_dkey_t))
+    if(request->argv[1]->length != sizeof(index_dkey_t)) {
+        debug("[-] command: get: invalid key length\n");
         return NULL;
+    }
 
     // converting binary key to internal struct
     index_dkey_t directkey;
@@ -252,6 +254,7 @@ static index_entry_t *redis_get_handler_direct(resp_request_t *request) {
     index_reusable_entry->idlength = sizeof(index_dkey_t);
     index_reusable_entry->offset = directkey.offset;
     index_reusable_entry->dataid = directkey.dataid;
+    index_reusable_entry->flags = 0;
 
     // since the user can provide any offset, he could potentially
     // get data not expected and maybe get sensitive data
@@ -488,13 +491,6 @@ static int command_del(resp_request_t *request) {
     if(!command_args_validate(request, 2))
         return 1;
 
-    // disallow delete key on direct mode, we don't have index
-    // we can't flag key as deleted and data files are always append
-    if(rootsettings.mode == DIRECTKEY) {
-        redis_hardsend(request->client->fd, "-Unsupported on this mode");
-        return 0;
-    }
-
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         printf("[-] command: del: invalid key size\n");
         redis_hardsend(request->client->fd, "-Invalid key");
@@ -508,8 +504,33 @@ static int command_del(resp_request_t *request) {
     }
 
     index_root_t *index = request->client->ns->index;
+    data_root_t *data = request->client->ns->data;
+    index_entry_t *entry;
 
-    if(!index_entry_delete(index, request->argv[1]->buffer, request->argv[1]->length)) {
+    // grabbing original entry
+    if(!(entry = redis_get_handlers[rootsettings.mode](request))) {
+        debug("[-] command: del: key not found\n");
+        redis_hardsend(request->client->fd, "-Key not found");
+        return 1;
+    }
+
+    // avoid double deletion
+    if(index_entry_is_deleted(entry)) {
+        debug("[-] command: del: key already deleted\n");
+        redis_hardsend(request->client->fd, "-Key not found");
+        return 1;
+    }
+
+    // add a new entry containing new flag
+    if(!index_entry_delete(index, entry)) {
+        debug("[-] command: del: index delete flag failed\n");
+        redis_hardsend(request->client->fd, "-Cannot delete key");
+        return 0;
+    }
+
+    // deleting data part
+    if(!data_delete(data, entry->offset, entry->dataid)) {
+        debug("[-] command: del: deleting data failed\n");
         redis_hardsend(request->client->fd, "-Cannot delete key");
         return 0;
     }

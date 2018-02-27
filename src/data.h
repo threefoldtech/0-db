@@ -30,6 +30,11 @@
 
     } __attribute__((packed)) data_header_t;
 
+    typedef enum data_flags_t {
+        DATA_ENTRY_DELETED = 1,  // flag entry as deleted
+
+    } data_flags_t;
+
     // data_header_t contains header of each entry on the datafile
     // this header doesn't contains the payload, we assume the payload
     // follows the header
@@ -37,6 +42,7 @@
         uint8_t idlength;     // length of the id
         uint32_t datalength;  // length of the payload
         uint32_t integrity;   // simple integrity check (crc32)
+        uint8_t flags;        // keep deleted flags (should be data_flags_t type)
         char id[];            // accessor to the id, dynamically
 
     } __attribute__((packed)) data_entry_header_t;
@@ -60,6 +66,8 @@
     data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_t dataid, uint8_t idlength);
     int data_check(data_root_t *root, size_t offset, uint16_t dataid);
     size_t data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, uint16_t dataid);
+
+    int data_delete(data_root_t *root, size_t offset, uint16_t dataid);
 
     size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength);
     size_t data_next_offset(data_root_t *root);

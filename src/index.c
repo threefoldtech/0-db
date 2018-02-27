@@ -247,7 +247,8 @@ index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlengt
     return entry;
 }
 
-index_entry_t *index_entry_delete(index_root_t *root, unsigned char *id, uint8_t idlength) {
+index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
+    /*
     index_entry_t *entry = index_entry_get(root, id, idlength);
 
     if(!entry) {
@@ -259,6 +260,7 @@ index_entry_t *index_entry_delete(index_root_t *root, unsigned char *id, uint8_t
         verbose("[-] index: key already deleted\n");
         return NULL;
     }
+    */
 
     // mark entry as deleted
     entry->flags |= INDEX_ENTRY_DELETED;
@@ -277,6 +279,11 @@ index_entry_t *index_entry_delete(index_root_t *root, unsigned char *id, uint8_t
         return NULL;
 
     return entry;
+}
+
+// return 1 or 0 if index entry is deleted or not
+int index_entry_is_deleted(index_entry_t *entry) {
+    return (entry->flags & INDEX_ENTRY_DELETED);
 }
 
 //

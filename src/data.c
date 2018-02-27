@@ -74,18 +74,29 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
 //
 // this function open the data file in read only and should
 // not be used to edit or open the current effective current file
-static int data_open_id(data_root_t *root, uint16_t id) {
+static int data_open_id_mode(data_root_t *root, uint16_t id, int mode) {
     char temp[PATH_MAX];
     int fd;
 
     sprintf(temp, "%s/zdb-data-%05u", root->datadir, id);
 
-    if((fd = open(temp, O_RDONLY, 0600)) < 0) {
+    if((fd = open(temp, mode, 0600)) < 0) {
         warnp(temp);
         return -1;
     }
 
     return fd;
+}
+
+// default mode, read-only datafile
+static int data_open_id(data_root_t *root, uint16_t id) {
+    return data_open_id_mode(root, id, O_RDONLY);
+}
+
+// special case (for deletion) where read-write is needed
+// and not in append mode
+int data_get_dataid_rw(data_root_t *root, uint16_t id) {
+    return data_open_id_mode(root, id, O_RDWR);
 }
 
 
@@ -349,6 +360,7 @@ size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, 
     header->idlength = idlength;
     header->datalength = datalength;
     header->integrity = data_crc32(data, datalength);
+    header->flags = 0;
 
     memcpy(header->id, id, idlength);
 
@@ -411,6 +423,11 @@ static inline size_t data_match_real(int fd, void *id, uint8_t idlength, size_t 
         return 0;
     }
 
+    if(header.flags & DATA_ENTRY_DELETED) {
+        debug("[-] data: validator: entry deleted\n");
+        return 0;
+    }
+
     // preliminary check: does the payload fit on the file
     if(header.datalength > DATA_MAXSIZE) {
         debug("[-] data: validator: payload length too big\n");
@@ -452,6 +469,64 @@ size_t data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, 
     data_release_dataid(root, dataid, fd);
 
     return length;
+}
+
+int data_delete_real(int fd, size_t offset) {
+    data_entry_header_t header;
+
+    // blindly move to the offset
+    lseek(fd, offset, SEEK_SET);
+
+    // read current header
+    if(read(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
+        warnp("data: delete: header read");
+        return 0;
+    }
+
+    // flag entry as deleted
+    header.flags |= DATA_ENTRY_DELETED;
+
+    // rollback to the offset
+    lseek(fd, offset, SEEK_SET);
+
+    // overwrite the header with the new flag
+    if(write(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
+        warnp("data: delete: header overwrite");
+        return 0;
+    }
+
+    return 1;
+}
+
+// IMPORTANT:
+//   this function is the only one to 'break' the always append
+//   behavior, this function will overwrite existing index by
+//   seeking and rewrite headers
+//
+// when deleting some data, we mark (flag) this data as deleted which
+// allows two things
+//   - we can do compaction offline by removing theses blocks
+//   - we still can rebuild an index based on datafile only
+//
+// during runtime, this flag will be checked only using the data_match
+// function
+int data_delete(data_root_t *root, size_t offset, uint16_t dataid) {
+    int fd;
+
+    debug("[+] data: delete: opening datafile in read-write mode\n");
+
+    // acquire data id fd
+    if((fd = data_get_dataid_rw(root, dataid)) < 0) {
+        debug("[-] data: delete: could not open requested file id (%u)\n", dataid);
+        return 0;
+    }
+
+    int value = data_delete_real(fd, offset);
+
+    // release dataid
+    close(fd);
+
+    return value;
 }
 
 uint16_t data_dataid(data_root_t *root) {

@@ -131,7 +131,9 @@
     index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t length);
     index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlength, size_t offset, size_t length);
     index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags);
-    index_entry_t *index_entry_delete(index_root_t *root, unsigned char *id, uint8_t length);
+
+    index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry);
+    int index_entry_is_deleted(index_entry_t *entry);
 
     extern index_entry_t *index_reusable_entry;
 
