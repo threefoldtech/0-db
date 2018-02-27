@@ -11,6 +11,7 @@
 #include "zerodb.h"
 #include "data.h"
 
+#if 0
 void warnp(char *str) {
     fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
 }
@@ -138,4 +139,11 @@ int main(int argc, char *argv[]) {
     close(fd);
 
     return val;
+}
+
+#endif
+
+int main(void) {
+    fprintf(stderr, "Temporary disabled\n");
+    return 0;
 }
