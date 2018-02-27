@@ -11,14 +11,30 @@
 #include "zerodb.h"
 #include "data.h"
 
-#if 0
-void warnp(char *str) {
+void *warnp(char *str) {
     fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
+    return NULL;
 }
 
 void diep(char *str) {
     warnp(str);
     exit(EXIT_FAILURE);
+}
+
+static char __hex[] = "0123456789abcdef";
+
+void hexdump(void *input, size_t length) {
+    unsigned char *buffer = (unsigned char *) input;
+    char *output = calloc((length * 2) + 1, 1);
+    char *writer = output;
+
+    for(unsigned int i = 0, j = 0; i < length; i++, j += 2) {
+        *writer++ = __hex[(buffer[i] & 0xF0) >> 4];
+        *writer++ = __hex[buffer[i] & 0x0F];
+    }
+
+    printf("0x%s", output);
+    free(output);
 }
 
 static uint32_t data_crc32(const char *bytes, ssize_t length) {
@@ -36,26 +52,21 @@ static uint32_t data_crc32(const char *bytes, ssize_t length) {
 }
 
 int data_integrity(int fd) {
-    char *buffer = NULL;
+    data_header_t header;
     int errors = 0;
 
     // first step, let's validate the header
-    // for now we use a dumb header of 1 byte which should
-    // contains 'X' (this will probably be improved later)
-    if(!(buffer = calloc(sizeof(char), 1)))
-        diep("malloc");
-
-    if(read(fd, buffer, 1) != 1) {
+    if(read(fd, &header, sizeof(data_header_t)) != (size_t) sizeof(data_header_t)) {
         fprintf(stderr, "[-] cannot read data header\n");
         return 1;
     }
 
-    if(*buffer != 'X') {
-        fprintf(stderr, "[-] header file mismatch\n");
+    if(memcmp(header.magic, "DAT0", 4) != 0) {
+        fprintf(stderr, "[-] header magic mismatch\n");
         return 1;
     }
 
-    printf("[+] data header correct\n");
+    printf("[+] data header seems correct\n");
 
     // now it's time to read each entries
     // each time, one entry starts by the entry-header
@@ -63,12 +74,13 @@ int data_integrity(int fd) {
     // the entry headers starts with the amount of bytes
     // of the key, which is needed to read the full header
     uint8_t idlength;
-    data_header_t *entry = NULL;
+    data_entry_header_t *entry = NULL;
     size_t entrycount = 0;
+    char *buffer = NULL;
 
     while(read(fd, &idlength, sizeof(idlength)) == sizeof(idlength)) {
         // we have the length of the key
-        ssize_t entrylength = sizeof(data_header_t) + idlength;
+        ssize_t entrylength = sizeof(data_entry_header_t) + idlength;
         if(!(entry = realloc(entry, entrylength)))
             diep("realloc");
 
@@ -82,8 +94,10 @@ int data_integrity(int fd) {
 
         printf("[+] data entry: %lu, id length: %d\n", entrycount, entry->idlength);
         printf("[+]   expected length: %u, current offset: %ld\n", entry->datalength, current);
-        printf("[+]   payload crc: %08x\n", entry->integrity);
-        printf("[+]   entry key: <%.*s>\n", entry->idlength, entry->id);
+        printf("[+]   expected crc: %08x\n", entry->integrity);
+        printf("[+]   entry key: ");
+        hexdump(entry->id, entry->idlength);
+        printf("\n");
 
         if(!(buffer = realloc(buffer, entry->datalength)))
             diep("realloc");
@@ -103,8 +117,6 @@ int data_integrity(int fd) {
     }
 
     free(entry);
-
-
 
     return errors;
 }
@@ -139,11 +151,4 @@ int main(int argc, char *argv[]) {
     close(fd);
 
     return val;
-}
-
-#endif
-
-int main(void) {
-    fprintf(stderr, "Temporary disabled\n");
-    return 0;
 }
