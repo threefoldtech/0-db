@@ -83,7 +83,7 @@ static void resp_discard(int fd, char *message) {
     char response[512];
 
     sprintf(response, "-%s\r\n", message);
-    fprintf(stderr, "[-] error: %s\n", message);
+    debug("[-] redis: resp: error: %s\n", message);
 
     if(send(fd, response, strlen(response), 0) < 0)
         fprintf(stderr, "[-] send failed for error message\n");
@@ -95,7 +95,10 @@ static void resp_discard(int fd, char *message) {
 //
 // basic kind of argc/argv is used to expose the received request
 int redis_response(int fd) {
-    resp_request_t command;
+    resp_request_t command = {
+        .argc = 0,
+        .argv = NULL
+    };
 
     char buffer[8192], *reader = NULL;
     int length;
@@ -106,17 +109,27 @@ int redis_response(int fd) {
     while((length = recv(fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
         // array
         if(buffer[0] != '*') {
-            printf("[-] not an array\n");
+            resp_discard(command.client->fd, "Malformed request, array expected");
             return 0;
         }
 
         if(!(reader = strchr(buffer, '\n'))) {
-            // error.
+            // error
             return 0;
         }
 
         command.argc = atoi(buffer + 1);
-        // printf("[+] resp: %d arguments\n", command.argc);
+        printf("[+] redis: resp: %d arguments\n", command.argc);
+
+        if(command.argc == 0) {
+            resp_discard(command.client->fd, "Missing arguments");
+            return 0;
+        }
+
+        if(command.argc > 16) {
+            resp_discard(command.client->fd, "Too many arguments");
+            return 0;
+        }
 
         if(!(reader = strchr(buffer, '\n')))
             return 0;
@@ -125,7 +138,7 @@ int redis_response(int fd) {
         command.argv = (resp_object_t **) calloc(sizeof(resp_type_t *), command.argc);
 
         for(int i = 0; i < command.argc; i++) {
-            command.argv[i] = malloc(sizeof(resp_object_t));
+            command.argv[i] = calloc(sizeof(resp_object_t), 1);
             resp_object_t *argument = command.argv[i];
 
             // reading next chunk
@@ -185,6 +198,10 @@ int redis_response(int fd) {
 
 cleanup:
         for(int i = 0; i < command.argc; i++) {
+            // prematured end and argv was not yet allocated
+            if(!command.argv[i])
+                continue;
+
             free(command.argv[i]->buffer);
             free(command.argv[i]);
         }
