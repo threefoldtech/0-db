@@ -1,3 +1,18 @@
+matrix:
+  include:
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - gcc-7
+      env:
+        - MATRIX_EVAL="CC=gcc-7"
+
+before_install:
+    - eval "${MATRIX_EVAL}"
+
 language: c
 sudo: false
 script:
