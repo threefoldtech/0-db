@@ -631,7 +631,7 @@ static int command_select(resp_request_t *request) {
             writable = 0;
 
         } else {
-            if(strncmp(request->argv[2]->buffer, namespace->password, request->argv[2]->length) != 0) {
+            if(strncmp(request->argv[2]->buffer, namespace->password, strlen(namespace->password)) != 0) {
                 redis_hardsend(request->client->fd, "-Access denied");
                 return 1;
             }
