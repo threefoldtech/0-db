@@ -127,7 +127,7 @@ static void namespace_descriptor_load(namespace_t *namespace) {
     namespace->public = (header.flags & NS_FLAGS_PUBLIC);
 
     if(header.passlength) {
-        if(!(namespace->password = malloc(sizeof(char) * header.passlength))) {
+        if(!(namespace->password = calloc(sizeof(char), header.passlength + 1))) {
             warnp("namespace password malloc");
             return;
         }

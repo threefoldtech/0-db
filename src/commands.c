@@ -602,7 +602,6 @@ static int command_select(resp_request_t *request) {
     // get name as usable string
     sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
 
-
     // checking for existing namespace
     if(!(namespace = namespace_get(target))) {
         debug("[-] command: select: namespace not found\n");
@@ -631,7 +630,19 @@ static int command_select(resp_request_t *request) {
             writable = 0;
 
         } else {
-            if(strncmp(request->argv[2]->buffer, namespace->password, request->argv[2]->length) != 0) {
+            char password[256];
+
+            if(request->argv[2]->length > (ssize_t) sizeof(password) - 1) {
+                redis_hardsend(request->client->fd, "-Password too long");
+                return 1;
+            }
+
+            // copy password to a temporary variable
+            // to check password match using strcmp and no any strncmp
+            // to ensure we check exact password
+            sprintf(password, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
+
+            if(strcmp(password, namespace->password) != 0) {
                 redis_hardsend(request->client->fd, "-Access denied");
                 return 1;
             }
