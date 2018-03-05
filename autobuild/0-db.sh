@@ -5,6 +5,9 @@ apt-get update
 apt-get install -y build-essential
 
 pushd /0-db
+pushd src
+make static
+popd
 make
 popd
 
