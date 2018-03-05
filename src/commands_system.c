@@ -28,7 +28,7 @@ int command_time(resp_request_t *request) {
     // default redis protocol returns values as string
     // not as integer
     sprintf(sec, "%lu", now.tv_sec);
-    sprintf(usec, "%ld", now.tv_usec);
+    sprintf(usec, "%ld", (long) now.tv_usec);
 
     // *2             \r\n  -- array of two values
     // $[sec-length]  \r\n  -- first header, string value
