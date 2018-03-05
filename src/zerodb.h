@@ -7,13 +7,16 @@
 
     typedef enum db_mode_t {
         // default key-value store
-        KEYVALUE,
+        KEYVALUE = 0,
 
         // auto-generated sequential id
-        SEQUENTIAL,
+        SEQUENTIAL = 1,
 
         // id is hard-fixed data position
-        DIRECTKEY,
+        DIRECTKEY = 2,
+
+        // amount of modes available
+        ZDB_MODES
 
     } db_mode_t;
 
