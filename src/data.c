@@ -179,9 +179,23 @@ static void data_open_final(data_root_t *root) {
         debug("[+] data: file opened in read-only mode\n");
     }
 
-    // skipping header
-    lseek(root->datafd, 0, SEEK_END);
+    // jumping to the first entry
+    root->previous = lseek(root->datafd, sizeof(data_header_t), SEEK_SET);
 
+    // reading all indexes to find where is the last one
+    data_entry_header_t header;
+    int entries = 0;
+
+    debug("[+] data: reading file, finding last entry\n");
+
+    while(read(root->datafd, &header, sizeof(data_entry_header_t)) == sizeof(data_entry_header_t)) {
+        root->previous = lseek(root->datafd, 0, SEEK_CUR) - sizeof(data_header_t);
+        lseek(root->datafd, header.datalength + header.idlength, SEEK_CUR);
+
+        entries += 1;
+    }
+
+    debug("[+] data: entries read: %d, last offset: %lu\n", entries, root->previous);
     printf("[+] data: active file: %s\n", root->datafile);
 }
 
@@ -359,6 +373,7 @@ size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, 
 
     header->idlength = idlength;
     header->datalength = datalength;
+    header->previous = root->previous;
     header->integrity = data_crc32(data, datalength);
     header->flags = 0;
 
@@ -379,6 +394,10 @@ size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, 
         verbose("[-] data payload: write failed\n");
         return 0;
     }
+
+    // set this current offset as the latest
+    // offset inserted
+    root->previous = offset;
 
     return offset;
 }

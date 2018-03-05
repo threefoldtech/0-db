@@ -14,6 +14,7 @@
         int sync;         // flag to force data write sync
         int synctime;     // force to sync data after this timeout (on next write)
         time_t lastsync;  // keep track when the last sync was explictly made
+        size_t previous;  // keep latest offset inserted to the datafile
 
     } data_root_t;
 
@@ -41,6 +42,7 @@
     typedef struct data_entry_header_t {
         uint8_t idlength;     // length of the id
         uint32_t datalength;  // length of the payload
+        uint32_t previous;    // previous entry offset
         uint32_t integrity;   // simple integrity check (crc32)
         uint8_t flags;        // keep deleted flags (should be data_flags_t type)
         char id[];            // accessor to the id, dynamically
