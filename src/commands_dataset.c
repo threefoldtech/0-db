@@ -142,13 +142,3 @@ int command_del(resp_request_t *request) {
     return 0;
 }
 
-int command_scan(resp_request_t *request) {
-    redis_hardsend(request->client->fd, "-Implementing");
-    return 0;
-}
-
-int command_rscan(resp_request_t *request) {
-    redis_hardsend(request->client->fd, "-Implementing");
-    return 0;
-}
-

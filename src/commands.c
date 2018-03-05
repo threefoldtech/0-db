@@ -14,6 +14,7 @@
 #include "commands.h"
 #include "commands_get.h"
 #include "commands_set.h"
+#include "commands_scan.h"
 #include "commands_dataset.h"
 #include "commands_namespace.h"
 #include "commands_system.h"
