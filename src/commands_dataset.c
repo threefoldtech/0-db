@@ -143,10 +143,6 @@ int command_del(resp_request_t *request) {
 }
 
 int command_scan(resp_request_t *request) {
-    if(request->argc == 1) {
-        printf("initial scan\n");
-    }
-
     redis_hardsend(request->client->fd, "-Implementing");
     return 0;
 }
