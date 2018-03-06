@@ -46,7 +46,7 @@ static int command_scan_send_array(data_entry_header_t *header, resp_request_t *
 //
 // SCAN
 //
-static int command_scan_userkey(resp_request_t *request) {
+int command_scan(resp_request_t *request) {
     index_entry_t *entry = NULL;
     data_scan_t scan;
 
@@ -54,7 +54,7 @@ static int command_scan_userkey(resp_request_t *request) {
         return 1;
 
     // grabbing original entry
-    if(!(entry = redis_get_handlers[KEYVALUE](request))) {
+    if(!(entry = redis_get_handlers[rootsettings.mode](request))) {
         debug("[-] command: scan: key not found\n");
         redis_hardsend(request->client->fd, "-Invalid index");
         return 1;
@@ -79,28 +79,6 @@ static int command_scan_userkey(resp_request_t *request) {
 
     return 0;
 }
-
-static int command_scan_sequential(resp_request_t *request) {
-
-    redis_hardsend(request->client->fd, "-Implementing (sequential)");
-    return 0;
-}
-
-static int command_scan_directkey(resp_request_t *request) {
-    redis_hardsend(request->client->fd, "-Implementing (directkey)");
-    return 0;
-}
-
-static int (*command_scan_handlers[])(resp_request_t *request) = {
-    command_scan_userkey,
-    command_scan_sequential,
-    command_scan_directkey,
-};
-
-int command_scan(resp_request_t *request) {
-    return command_scan_handlers[rootsettings.mode](request);
-}
-
 
 //
 // RSCAN
