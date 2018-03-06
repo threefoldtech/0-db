@@ -83,30 +83,38 @@ int command_scan(resp_request_t *request) {
 //
 // RSCAN
 //
-static int command_rscan_userkey(resp_request_t *request) {
-    redis_hardsend(request->client->fd, "-Implementing (userkey)");
-    return 0;
-}
-
-static int command_rscan_sequential(resp_request_t *request) {
-
-    redis_hardsend(request->client->fd, "-Implementing (sequential)");
-    return 0;
-}
-
-static int command_rscan_directkey(resp_request_t *request) {
-    redis_hardsend(request->client->fd, "-Implementing (directkey)");
-    return 0;
-}
-
-static int (*command_rscan_handlers[])(resp_request_t *request) = {
-    command_rscan_userkey,
-    command_rscan_sequential,
-    command_rscan_directkey,
-};
-
 int command_rscan(resp_request_t *request) {
-    return command_rscan_handlers[rootsettings.mode](request);
+    index_entry_t *entry = NULL;
+    data_scan_t scan;
+
+    if(!command_args_validate(request, 2))
+        return 1;
+
+    // grabbing original entry
+    if(!(entry = redis_get_handlers[rootsettings.mode](request))) {
+        debug("[-] command: scan: key not found\n");
+        redis_hardsend(request->client->fd, "-Invalid index");
+        return 1;
+    }
+
+    scan = data_previous_header(request->client->ns->data, entry->dataid, entry->offset);
+
+    if(scan.status == DATA_SCAN_SUCCESS) {
+        command_scan_send_array(scan.header, request);
+        free(scan.header);
+    }
+
+    if(scan.status == DATA_SCAN_UNEXPECTED) {
+        redis_hardsend(request->client->fd, "-Internal Error");
+        return 1;
+    }
+
+    if(scan.status == DATA_SCAN_NO_MORE_DATA) {
+        redis_hardsend(request->client->fd, "-No more data");
+        return 1;
+    }
+
+    return 0;
 }
 
 

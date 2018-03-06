@@ -552,34 +552,7 @@ uint16_t data_dataid(data_root_t *root) {
     return root->dataid;
 }
 
-static data_entry_header_t *data_previous_header_real(int fd, size_t offset) {
-    return NULL;
-}
-
-data_scan_t data_previous_header(data_root_t *root, uint16_t dataid, size_t offset) {
-    data_scan_t scan = {
-        .fd = 0,
-        .header = NULL,
-        .status = DATA_SCAN_UNEXPECTED,
-    };
-
-    /*
-    // acquire data id fd
-    if((fd = data_grab_dataid(root, dataid)) < 0) {
-        debug("[-] data: previous-header: could not open requested file id (%u)\n", dataid);
-        return 0;
-    }
-
-    entry = data_previous_header_real(fd, offset);
-
-    // release dataid
-    data_release_dataid(root, dataid, fd);
-    */
-
-    return scan;
-}
-
-static data_scan_t data_scan_error(data_scan_t original, data_scan_status_t error) {
+static inline data_scan_t data_scan_error(data_scan_t original, data_scan_status_t error) {
     // clean any remaning memory
     free(original.header);
 
@@ -590,29 +563,129 @@ static data_scan_t data_scan_error(data_scan_t original, data_scan_status_t erro
     return original;
 }
 
-static data_scan_t data_next_header_real(int fd, size_t offset) {
+// RSCAN implementation
+static data_scan_t data_previous_header_real(data_scan_t scan) {
     data_entry_header_t source;
+
+    if(scan.target == 0) {
+        off_t current = lseek(scan.fd, scan.original, SEEK_SET);
+
+        if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
+            warnp("data: previous-header: could not read original offset datafile");
+            return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+        }
+
+        scan.target = source.previous;
+
+        if(source.previous > current) {
+            debug("[+] data: previous-header: previous offset in previous file\n");
+            return data_scan_error(scan, DATA_SCAN_REQUEST_PREVIOUS);
+        }
+    }
+
+    debug("[+] data: previous-header: offset: %u\n", source.previous);
+
+    // at that point, we know scan.target is set to the expected value
+    if(scan.target == 0) {
+        debug("[+] data: previous-header: zero reached, nothing to rollback\n");
+        return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
+    }
+
+    // jumping to next object
+    lseek(scan.fd, scan.target, SEEK_SET);
+
+    // reading the fixed-length
+    if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
+        warnp("data: previous-header: could not read previous offset datafile");
+        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+    }
+
+    if(!(scan.header = (data_entry_header_t *) malloc(sizeof(data_entry_header_t) + source.idlength))) {
+        warnp("data: previous-header: malloc");
+        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+    }
+
+    // reading the full header to target
+    *scan.header = source;
+
+    if(read(scan.fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
+        warnp("data: previous-header: could not read id from datafile");
+        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+    }
+
+    debug("[+] data: previous-header: entry found\n");
+    scan.status = DATA_SCAN_SUCCESS;
+
+    return scan;
+}
+
+data_scan_t data_previous_header(data_root_t *root, uint16_t dataid, size_t offset) {
     data_scan_t scan = {
-        .fd = fd,
+        .fd = 0,
+        .original = offset,
+        .target = 0,
         .header = NULL,
         .status = DATA_SCAN_UNEXPECTED,
     };
 
-    lseek(fd, offset, SEEK_SET);
+    while(1) {
+        // acquire data id fd
+        if((scan.fd = data_grab_dataid(root, dataid)) < 0) {
+            debug("[-] data: previous-header: could not open requested file id (%u)\n", dataid);
+            return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
+        }
 
-    if(read(fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
-        warnp("data: next-header: could not read original offset datafile");
-        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+        // trying to get entry
+        scan = data_previous_header_real(scan);
+
+        // release dataid
+        data_release_dataid(root, dataid, scan.fd);
+
+        if(scan.status == DATA_SCAN_SUCCESS) {
+            // printf("PREVIOUS ENTRY KEY: <%.*s>\n", scan.header->idlength, scan.header->id);
+            return scan;
+        }
+
+        if(scan.status == DATA_SCAN_UNEXPECTED)
+            return scan;
+
+        if(scan.status == DATA_SCAN_NO_MORE_DATA)
+            return scan;
+
+        if(scan.status == DATA_SCAN_REQUEST_PREVIOUS)
+            dataid -= 1;
     }
 
-    debug("[+] data: next-header: this length: %u\n", source.datalength);
+    // never reached
+}
+
+// SCAN implementation
+static data_scan_t data_next_header_real(data_scan_t scan) {
+    data_entry_header_t source;
+
+    if(scan.target == 0) {
+        lseek(scan.fd, scan.original, SEEK_SET);
+
+        if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
+            warnp("data: next-header: could not read original offset datafile");
+            return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+        }
+
+        debug("[+] data: next-header: this length: %u\n", source.datalength);
+
+        // next header is at offset + this header + payload
+        scan.target = scan.original + sizeof(data_entry_header_t);
+        scan.target += source.idlength + source.datalength;
+    }
 
     // jumping to next object
-    lseek(fd, source.idlength + source.datalength, SEEK_CUR);
+    lseek(scan.fd, scan.target, SEEK_SET);
 
     // reading the fixed-length
-    if(read(fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
+    if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
         warnp("data: next-header: could not read next offset datafile");
+        // this mean the data expected is the first of the next datafile
+        scan.target = sizeof(data_header_t);
         return data_scan_error(scan, DATA_SCAN_EOF_REACHED);
     }
 
@@ -624,7 +697,7 @@ static data_scan_t data_next_header_real(int fd, size_t offset) {
     // reading the full header to target
     *scan.header = source;
 
-    if(read(fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
+    if(read(scan.fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
         warnp("data: next-header: could not read id from datafile");
         return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
     }
@@ -638,6 +711,8 @@ static data_scan_t data_next_header_real(int fd, size_t offset) {
 data_scan_t data_next_header(data_root_t *root, uint16_t dataid, size_t offset) {
     data_scan_t scan = {
         .fd = 0,
+        .original = offset,
+        .target = 0,
         .header = NULL,
         .status = DATA_SCAN_UNEXPECTED,
     };
@@ -649,23 +724,24 @@ data_scan_t data_next_header(data_root_t *root, uint16_t dataid, size_t offset) 
             return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
         }
 
-        // if the entry is not found, we assume this
-        // is because it's in another file
-        scan = data_next_header_real(scan.fd, offset);
+        // trying to get entry
+        scan = data_next_header_real(scan);
 
         // release dataid
         data_release_dataid(root, dataid, scan.fd);
 
         if(scan.status == DATA_SCAN_SUCCESS) {
-            printf("NEXT ENTRY KEY: <%.*s>\n", scan.header->idlength, scan.header->id);
+            // printf("NEXT ENTRY KEY: <%.*s>\n", scan.header->idlength, scan.header->id);
             return scan;
         }
 
         if(scan.status == DATA_SCAN_UNEXPECTED)
             return scan;
 
-        if(scan.status == DATA_SCAN_EOF_REACHED)
+        if(scan.status == DATA_SCAN_EOF_REACHED) {
+            debug("[-] data: next-header: eof reached\n");
             dataid += 1;
+        }
     }
 
     // never reached

@@ -72,9 +72,13 @@
     } data_scan_status_t;
 
     typedef struct data_scan_t {
-        int fd;
-        data_entry_header_t *header;
-        data_scan_status_t status;
+        int fd;           // data file descriptor
+        size_t original;  // offset of the original key requested
+        size_t target;    // offset of the target key (read from the original)
+                          // target will be 0 on the first call
+                          // target will be updated if the offset is in another datafile
+        data_entry_header_t *header;  // target header, set when found
+        data_scan_status_t status;    // status code
 
     } data_scan_t;
 
