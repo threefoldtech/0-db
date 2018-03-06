@@ -552,6 +552,125 @@ uint16_t data_dataid(data_root_t *root) {
     return root->dataid;
 }
 
+static data_entry_header_t *data_previous_header_real(int fd, size_t offset) {
+    return NULL;
+}
+
+data_scan_t data_previous_header(data_root_t *root, uint16_t dataid, size_t offset) {
+    data_scan_t scan = {
+        .fd = 0,
+        .header = NULL,
+        .status = DATA_SCAN_UNEXPECTED,
+    };
+
+    /*
+    // acquire data id fd
+    if((fd = data_grab_dataid(root, dataid)) < 0) {
+        debug("[-] data: previous-header: could not open requested file id (%u)\n", dataid);
+        return 0;
+    }
+
+    entry = data_previous_header_real(fd, offset);
+
+    // release dataid
+    data_release_dataid(root, dataid, fd);
+    */
+
+    return scan;
+}
+
+static data_scan_t data_scan_error(data_scan_t original, data_scan_status_t error) {
+    // clean any remaning memory
+    free(original.header);
+
+    // ensure we reset everything
+    original.header = NULL;
+    original.status = error;
+
+    return original;
+}
+
+static data_scan_t data_next_header_real(int fd, size_t offset) {
+    data_entry_header_t source;
+    data_scan_t scan = {
+        .fd = fd,
+        .header = NULL,
+        .status = DATA_SCAN_UNEXPECTED,
+    };
+
+    lseek(fd, offset, SEEK_SET);
+
+    if(read(fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
+        warnp("data: next-header: could not read original offset datafile");
+        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+    }
+
+    debug("[+] data: next-header: this length: %u\n", source.datalength);
+
+    // jumping to next object
+    lseek(fd, source.idlength + source.datalength, SEEK_CUR);
+
+    // reading the fixed-length
+    if(read(fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
+        warnp("data: next-header: could not read next offset datafile");
+        return data_scan_error(scan, DATA_SCAN_EOF_REACHED);
+    }
+
+    if(!(scan.header = (data_entry_header_t *) malloc(sizeof(data_entry_header_t) + source.idlength))) {
+        warnp("data: next-header: malloc");
+        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+    }
+
+    // reading the full header to target
+    *scan.header = source;
+
+    if(read(fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
+        warnp("data: next-header: could not read id from datafile");
+        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+    }
+
+    debug("[+] data: next-header: entry found\n");
+    scan.status = DATA_SCAN_SUCCESS;
+
+    return scan;
+}
+
+data_scan_t data_next_header(data_root_t *root, uint16_t dataid, size_t offset) {
+    data_scan_t scan = {
+        .fd = 0,
+        .header = NULL,
+        .status = DATA_SCAN_UNEXPECTED,
+    };
+
+    while(1) {
+        // acquire data id fd
+        if((scan.fd = data_grab_dataid(root, dataid)) < 0) {
+            debug("[-] data: next-header: could not open requested file id (%u)\n", dataid);
+            return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
+        }
+
+        // if the entry is not found, we assume this
+        // is because it's in another file
+        scan = data_next_header_real(scan.fd, offset);
+
+        // release dataid
+        data_release_dataid(root, dataid, scan.fd);
+
+        if(scan.status == DATA_SCAN_SUCCESS) {
+            printf("NEXT ENTRY KEY: <%.*s>\n", scan.header->idlength, scan.header->id);
+            return scan;
+        }
+
+        if(scan.status == DATA_SCAN_UNEXPECTED)
+            return scan;
+
+        if(scan.status == DATA_SCAN_EOF_REACHED)
+            dataid += 1;
+    }
+
+    // never reached
+}
+
 //
 // data constructor and destructor
 //

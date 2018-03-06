@@ -59,6 +59,25 @@
 
     } data_payload_t;
 
+    // scan internal representation
+    // we use a status and a pointer to the header
+    // in order to know what to do
+    typedef enum data_scan_status_t {
+        DATA_SCAN_SUCCESS,          // requested data found
+        DATA_SCAN_REQUEST_PREVIOUS, // offset requested found in the previous datafile
+        DATA_SCAN_EOF_REACHED,      // end of datafile reached, last key of next datafile requested
+        DATA_SCAN_UNEXPECTED,       // unexpected (memory, ...) error
+        DATA_SCAN_NO_MORE_DATA,     // last item requested, nothing more
+
+    } data_scan_status_t;
+
+    typedef struct data_scan_t {
+        int fd;
+        data_entry_header_t *header;
+        data_scan_status_t status;
+
+    } data_scan_t;
+
     data_root_t *data_init(settings_t *settings, char *datapath, uint16_t dataid);
     void data_destroy(data_root_t *root);
     size_t data_jump_next(data_root_t *root, uint16_t newid);
@@ -73,4 +92,7 @@
 
     size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength);
     size_t data_next_offset(data_root_t *root);
+
+    data_scan_t data_previous_header(data_root_t *root, uint16_t dataid, size_t offset);
+    data_scan_t data_next_header(data_root_t *root, uint16_t dataid, size_t offset);
 #endif
