@@ -180,7 +180,7 @@ static void data_open_final(data_root_t *root) {
     }
 
     // jumping to the first entry
-    root->previous = lseek(root->datafd, sizeof(data_header_t), SEEK_SET);
+    lseek(root->datafd, sizeof(data_header_t), SEEK_SET);
 
     // reading all indexes to find where is the last one
     data_entry_header_t header;
@@ -569,6 +569,7 @@ data_root_t *data_init(settings_t *settings, char *datapath, uint16_t dataid) {
     root->sync = settings->sync;
     root->synctime = settings->synctime;
     root->lastsync = 0;
+    root->previous = 0;
 
     data_set_id(root);
 
