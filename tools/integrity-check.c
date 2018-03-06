@@ -94,6 +94,7 @@ int data_integrity(int fd) {
 
         printf("[+] data entry: %lu, id length: %d\n", entrycount, entry->idlength);
         printf("[+]   expected length: %u, current offset: %ld\n", entry->datalength, current);
+        printf("[+]   previous offset: %u\n", entry->previous);
         printf("[+]   expected crc: %08x\n", entry->integrity);
         printf("[+]   entry key: ");
         hexdump(entry->id, entry->idlength);
