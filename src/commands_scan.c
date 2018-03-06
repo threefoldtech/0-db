@@ -33,7 +33,7 @@ static int command_scan_directkey(resp_request_t *request) {
     return 0;
 }
 
-int (*command_scan_handlers[])(resp_request_t *request) = {
+static int (*command_scan_handlers[])(resp_request_t *request) = {
     command_scan_userkey,
     command_scan_sequential,
     command_scan_directkey,
@@ -63,7 +63,7 @@ static int command_rscan_directkey(resp_request_t *request) {
     return 0;
 }
 
-int (*command_rscan_handlers[])(resp_request_t *request) = {
+static int (*command_rscan_handlers[])(resp_request_t *request) = {
     command_rscan_userkey,
     command_rscan_sequential,
     command_rscan_directkey,
