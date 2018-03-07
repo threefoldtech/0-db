@@ -119,7 +119,7 @@ int redis_response(int fd) {
         }
 
         command.argc = atoi(buffer + 1);
-        printf("[+] redis: resp: %d arguments\n", command.argc);
+        debug("[+] redis: resp: %d arguments\n", command.argc);
 
         if(command.argc == 0) {
             resp_discard(command.client->fd, "Missing arguments");
