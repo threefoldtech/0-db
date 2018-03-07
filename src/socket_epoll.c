@@ -36,13 +36,8 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
         // creating the new client and accepting it
         if(ev->data.fd == redis->mainfd) {
             int clientfd;
-            char *clientip;
-            struct sockaddr_in addr_client;
-            socklen_t addr_client_len;
 
-            addr_client_len = sizeof(addr_client);
-
-            if((clientfd = accept(redis->mainfd, (struct sockaddr *)&addr_client, &addr_client_len)) == -1) {
+            if((clientfd = accept(redis->mainfd, NULL, NULL)) == -1) {
                 warnp("accept");
                 continue;
             }
@@ -50,8 +45,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             socket_nonblock(clientfd);
             socket_client_new(clientfd);
 
-            clientip = inet_ntoa(addr_client.sin_addr);
-            verbose("[+] incoming connection from %s\n", clientip);
+            verbose("[+] incoming connection (socket %d)\n", clientfd);
 
             // adding client to the epoll list
             struct epoll_event event;

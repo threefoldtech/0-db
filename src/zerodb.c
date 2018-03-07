@@ -28,6 +28,7 @@ settings_t rootsettings = {
     .synctime = 0,
     .mode = KEYVALUE,
     .adminpwd = NULL,
+    .socket = NULL,
 };
 
 static struct option long_options[] = {
@@ -35,6 +36,7 @@ static struct option long_options[] = {
     {"index",     required_argument, 0, 'i'},
     {"listen",    required_argument, 0, 'l'},
     {"port",      required_argument, 0, 'p'},
+    {"socket",    required_argument, 0, 'u'},
     {"verbose",   no_argument,       0, 'v'},
     {"sync",      no_argument,       0, 's'},
     {"synctime",  required_argument, 0, 't'},
@@ -142,7 +144,7 @@ static int proceed(struct settings_t *settings) {
     namespace_init(settings);
 
     // main worker point
-    redis_listen(settings->listen, settings->port);
+    redis_listen(settings->listen, settings->port, settings->socket);
 
     // we should not reach this point in production
     // this case is handled when calling explicitly
@@ -162,6 +164,7 @@ void usage() {
     printf("  --index     indexfiles directory (default ./index)\n");
     printf("  --listen    listen address (default 0.0.0.0)\n");
     printf("  --port      listen port (default 9900)\n");
+    printf("  --socket    unix socket path (override listen and port)\n");
     printf("  --verbose   enable verbose (debug) information\n");
     printf("  --dump      only dump index contents (debug)\n");
     printf("  --sync      force all write to be sync'd\n");
@@ -246,6 +249,11 @@ int main(int argc, char *argv[]) {
                     exit(EXIT_FAILURE);
                 }
 
+                break;
+
+            case 'u':
+                printf("socket\n");
+                settings->socket = optarg;
                 break;
 
             case 'h':

@@ -36,13 +36,8 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
 
         } else if((int) ev->ident == redis->mainfd) {
             int clientfd;
-            char *clientip;
-            struct sockaddr_in addr_client;
-            socklen_t addr_client_len;
 
-            addr_client_len = sizeof(addr_client);
-
-            if((clientfd = accept(redis->mainfd, (struct sockaddr *)&addr_client, &addr_client_len)) == -1) {
+            if((clientfd = accept(redis->mainfd, NULL, NULL)) == -1) {
                 warnp("accept");
                 continue;
             }
@@ -50,8 +45,7 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
             socket_nonblock(clientfd);
             socket_client_new(clientfd);
 
-            clientip = inet_ntoa(addr_client.sin_addr);
-            verbose("[+] incoming connection from %s (socket %d)\n", clientip, clientfd);
+            verbose("[+] incoming connection (socket %d)\n", clientfd);
 
             EV_SET(&evset, clientfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
             if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1) {

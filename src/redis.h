@@ -75,7 +75,7 @@
 
     } redis_bulk_t;
 
-    int redis_listen(char *listenaddr, int port);
+    int redis_listen(char *listenaddr, int port, char *socket);
     int redis_response(int fd);
 
     void socket_nonblock(int fd);

@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/un.h>
 #include <fcntl.h>
 #include <time.h>
 #include <inttypes.h>
@@ -299,8 +300,48 @@ void socket_client_free(int fd) {
     // maybe we could reduce the list usage now
 }
 
-int redis_listen(char *listenaddr, int port) {
-    struct sockaddr_in addr_listen;
+// classic tcp socket
+static int redis_tcp_listen(char *listenaddr, int port) {
+    struct sockaddr_in addr;
+    int fd;
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = inet_addr(listenaddr);
+
+    if((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+        diep("tcp socket");
+
+    if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
+        diep("tcp setsockopt");
+
+    if(bind(fd, (struct sockaddr*) &addr, sizeof(addr)) == -1)
+        diep("tcp bind");
+
+    return fd;
+}
+
+// unix socket
+static int redis_unix_listen(char *socketpath) {
+    struct sockaddr_un addr;
+    int fd;
+
+    if((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
+        diep("unix socket");
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+
+    strncpy(addr.sun_path, socketpath, sizeof(addr.sun_path) - 1);
+    unlink(socketpath);
+
+    if(bind(fd, (struct sockaddr*) &addr, sizeof(addr)) == -1)
+        diep("unix bind");
+
+    return fd;
+}
+
+int redis_listen(char *listenaddr, int port, char *socket) {
     redis_handler_t redis;
 
     // allocating space for clients
@@ -309,26 +350,24 @@ int redis_listen(char *listenaddr, int port) {
     if(!(clients.list = calloc(sizeof(redis_client_t *), clients.length)))
         diep("clients malloc");
 
-    // classic basic network socket operation
-    addr_listen.sin_family = AF_INET;
-    addr_listen.sin_port = htons(port);
-    addr_listen.sin_addr.s_addr = inet_addr(listenaddr);
+    if(socket) {
+        redis.mainfd = redis_unix_listen(socket);
 
-    if((redis.mainfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-        diep("socket");
-
-    if(setsockopt(redis.mainfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
-        diep("setsockopt");
+    } else {
+        redis.mainfd = redis_tcp_listen(listenaddr, port);
+    }
 
     socket_nonblock(redis.mainfd);
-
-    if(bind(redis.mainfd, (struct sockaddr*) &addr_listen, sizeof(addr_listen)) == -1)
-        diep("bind");
 
     if(listen(redis.mainfd, SOMAXCONN) == -1)
         diep("listen");
 
-    success("[+] listening on %s:%d", listenaddr, port);
+    if(!socket) {
+        success("[+] listening on: %s:%d", listenaddr, port);
+
+    } else {
+        success("[+] listening on: %s", socket);
+    }
 
     // entering the worker loop
     int handler = socket_handler(&redis);

@@ -31,6 +31,7 @@
         int synctime;     // force to sync writes after this amount of seconds
         db_mode_t mode;   // running mode
         char *adminpwd;   // admin password, if NULL, all users are admin
+        char *socket;     // unix socket path
 
         // the synctime can be useful to add basic security without killing
         // performance
