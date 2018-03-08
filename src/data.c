@@ -411,6 +411,10 @@ size_t data_next_offset(data_root_t *root) {
     return lseek(root->datafd, 0, SEEK_END);
 }
 
+int data_entry_is_deleted(data_entry_header_t *entry) {
+    return (entry->flags & DATA_ENTRY_DELETED);
+}
+
 // this function will check for a legitime request inside the data set
 // to estimate if a request is legitimate, we assume that
 //  - if the offset provided point to a header
@@ -641,10 +645,8 @@ data_scan_t data_previous_header(data_root_t *root, uint16_t dataid, size_t offs
         // release dataid
         data_release_dataid(root, dataid, scan.fd);
 
-        if(scan.status == DATA_SCAN_SUCCESS) {
-            // printf("PREVIOUS ENTRY KEY: <%.*s>\n", scan.header->idlength, scan.header->id);
+        if(scan.status == DATA_SCAN_SUCCESS)
             return scan;
-        }
 
         if(scan.status == DATA_SCAN_UNEXPECTED)
             return scan;
@@ -730,10 +732,8 @@ data_scan_t data_next_header(data_root_t *root, uint16_t dataid, size_t offset) 
         // release dataid
         data_release_dataid(root, dataid, scan.fd);
 
-        if(scan.status == DATA_SCAN_SUCCESS) {
-            // printf("NEXT ENTRY KEY: <%.*s>\n", scan.header->idlength, scan.header->id);
+        if(scan.status == DATA_SCAN_SUCCESS)
             return scan;
-        }
 
         if(scan.status == DATA_SCAN_UNEXPECTED)
             return scan;

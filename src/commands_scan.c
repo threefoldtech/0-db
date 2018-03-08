@@ -60,6 +60,12 @@ int command_scan(redis_client_t *client) {
         return 1;
     }
 
+    if(index_entry_is_deleted(entry)) {
+        verbose("[-] command: scan: key deleted\n");
+        redis_hardsend(client->fd, "-Invalid index");
+        return 1;
+    }
+
     scan = data_next_header(client->ns->data, entry->dataid, entry->offset);
 
     if(scan.status == DATA_SCAN_SUCCESS) {
@@ -93,6 +99,12 @@ int command_rscan(redis_client_t *client) {
     // grabbing original entry
     if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
         debug("[-] command: scan: key not found\n");
+        redis_hardsend(client->fd, "-Invalid index");
+        return 1;
+    }
+
+    if(index_entry_is_deleted(entry)) {
+        verbose("[-] command: scan: key deleted\n");
         redis_hardsend(client->fd, "-Invalid index");
         return 1;
     }
