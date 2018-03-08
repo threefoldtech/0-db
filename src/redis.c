@@ -178,14 +178,21 @@ static resp_status_t redis_handle_resp_header(redis_client_t *client) {
     buffer_t *buffer = &client->buffer;
     char *match;
 
+    // this could occures if the reader was set
+    // to the next data and theses data are not yet available
+    if(buffer->reader > buffer->writer) {
+        debug("[-] resp: header: trying to read data not received yet\n");
+        return RESP_STATUS_ABNORMAL;
+    }
+
     // waiting for a new line
     if(!(match = strchr(buffer->reader, '\n')))
-        return RESP_STATUS_CONTINUE;
+        return RESP_STATUS_ABNORMAL;
 
     // checking if it's a string request
     if(*buffer->reader != '$') {
         debug("[-] resp: request is not a string, rejecting\n");
-        return RESP_STATUS_DISCARD;
+        return RESP_STATUS_ABNORMAL;
     }
 
     if(!(request->argv[request->fillin] = calloc(sizeof(resp_object_t), 1))) {
@@ -219,7 +226,6 @@ static resp_status_t redis_handle_resp_header(redis_client_t *client) {
 static resp_status_t redis_handle_resp_payload(redis_client_t *client, int fd) {
     resp_request_t *request = client->request;
     buffer_t *buffer = &client->buffer;
-
     resp_object_t *argument = request->argv[request->fillin];
 
     ssize_t available = buffer->length - (buffer->reader - buffer->buffer);
@@ -228,6 +234,12 @@ static resp_status_t redis_handle_resp_payload(redis_client_t *client, int fd) {
     if(available == 0) {
         debug("[-] resp: reading payload: no data available on the buffer\n");
         return RESP_STATUS_SUCCESS;
+    }
+
+    if(available < argument->length - argument->filled && buffer->remain > 1) {
+        // no enough data but the buffer is not full, let's wait for
+        // more data to come
+        return RESP_STATUS_ABNORMAL;
     }
 
     // we don't have enough data on the buffer
@@ -256,23 +268,25 @@ static resp_status_t redis_handle_resp_payload(redis_client_t *client, int fd) {
     request->state = RESP_FILLIN_HEADER;
     buffer->reader += argument->length + 2; // skipping the last \r\n
 
-    // if this was the last argument, executing the request
-    if(request->fillin == request->argc) {
-        debug("[+] redis: request parsed, calling dispatcher\n");
-        int value = redis_dispatcher(client);
-        debug("[+] redis: dispatcher done, return code: %d\n", value);
-
-        // clearing the request
-        redis_free_request(request);
-
-        // reset states
-        buffer_reset(&client->buffer);
-        request->state = RESP_EMPTY;
-
-        return value;
-    }
-
     return RESP_STATUS_CONTINUE;
+}
+
+static resp_status_t redis_handle_resp_finished(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    int value = 0;
+
+    debug("[+] redis: request parsed, calling dispatcher\n");
+    value = redis_dispatcher(client);
+    debug("[+] redis: dispatcher done, return code: %d\n", value);
+
+    // clearing the request
+    redis_free_request(request);
+
+    // reset states
+    buffer_reset(&client->buffer);
+    request->state = RESP_EMPTY;
+
+    return value;
 }
 
 // int redis_read_client(int fd) {
@@ -319,13 +333,26 @@ resp_status_t redis_chunk(int fd) {
             return value;
 
     while(1) {
-        if(request->state == RESP_FILLIN_HEADER)
+        // if this was the last argument, executing the request
+        if(request->fillin == request->argc) {
+            // we have everything we need to proceed but
+            // we still wait to receive the last \r\n from the client
+            if(strncmp(buffer->buffer + buffer->length - 2, "\r\n", 2) != 0)
+                return RESP_STATUS_CONTINUE;
+
+            // executing the request
+            return redis_handle_resp_finished(client);
+        }
+
+        if(request->state == RESP_FILLIN_HEADER) {
             if((value = redis_handle_resp_header(client)) != RESP_STATUS_CONTINUE)
                 return value;
+        }
 
-        if(request->state == RESP_FILLIN_PAYLOAD)
+        if(request->state == RESP_FILLIN_PAYLOAD) {
             if((value = redis_handle_resp_payload(client, fd)) != RESP_STATUS_CONTINUE)
                 return value;
+        }
     }
 
     return 0;
