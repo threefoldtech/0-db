@@ -80,7 +80,7 @@ int command_auth(redis_client_t *client) {
 int command_stop(redis_client_t *client) {
     #ifndef RELEASE
         redis_hardsend(client->fd, "+Stopping");
-        return 2;
+        return RESP_STATUS_SHUTDOWN;
     #else
         redis_hardsend(client->fd, "-Unauthorized");
         return 0;

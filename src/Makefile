@@ -2,7 +2,7 @@ EXEC=zdb
 SRC=$(wildcard *.c)
 OBJ=$(SRC:.c=.o)
 
-CFLAGS=-g -W -Wall -O2 -msse4.2 -Wno-implicit-fallthrough
+CFLAGS=-g -O0 -W -Wall -msse4.2 -Wno-implicit-fallthrough
 LDFLAGS=-rdynamic
 
 # grab version from git, if possible
@@ -13,7 +13,7 @@ endif
 
 all: $(EXEC)
 
-release: CFLAGS+=-DRELEASE
+release: CFLAGS+=-DRELEASE -O2
 release: clean $(EXEC)
 
 static: LDFLAGS+=-static

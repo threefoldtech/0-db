@@ -26,21 +26,50 @@
         resp_type_t type;
         void *buffer;
         int length;
+        int filled;
 
     } resp_object_t;
 
+    typedef enum resp_state_t {
+        RESP_EMPTY,
+        RESP_FILLIN_HEADER,
+        RESP_FILLIN_PAYLOAD,
+
+    } resp_state_t;
+
     // represent one redis command with arguments
     typedef struct resp_request_t {
-        // redis_client_t *client;
+        resp_state_t state;
+        int fillin;
         int argc;
         resp_object_t **argv;
 
     } resp_request_t;
 
+    typedef enum resp_status_t {
+        RESP_STATUS_SUCCESS,
+        RESP_STATUS_ABNORMAL,
+        RESP_STATUS_DISCARD,
+        RESP_STATUS_DISCONNECTED,
+        RESP_STATUS_CONTINUE,
+        RESP_STATUS_DONE,
+        RESP_STATUS_SHUTDOWN,
+
+    } resp_status_t;
+
     // tracking each clients in memory
     // we need to create object per client to keep
     // some session-life persistant data, such namespace
     // attached to the socket, and so on
+
+    typedef struct buffer_t {
+        char *buffer;
+        size_t length;
+        size_t remain;
+        char *reader;
+        char *writer;
+
+    } buffer_t;
 
     // represent one client in memory
     typedef struct redis_client_t {
@@ -50,7 +79,7 @@
         size_t commands;  // request (commands) counter
         int writable;     // does the client can write on the namespace
         int admin;        // does the client is admin
-        char *buffer;     // per-client buffer
+        buffer_t buffer;  // per-client buffer
 
         // each client will be attached to a request
         // this request will contains one-per-one commands
@@ -71,6 +100,9 @@
     // per client buffer
     #define REDIS_BUFFER_SIZE 8192
 
+    // maximum payload size
+    #define REDIS_MAX_PAYLOAD 8 * 1024 * 1024
+
     typedef struct redis_handler_t {
         int mainfd;  // main socket handler
         int evfd;    // event handler (epoll, kqueue, ...)
@@ -85,7 +117,7 @@
     } redis_bulk_t;
 
     int redis_listen(char *listenaddr, int port, char *socket);
-    int redis_response(int fd);
+    resp_status_t redis_chunk(int fd);
 
     void socket_nonblock(int fd);
     void socket_block(int fd);

@@ -53,7 +53,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             memset(&event, 0, sizeof(struct epoll_event));
 
             event.data.fd = clientfd;
-            event.events = EPOLLIN;
+            event.events = EPOLLIN | EPOLLET;
 
             if(epoll_ctl(redis->evfd, EPOLL_CTL_ADD, clientfd, &event) < 0) {
                 warnp("epoll_ctl");
@@ -63,29 +63,17 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             continue;
         }
 
-        // here is the "blocking" state
-        // which only allows us to parse one client at a time
-        // we will only proceed a full request at a time
-        //
-        // -- FIXME --
-        // basicly here is one security issue, a client could
-        // potentially lock the daemon by starting a command and not complete it
-        //
-        socket_block(ev->data.fd);
-
-        // dispatching client event
-        int ctrl = redis_response(ev->data.fd);
+        // calling the redis chunk event handler
+        resp_status_t ctrl = redis_chunk(ev->data.fd);
 
         // client error, we discard it
-        if(ctrl == 3) {
+        if(ctrl == RESP_STATUS_DISCARD || ctrl == RESP_STATUS_DISCONNECTED) {
             socket_client_free(ev->data.fd);
             continue;
         }
 
-        socket_nonblock(ev->data.fd);
-
-        // dirty way the STOP event is handled
-        if(ctrl == 2) {
+        // (dirty) way the STOP event is handled
+        if(ctrl == RESP_STATUS_SHUTDOWN) {
             printf("[+] stopping daemon\n");
             close(redis->mainfd);
             return 1;

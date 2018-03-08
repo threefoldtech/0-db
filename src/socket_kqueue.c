@@ -47,6 +47,7 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
 
             verbose("[+] incoming connection (socket %d)\n", clientfd);
 
+
             EV_SET(&evset, clientfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
             if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1) {
                 warnp("kevent");
@@ -56,30 +57,17 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
             continue;
         }
 
-        // here is the "blocking" state
-        // which only allows us to parse one client at a time
-        // we will only proceed a full request at a time
-        //
-        // -- FIXME --
-        // basicly here is one security issue, a client could
-        // potentially lock the daemon by starting a command and not complete it
-        //
-        socket_block(ev->ident);
-
-        // dispatching client event
-        int ctrl = redis_response(ev->ident);
+        // calling the redis chunk event handler
+        resp_status_t ctrl = redis_chunk(ev->data.fd);
 
         // client error, we discard it
-        if(ctrl == 3) {
-            close(ev->ident);
-            socket_client_free(ev->ident);
+        if(ctrl == RESP_STATUS_DISCARD || ctrl == RESP_STATUS_DISCONNECTED) {
+            socket_client_free(ev->data.fd);
             continue;
         }
 
-        socket_nonblock(ev->ident);
-
-        // dirty way the STOP event is handled
-        if(ctrl == 2) {
+        // (dirty) way the STOP event is handled
+        if(ctrl == RESP_STATUS_SHUTDOWN) {
             printf("[+] stopping daemon\n");
             close(redis->mainfd);
             return 1;
