@@ -20,15 +20,15 @@
 #include "commands_system.h"
 
 // ensure number of argument and their validity
-int command_args_validate(resp_request_t *request, int expected) {
-    if(request->argc != expected) {
-        redis_hardsend(request->client->fd, "-Unexpected arguments");
+int command_args_validate(redis_client_t *client, int expected) {
+    if(client->request->argc != expected) {
+        redis_hardsend(client->fd, "-Unexpected arguments");
         return 0;
     }
 
     for(int i = 0; i < expected; i++) {
-        if(request->argv[i]->length == 0) {
-            redis_hardsend(request->client->fd, "-Invalid argument");
+        if(client->request->argv[i]->length == 0) {
+            redis_hardsend(client->fd, "-Invalid argument");
             return 0;
         }
     }
@@ -36,9 +36,9 @@ int command_args_validate(resp_request_t *request, int expected) {
     return 1;
 }
 
-int command_admin_authorized(resp_request_t *request) {
-    if(!request->client->admin) {
-        redis_hardsend(request->client->fd, "-Permission denied");
+int command_admin_authorized(redis_client_t *client) {
+    if(!client->admin) {
+        redis_hardsend(client->fd, "-Permission denied");
         return 0;
     }
 
@@ -77,11 +77,12 @@ static command_t commands_handlers[] = {
     {.command = "SELECT", .handler = command_select},  // default SELECT (with pwd) namespace switch
 };
 
-int redis_dispatcher(resp_request_t *request) {
+int redis_dispatcher(redis_client_t *client) {
+    resp_request_t *request = client->request;
     resp_object_t *key = request->argv[0];
 
-    debug("[+] command: request fd: %d, namespace: %s\n", request->client->fd, request->client->ns->name);
-    request->client->commands += 1;
+    debug("[+] command: request fd: %d, namespace: %s\n", client->fd, client->ns->name);
+    client->commands += 1;
 
     if(key->type != STRING) {
         debug("[-] command: not a string command, ignoring\n");
@@ -92,12 +93,12 @@ int redis_dispatcher(resp_request_t *request) {
 
     for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
         if(strncmp(key->buffer, commands_handlers[i].command, key->length) == 0)
-            return commands_handlers[i].handler(request);
+            return commands_handlers[i].handler(client);
     }
 
     // unknown
     printf("[-] command: unsupported redis command\n");
-    redis_hardsend(request->client->fd, "-Command not supported");
+    redis_hardsend(client->fd, "-Command not supported");
 
     return 1;
 }

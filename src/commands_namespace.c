@@ -15,17 +15,18 @@
 
 // create a new namespace
 //   NSNEW [namespace]
-int command_nsnew(resp_request_t *request) {
+int command_nsnew(redis_client_t *client) {
+    resp_request_t *request = client->request;
     char target[COMMAND_MAXLEN];
 
-    if(!command_admin_authorized(request))
+    if(!command_admin_authorized(client))
         return 1;
 
-    if(!command_args_validate(request, 2))
+    if(!command_args_validate(client, 2))
         return 1;
 
     if(request->argv[1]->length > 128) {
-        redis_hardsend(request->client->fd, "-Namespace too long");
+        redis_hardsend(client->fd, "-Namespace too long");
         return 1;
     }
 
@@ -35,35 +36,36 @@ int command_nsnew(resp_request_t *request) {
     // deny already existing namespace
     if(namespace_get(target)) {
         debug("[-] command: mkns: namespace already exists\n");
-        redis_hardsend(request->client->fd, "-This namespace is not available");
+        redis_hardsend(client->fd, "-This namespace is not available");
         return 1;
     }
 
     // creating the new namespace
     // note: password needs to be set via NSSET after creation
     if(!namespace_create(target)) {
-        redis_hardsend(request->client->fd, "-Could not create namespace");
+        redis_hardsend(client->fd, "-Could not create namespace");
         return 1;
     }
 
-    redis_hardsend(request->client->fd, "+OK");
+    redis_hardsend(client->fd, "+OK");
 
     return 0;
 }
 
 // change user active namespace
 //   SELECT [namespace]
-int command_select(resp_request_t *request) {
+int command_select(redis_client_t *client) {
+    resp_request_t *request = client->request;
     char target[COMMAND_MAXLEN];
     namespace_t *namespace = NULL;
 
     if(request->argc < 2) {
-        redis_hardsend(request->client->fd, "-Invalid argument");
+        redis_hardsend(client->fd, "-Invalid argument");
         return 1;
     }
 
     if(request->argv[1]->length > 128) {
-        redis_hardsend(request->client->fd, "-Namespace too long");
+        redis_hardsend(client->fd, "-Namespace too long");
         return 1;
     }
 
@@ -73,7 +75,7 @@ int command_select(resp_request_t *request) {
     // checking for existing namespace
     if(!(namespace = namespace_get(target))) {
         debug("[-] command: select: namespace not found\n");
-        redis_hardsend(request->client->fd, "-Namespace not found");
+        redis_hardsend(client->fd, "-Namespace not found");
         return 1;
     }
 
@@ -88,7 +90,7 @@ int command_select(resp_request_t *request) {
             // but in read-only mode
             if(!namespace->public) {
                 debug("[-] command: select: namespace not public and password not provided\n");
-                redis_hardsend(request->client->fd, "-Namespace protected and private");
+                redis_hardsend(client->fd, "-Namespace protected and private");
                 return 1;
             }
 
@@ -101,7 +103,7 @@ int command_select(resp_request_t *request) {
             char password[256];
 
             if(request->argv[2]->length > (ssize_t) sizeof(password) - 1) {
-                redis_hardsend(request->client->fd, "-Password too long");
+                redis_hardsend(client->fd, "-Password too long");
                 return 1;
             }
 
@@ -111,7 +113,7 @@ int command_select(resp_request_t *request) {
             sprintf(password, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
 
             if(strcmp(password, namespace->password) != 0) {
-                redis_hardsend(request->client->fd, "-Access denied");
+                redis_hardsend(client->fd, "-Access denied");
                 return 1;
             }
 
@@ -125,24 +127,24 @@ int command_select(resp_request_t *request) {
 
     // switching client's active namespace
     debug("[+] command: select: moving user to namespace '%s'\n", namespace->name);
-    request->client->ns = namespace;
-    request->client->writable = writable;
+    client->ns = namespace;
+    client->writable = writable;
 
     // return confirmation
-    redis_hardsend(request->client->fd, "+OK");
+    redis_hardsend(client->fd, "+OK");
 
     return 0;
 }
 
 // list available namespaces (all of them)
 //   NSLIST (no arguments)
-int command_nslist(resp_request_t *request) {
+int command_nslist(redis_client_t *client) {
     char line[512];
     ns_root_t *nsroot = namespace_get_list();
 
     // streaming list to the client
     sprintf(line, "*%lu\r\n", nsroot->length);
-    send(request->client->fd, line, strlen(line), 0);
+    send(client->fd, line, strlen(line), 0);
 
     debug("[+] command: nslist: sending %lu items\n", nsroot->length);
 
@@ -151,7 +153,7 @@ int command_nslist(resp_request_t *request) {
         namespace_t *ns = nsroot->namespaces[i];
 
         sprintf(line, "$%ld\r\n%s\r\n", strlen(ns->name), ns->name);
-        send(request->client->fd, line, strlen(line), 0);
+        send(client->fd, line, strlen(line), 0);
     }
 
     return 0;
@@ -159,16 +161,17 @@ int command_nslist(resp_request_t *request) {
 
 // get information about a namespace
 //   NSINFO [namespace]
-int command_nsinfo(resp_request_t *request) {
+int command_nsinfo(redis_client_t *client) {
+    resp_request_t *request = client->request;
     char info[1024];
     char target[COMMAND_MAXLEN];
     namespace_t *namespace;
 
-    if(!command_args_validate(request, 2))
+    if(!command_args_validate(client, 2))
         return 1;
 
     if(request->argv[1]->length > 128) {
-        redis_hardsend(request->client->fd, "-Namespace too long");
+        redis_hardsend(client->fd, "-Namespace too long");
         return 1;
     }
 
@@ -178,7 +181,7 @@ int command_nsinfo(resp_request_t *request) {
     // checking for existing namespace
     if(!(namespace = namespace_get(target))) {
         debug("[-] command: nsinfo: namespace not found\n");
-        redis_hardsend(request->client->fd, "-Namespace not found");
+        redis_hardsend(client->fd, "-Namespace not found");
         return 1;
     }
 
@@ -195,11 +198,11 @@ int command_nsinfo(resp_request_t *request) {
 
     redis_bulk_t response = redis_bulk(info, strlen(info));
     if(!response.buffer) {
-        redis_hardsend(request->client->fd, "$-1");
+        redis_hardsend(client->fd, "$-1");
         return 0;
     }
 
-    send(request->client->fd, response.buffer, response.length, 0);
+    send(client->fd, response.buffer, response.length, 0);
 
     free(response.buffer);
 
@@ -213,25 +216,26 @@ int command_nsinfo(resp_request_t *request) {
 //                                          if this is more than actual size, there
 //                                          is no shrink, it stay as it
 //   NSSET [namespace] public [1 or 0]   -> enable or disable public access
-int command_nsset(resp_request_t *request) {
+int command_nsset(redis_client_t *client) {
+    resp_request_t *request = client->request;
     namespace_t *namespace = NULL;
     char target[COMMAND_MAXLEN];
     char command[COMMAND_MAXLEN];
     char value[COMMAND_MAXLEN];
 
-    if(!command_admin_authorized(request))
+    if(!command_admin_authorized(client))
         return 1;
 
-    if(!command_args_validate(request, 4))
+    if(!command_args_validate(client, 4))
         return 1;
 
     if(request->argv[1]->length > 128) {
-        redis_hardsend(request->client->fd, "-Namespace too long");
+        redis_hardsend(client->fd, "-Namespace too long");
         return 1;
     }
 
     if(request->argv[2]->length > COMMAND_MAXLEN || request->argv[3]->length > COMMAND_MAXLEN) {
-        redis_hardsend(request->client->fd, "-Argument too long");
+        redis_hardsend(client->fd, "-Argument too long");
         return 1;
     }
 
@@ -241,20 +245,20 @@ int command_nsset(resp_request_t *request) {
 
     // limit size of the value
     if(request->argv[3]->length > 63) {
-        redis_hardsend(request->client->fd, "-Invalid value");
+        redis_hardsend(client->fd, "-Invalid value");
         return 1;
     }
 
     // default namespace cannot be changed
     if(strcmp(target, NAMESPACE_DEFAULT) == 0) {
-        redis_hardsend(request->client->fd, "-Cannot update default namespace");
+        redis_hardsend(client->fd, "-Cannot update default namespace");
         return 1;
     }
 
     // checking for existing namespace
     if(!(namespace = namespace_get(target))) {
         debug("[-] command: nsset: namespace not found\n");
-        redis_hardsend(request->client->fd, "-Namespace not found");
+        redis_hardsend(client->fd, "-Namespace not found");
         return 1;
     }
 
@@ -286,7 +290,7 @@ int command_nsset(resp_request_t *request) {
 
     } else {
         debug("[-] command: nsset: unknown property '%s'\n", command);
-        redis_hardsend(request->client->fd, "-Invalid property");
+        redis_hardsend(client->fd, "-Invalid property");
         return 1;
     }
 
@@ -294,16 +298,16 @@ int command_nsset(resp_request_t *request) {
     namespace_commit(namespace);
 
     // confirmation
-    redis_hardsend(request->client->fd, "+OK");
+    redis_hardsend(client->fd, "+OK");
 
     return 0;
 }
 
-int command_dbsize(resp_request_t *request) {
+int command_dbsize(redis_client_t *client) {
     char response[64];
 
-    sprintf(response, ":%lu\r\n", request->client->ns->index->entries);
-    send(request->client->fd, response, strlen(response), 0);
+    sprintf(response, ":%lu\r\n", client->ns->index->entries);
+    send(client->fd, response, strlen(response), 0);
 
     return 0;
 }

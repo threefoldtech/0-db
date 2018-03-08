@@ -14,7 +14,11 @@
 #include "commands.h"
 #include "commands_get.h"
 
-static size_t redis_set_handler_userkey(resp_request_t *request, index_root_t *index, data_root_t *data) {
+static size_t redis_set_handler_userkey(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    index_root_t *index = client->ns->index;
+    data_root_t *data = client->ns->data;
+
     // create some easier accessor
     unsigned char *id = request->argv[1]->buffer;
     uint8_t idlength = request->argv[1]->length;
@@ -34,7 +38,7 @@ static size_t redis_set_handler_userkey(resp_request_t *request, index_root_t *i
     // if we couldn't write the data, we won't add entry on the index
     // and report to the client an error
     if(offset == 0) {
-        redis_hardsend(request->client->fd, "$-1");
+        redis_hardsend(client->fd, "$-1");
         return 0;
     }
 
@@ -47,7 +51,7 @@ static size_t redis_set_handler_userkey(resp_request_t *request, index_root_t *i
     // inserting this offset with the id on the index
     if(!index_entry_insert(index, id, idlength, offset, request->argv[2]->length)) {
         // cannot insert index (disk issue)
-        redis_hardsend(request->client->fd, "$-1");
+        redis_hardsend(client->fd, "$-1");
         return 0;
     }
 
@@ -58,17 +62,21 @@ static size_t redis_set_handler_userkey(resp_request_t *request, index_root_t *i
     // this is how the sequential-id can returns the id generated
     redis_bulk_t response = redis_bulk(id, idlength);
     if(!response.buffer) {
-        redis_hardsend(request->client->fd, "$-1");
+        redis_hardsend(client->fd, "$-1");
         return 0;
     }
 
-    send(request->client->fd, response.buffer, response.length, 0);
+    send(client->fd, response.buffer, response.length, 0);
     free(response.buffer);
 
     return offset;
 }
 
-static size_t redis_set_handler_sequential(resp_request_t *request, index_root_t *index, data_root_t *data) {
+static size_t redis_set_handler_sequential(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    index_root_t *index = client->ns->index;
+    data_root_t *data = client->ns->data;
+
     // create some easier accessor
     uint32_t id = index_next_id(index);
     uint8_t idlength = sizeof(uint32_t);
@@ -87,7 +95,7 @@ static size_t redis_set_handler_sequential(resp_request_t *request, index_root_t
     // if we couldn't write the data, we won't add entry on the index
     // and report to the client an error
     if(offset == 0) {
-        redis_hardsend(request->client->fd, "$-1");
+        redis_hardsend(client->fd, "$-1");
         return 0;
     }
 
@@ -101,7 +109,7 @@ static size_t redis_set_handler_sequential(resp_request_t *request, index_root_t
     // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
     if(!index_entry_insert(index, &id, idlength, offset, request->argv[2]->length)) {
         // cannot insert index (disk issue)
-        redis_hardsend(request->client->fd, "$-1");
+        redis_hardsend(client->fd, "$-1");
         return 0;
     }
 
@@ -113,17 +121,21 @@ static size_t redis_set_handler_sequential(resp_request_t *request, index_root_t
     // redis_bulk_t response = redis_bulk(id, idlength);
     redis_bulk_t response = redis_bulk(&id, idlength);
     if(!response.buffer) {
-        redis_hardsend(request->client->fd, "$-1");
+        redis_hardsend(client->fd, "$-1");
         return 0;
     }
 
-    send(request->client->fd, response.buffer, response.length, 0);
+    send(client->fd, response.buffer, response.length, 0);
     free(response.buffer);
 
     return offset;
 }
 
-static size_t redis_set_handler_directkey(resp_request_t *request, index_root_t *index, data_root_t *data) {
+static size_t redis_set_handler_directkey(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    index_root_t *index = client->ns->index;
+    data_root_t *data = client->ns->data;
+
     // create some easier accessor
     index_dkey_t id = {
         .dataid = data_dataid(data),      // current data fileid
@@ -146,7 +158,7 @@ static size_t redis_set_handler_directkey(resp_request_t *request, index_root_t 
     // if we couldn't write the data, we won't add entry on the index
     // and report to the client an error
     if(offset == 0) {
-        redis_hardsend(request->client->fd, "$-1");
+        redis_hardsend(client->fd, "$-1");
         return 0;
     }
 
@@ -162,7 +174,7 @@ static size_t redis_set_handler_directkey(resp_request_t *request, index_root_t 
     // memory, the memory part is skipped but index is still written
     if(!index_entry_insert(index, &id, idlength, offset, request->argv[2]->length)) {
         // cannot insert index (disk issue)
-        redis_hardsend(request->client->fd, "$-1");
+        redis_hardsend(client->fd, "$-1");
         return 0;
     }
 
@@ -173,40 +185,41 @@ static size_t redis_set_handler_directkey(resp_request_t *request, index_root_t 
     // this is how the direct-id can returns the id generated
     redis_bulk_t response = redis_bulk(&id, idlength);
     if(!response.buffer) {
-        redis_hardsend(request->client->fd, "$-1");
+        redis_hardsend(client->fd, "$-1");
         return 0;
     }
 
-    send(request->client->fd, response.buffer, response.length, 0);
+    send(client->fd, response.buffer, response.length, 0);
     free(response.buffer);
 
     return offset;
 }
 
-static size_t (*redis_set_handlers[])(resp_request_t *request, index_root_t *index, data_root_t *data) = {
+static size_t (*redis_set_handlers[])(redis_client_t *client) = {
     redis_set_handler_userkey,    // key-value mode
     redis_set_handler_sequential, // incremental mode
     redis_set_handler_directkey,  // direct-key mode
 };
 
-int command_set(resp_request_t *request) {
-    if(!command_args_validate(request, 3))
+int command_set(redis_client_t *client) {
+    resp_request_t *request = client->request;
+
+    if(!command_args_validate(client, 3))
         return 1;
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
-        redis_hardsend(request->client->fd, "-Key too large");
+        redis_hardsend(client->fd, "-Key too large");
         return 1;
     }
 
-    if(!request->client->writable) {
+    if(!client->writable) {
         debug("[-] command: set: denied, read-only namespace\n");
-        redis_hardsend(request->client->fd, "-Namespace is in read-only mode");
+        redis_hardsend(client->fd, "-Namespace is in read-only mode");
         return 1;
     }
 
     // shortcut to data
-    index_root_t *index = request->client->ns->index;
-    data_root_t *data = request->client->ns->data;
+    index_root_t *index = client->ns->index;
     index_entry_t *entry = NULL;
     size_t floating = 0;
 
@@ -214,22 +227,22 @@ int command_set(resp_request_t *request) {
     // and the maxsize of the namespace is reached, we need
     // to know if the replacement data is shorter, this is
     // a valid and legitimate insert request
-    if((entry = redis_get_handlers[rootsettings.mode](request))) {
+    if((entry = redis_get_handlers[rootsettings.mode](client))) {
         floating = entry->length;
     }
 
     // check if namespace limitation is set
-    if(request->client->ns->maxsize) {
-        size_t limits = request->client->ns->maxsize + floating;
+    if(client->ns->maxsize) {
+        size_t limits = client->ns->maxsize + floating;
 
         // check if there is still enough space
         if(index->datasize + request->argv[2]->length > limits) {
-            redis_hardsend(request->client->fd, "-No space left on this namespace");
+            redis_hardsend(client->fd, "-No space left on this namespace");
             return 1;
         }
     }
 
-    size_t offset = redis_set_handlers[rootsettings.mode](request, index, data);
+    size_t offset = redis_set_handlers[rootsettings.mode](client);
     if(offset == 0)
         return 0;
 
@@ -237,8 +250,8 @@ int command_set(resp_request_t *request) {
     // we do this check here and not from data (event if this is like a
     // datafile event) to keep data and index code completly distinct
     if(offset + request->argv[2]->length > DATA_MAXSIZE) {
-        size_t newid = index_jump_next(request->client->ns->index);
-        data_jump_next(request->client->ns->data, newid);
+        size_t newid = index_jump_next(client->ns->index);
+        data_jump_next(client->ns->data, newid);
     }
 
     return 0;

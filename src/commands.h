@@ -3,14 +3,14 @@
 
     typedef struct command_t {
         char *command;
-        int (*handler)(resp_request_t *request);
+        int (*handler)(redis_client_t *client);
 
     } command_t;
 
     #define COMMAND_MAXLEN  256
 
-    int redis_dispatcher(resp_request_t *request);
+    int redis_dispatcher(redis_client_t *client);
 
-    int command_args_validate(resp_request_t *request, int expected);
-    int command_admin_authorized(resp_request_t *request);
+    int command_args_validate(redis_client_t *client, int expected);
+    int command_admin_authorized(redis_client_t *client);
 #endif

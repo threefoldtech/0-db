@@ -12,32 +12,6 @@
     // just be +1
     #define redis_hardsend(fd, message) send(fd, message "\r\n", sizeof(message) + 1, 0)
 
-    // tracking each clients in memory
-    // we need to create object per client to keep
-    // some session-life persistant data, such namespace
-    // attached to the socket, and so on
-
-    // represent one client in memory
-    typedef struct redis_client_t {
-        int fd;           // socket file descriptor
-        namespace_t *ns;  // connection namespace
-        time_t connected; // connection time
-        size_t commands;  // request (commands) counter
-        int writable;     // does the client can write on the namespace
-        int admin;        // does the client is admin
-
-    } redis_client_t;
-
-    // represent all clients in memory
-    typedef struct redis_clients_t {
-        size_t length;
-        redis_client_t **list;
-
-    } redis_clients_t;
-
-    // minimum (default) amount of client pre-allocated
-    #define REDIS_CLIENTS_INITIAL_LENGTH 32
-
     //
     // redis protocol oriented objects
     //
@@ -55,12 +29,47 @@
 
     } resp_object_t;
 
+    // represent one redis command with arguments
     typedef struct resp_request_t {
-        redis_client_t *client;
+        // redis_client_t *client;
         int argc;
         resp_object_t **argv;
 
     } resp_request_t;
+
+    // tracking each clients in memory
+    // we need to create object per client to keep
+    // some session-life persistant data, such namespace
+    // attached to the socket, and so on
+
+    // represent one client in memory
+    typedef struct redis_client_t {
+        int fd;           // socket file descriptor
+        namespace_t *ns;  // connection namespace
+        time_t connected; // connection time
+        size_t commands;  // request (commands) counter
+        int writable;     // does the client can write on the namespace
+        int admin;        // does the client is admin
+        char *buffer;     // per-client buffer
+
+        // each client will be attached to a request
+        // this request will contains one-per-one commands
+        resp_request_t *request;
+
+    } redis_client_t;
+
+    // represent all clients in memory
+    typedef struct redis_clients_t {
+        size_t length;
+        redis_client_t **list;
+
+    } redis_clients_t;
+
+    // minimum (default) amount of client pre-allocated
+    #define REDIS_CLIENTS_INITIAL_LENGTH 32
+
+    // per client buffer
+    #define REDIS_BUFFER_SIZE 8192
 
     typedef struct redis_handler_t {
         int mainfd;  // main socket handler

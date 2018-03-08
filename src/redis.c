@@ -90,27 +90,52 @@ static void resp_discard(int fd, char *message) {
         fprintf(stderr, "[-] send failed for error message\n");
 }
 
+static void redis_free_request(resp_request_t *request) {
+    for(int i = 0; i < request->argc; i++) {
+        // prematured end and argv was not yet allocated
+        if(!request->argv[i])
+            continue;
+
+        free(request->argv[i]->buffer);
+        free(request->argv[i]);
+    }
+
+    free(request->argv);
+
+    // reset request
+    request->argc = 0;
+    request->argv = NULL;
+}
+
 // parsing a redis request
 // we parse the string and try to allocate something
 // in memory representing the request
 //
 // basic kind of argc/argv is used to expose the received request
 int redis_response(int fd) {
-    resp_request_t command = {
-        .argc = 0,
-        .argv = NULL
-    };
-
-    char buffer[8192], *reader = NULL;
+    resp_request_t *command;
+    redis_client_t *client;
+    char *reader = NULL;
     int length;
     int dvalue = 0;
 
-    command.client = clients.list[fd];
+    // linking object together
+    client = clients.list[fd];
+    command = client->request;
 
-    while((length = recv(fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
+    if(!client->buffer) {
+        if(!(client->buffer = malloc(REDIS_BUFFER_SIZE))) {
+            warnp("malloc");
+            return 0;
+        }
+    }
+
+    char *buffer = client->buffer;
+
+    while((length = recv(fd, buffer, REDIS_BUFFER_SIZE - 1, 0)) > 0) {
         // array
         if(buffer[0] != '*') {
-            resp_discard(command.client->fd, "Malformed request, array expected");
+            resp_discard(client->fd, "Malformed request, array expected");
             return 0;
         }
 
@@ -119,16 +144,16 @@ int redis_response(int fd) {
             return 0;
         }
 
-        command.argc = atoi(buffer + 1);
-        debug("[+] redis: resp: %d arguments\n", command.argc);
+        command->argc = atoi(buffer + 1);
+        debug("[+] redis: resp: %d arguments\n", command->argc);
 
-        if(command.argc == 0) {
-            resp_discard(command.client->fd, "Missing arguments");
+        if(command->argc == 0) {
+            resp_discard(client->fd, "Missing arguments");
             return 0;
         }
 
-        if(command.argc > 16) {
-            resp_discard(command.client->fd, "Too many arguments");
+        if(command->argc > 16) {
+            resp_discard(client->fd, "Too many arguments");
             return 0;
         }
 
@@ -136,16 +161,16 @@ int redis_response(int fd) {
             return 0;
 
         reader += 1;
-        command.argv = (resp_object_t **) calloc(sizeof(resp_type_t *), command.argc);
+        command->argv = (resp_object_t **) calloc(sizeof(resp_type_t *), command->argc);
 
-        for(int i = 0; i < command.argc; i++) {
-            command.argv[i] = calloc(sizeof(resp_object_t), 1);
-            resp_object_t *argument = command.argv[i];
+        for(int i = 0; i < command->argc; i++) {
+            command->argv[i] = calloc(sizeof(resp_object_t), 1);
+            resp_object_t *argument = command->argv[i];
 
             // reading next chunk
             // verifiying it's a string command
             if(*reader != '$') {
-                resp_discard(command.client->fd, "Malformed request (string)");
+                resp_discard(client->fd, "Malformed request (string)");
                 goto cleanup;
             }
 
@@ -155,12 +180,12 @@ int redis_response(int fd) {
 
             // going to the next line for the payload
             if(!(reader = strchr(reader, '\n'))) {
-                resp_discard(command.client->fd, "Malformed request (payload)");
+                resp_discard(client->fd, "Malformed request (payload)");
                 goto cleanup;
             }
 
             if(argument->length > 8 * 1024 * 1024) {
-                resp_discard(command.client->fd, "Payload too big");
+                resp_discard(client->fd, "Payload too big");
                 goto cleanup;
             }
 
@@ -180,9 +205,9 @@ int redis_response(int fd) {
 
             // the buffer doesn't contains enough data, let's read again to fill in the data
             memcpy(argument->buffer, reader + 1, remain);
-            recvto(command.client->fd, argument->buffer + remain, argument->length - remain);
+            recvto(client->fd, argument->buffer + remain, argument->length - remain);
 
-            if(recv(command.client->fd, buffer, 2, 0) != 2) {
+            if(recv(client->fd, buffer, 2, 0) != 2) {
                 fprintf(stderr, "[-] recv failed, ignoring\n");
                 goto cleanup;
             }
@@ -190,24 +215,18 @@ int redis_response(int fd) {
             // we read the rest of the payload, the rest on the socket should
             // be the end-of-line of the redis protocol
             if(strncmp(buffer, "\r\n", 2)) {
-                resp_discard(command.client->fd, "Protocol malformed");
+                resp_discard(client->fd, "Protocol malformed");
                 goto cleanup;
             }
         }
 
-        dvalue = redis_dispatcher(&command);
+        dvalue = redis_dispatcher(client);
 
 cleanup:
-        for(int i = 0; i < command.argc; i++) {
-            // prematured end and argv was not yet allocated
-            if(!command.argv[i])
-                continue;
+        redis_free_request(command);
 
-            free(command.argv[i]->buffer);
-            free(command.argv[i]);
-        }
-
-        free(command.argv);
+        free(client->buffer);
+        client->buffer = NULL;
 
         // special catch for STOP request
         if(dvalue == 2)
@@ -260,21 +279,36 @@ redis_client_t *socket_client_new(int fd) {
         clients.length = newlength;
     }
 
-    clients.list[fd] = malloc(sizeof(redis_client_t));
-    clients.list[fd]->fd = fd;
-    clients.list[fd]->connected = time(NULL);
-    clients.list[fd]->commands = 0;
+    redis_client_t *client = NULL;
+
+    if(!(client = malloc(sizeof(redis_client_t)))) {
+        warnp("new client malloc");
+        return NULL;
+    }
+
+    client->fd = fd;
+    client->connected = time(NULL);
+    client->commands = 0;
+    client->buffer = NULL;
+
+    if(!(client->request = (resp_request_t *) malloc(sizeof(resp_request_t)))) {
+        warnp("new client malloc");
+        return NULL;
+    }
 
     // attaching default namespace to this client
-    clients.list[fd]->ns = namespace_get_default();
+    client->ns = namespace_get_default();
 
     // by default, the default namespace is writable
-    clients.list[fd]->writable = 1;
+    client->writable = 1;
 
     // set all users admin if no password are set
-    clients.list[fd]->admin = (rootsettings.adminpwd) ? 0 : 1;
+    client->admin = (rootsettings.adminpwd) ? 0 : 1;
 
-    return clients.list[fd];
+    // set client to the list
+    clients.list[fd] = client;
+
+    return client;
 }
 
 // free allocated client when disconnected
@@ -292,6 +326,9 @@ void socket_client_free(int fd) {
     close(client->fd);
 
     // cleaning client memory usage
+    redis_free_request(client->request);
+    free(client->request);
+    free(client->buffer);
     free(client);
 
     // allow new client on this spot
