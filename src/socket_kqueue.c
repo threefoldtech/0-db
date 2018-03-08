@@ -58,11 +58,11 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
         }
 
         // calling the redis chunk event handler
-        resp_status_t ctrl = redis_chunk(ev->data.fd);
+        resp_status_t ctrl = redis_chunk(ev->ident);
 
         // client error, we discard it
         if(ctrl == RESP_STATUS_DISCARD || ctrl == RESP_STATUS_DISCONNECTED) {
-            socket_client_free(ev->data.fd);
+            socket_client_free(ev->ident);
             continue;
         }
 
