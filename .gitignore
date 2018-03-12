@@ -52,4 +52,6 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+bin/
+
 
