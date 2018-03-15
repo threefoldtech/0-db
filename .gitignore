@@ -53,3 +53,6 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+# binary files
+src/zdb
+tools/integrity-check
