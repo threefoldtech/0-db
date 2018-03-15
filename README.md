@@ -1,4 +1,4 @@
-# 0-db [![Build Status](https://travis-ci.org/zero-os/0-db.svg?branch=master)](https://travis-ci.org/zero-os/0-db)
+# 0-db [![Build Status](https://travis-ci.org/rivine/0-db.svg?branch=master)](https://travis-ci.org/zero-os/0-db)
 0-db is a super fast & efficient key-value store redis-protocol compatible which
 makes data persistant inside an always append index/datafile, with namespaces support.
 
