@@ -54,5 +54,7 @@ Mkfile.old
 dkms.conf
 
 # binary files
+bin/zdb
+bin/integrity-check
 src/zdb
 tools/integrity-check
