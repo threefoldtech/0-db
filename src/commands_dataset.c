@@ -82,9 +82,6 @@ int command_check(redis_client_t *client) {
     data_root_t *data = client->ns->data;
     int status = data_check(data, entry->offset, entry->dataid);
 
-    //
-    //
-
     char response[32];
     sprintf(response, ":%d\r\n", status);
 

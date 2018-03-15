@@ -2,7 +2,7 @@ EXEC=zdb
 SRC=$(wildcard *.c)
 OBJ=$(SRC:.c=.o)
 
-CFLAGS=-g -O0 -W -Wall -msse4.2 -Wno-implicit-fallthrough
+CFLAGS=-g -O0 -W -Wall -Wextra -msse4.2 -Wno-implicit-fallthrough
 LDFLAGS=-rdynamic
 
 # grab version from git, if possible

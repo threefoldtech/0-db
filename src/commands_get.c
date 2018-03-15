@@ -69,6 +69,7 @@ index_entry_t * (*redis_get_handlers[])(redis_client_t *client) = {
     redis_get_handler_memkey, // key-value mode
     redis_get_handler_memkey, // incremental mode
     redis_get_handler_direct, // direct-key mode
+    redis_get_handler_direct, // fixed block mode
 };
 
 int command_get(redis_client_t *client) {

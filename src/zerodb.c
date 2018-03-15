@@ -51,6 +51,7 @@ static char *modes[] = {
     "default key-value",
     "sequential keys",
     "direct key position",
+    "direct key fixed block length",
 };
 
 // debug tools
@@ -172,6 +173,7 @@ void usage() {
     printf("               > user: default user key-value mode\n");
     printf("               > seq: sequential keys generated\n");
     printf("               > direct: direct position by key\n");
+    printf("               > block: fixed blocks length (smaller direct)\n");
     printf("  --admin     set admin password\n");
     printf("  --help      print this message\n");
 
@@ -243,6 +245,9 @@ int main(int argc, char *argv[]) {
                 } else if(strcmp(optarg, "direct") == 0) {
                     settings->mode = DIRECTKEY;
 
+                } else if(strcmp(optarg, "block") == 0) {
+                    settings->mode = DIRECTBLOCK;
+
                 } else {
                     danger("[-] invalid mode '%s'", optarg);
                     fprintf(stderr, "[-] mode 'user', 'seq' or 'direct' expected\n");
@@ -265,7 +270,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    printf("[+] system: running mode: %s\n", modes[settings->mode]);
+    printf("[+] system: running mode: " COLOR_GREEN "%s" COLOR_RESET "\n", modes[settings->mode]);
 
     if(!dir_exists(settings->datapath)) {
         verbose("[+] system: creating datapath: %s\n", settings->datapath);

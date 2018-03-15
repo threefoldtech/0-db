@@ -199,6 +199,7 @@ static size_t (*redis_set_handlers[])(redis_client_t *client) = {
     redis_set_handler_userkey,    // key-value mode
     redis_set_handler_sequential, // incremental mode
     redis_set_handler_directkey,  // direct-key mode
+    redis_set_handler_directkey,  // fixed blocks mode
 };
 
 int command_set(redis_client_t *client) {

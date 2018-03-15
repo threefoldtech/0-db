@@ -15,10 +15,17 @@
         // id is hard-fixed data position
         DIRECTKEY = 2,
 
+        // fixed-block length
+        DIRECTBLOCK = 3,
+
         // amount of modes available
         ZDB_MODES
 
     } db_mode_t;
+
+    // when adding or removing some modes
+    // don't forget to adapt correctly the handlers
+    // function pointers (basicly for GET and SET)
 
     typedef struct settings_t {
         char *datapath;   // path where data files will be written
