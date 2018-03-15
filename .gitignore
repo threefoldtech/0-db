@@ -55,3 +55,6 @@ dkms.conf
 bin/zdb*
 
 
+# binary files
+src/zdb
+tools/integrity-check
