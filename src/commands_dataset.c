@@ -63,7 +63,7 @@ int command_check(redis_client_t *client) {
 
     // key not found at all
     if(!entry) {
-        verbose("[-] command: check: key not found\n");
+        debug("[-] command: check: key not found\n");
         redis_hardsend(client->fd, "$-1");
         return 1;
     }

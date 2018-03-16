@@ -92,7 +92,7 @@ int command_get(redis_client_t *client) {
 
     // key not found at all
     if(!entry) {
-        verbose("[-] command: get: key not found\n");
+        debug("[-] command: get: key not found\n");
         redis_hardsend(client->fd, "$-1");
         return 1;
     }
