@@ -177,6 +177,7 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
         exists->length = length;
         exists->offset = offset;
         exists->flags = flags;
+        exists->dataid = root->indexid;
 
         return exists;
     }
