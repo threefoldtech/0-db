@@ -1,9 +1,9 @@
 # 0-db [![Build Status](https://travis-ci.org/rivine/0-db.svg?branch=master)](https://travis-ci.org/zero-os/0-db)
-0-db is a super fast & efficient key-value store redis-protocol compatible which
+0-db is a super fast and efficient key-value store redis-protocol (mostly) compatible which
 makes data persistant inside an always append index/datafile, with namespaces support.
 
-its usable as generic replacement for any redis compatible key value store
-we use it as backend for many of our blockchain work
+We use it as backend for many of our blockchain work and might replace redis for basic
+SET and GET request.
 
 # Build targets
 Currently supported system:
@@ -13,7 +13,7 @@ Currently supported system:
 Currently supported hardware:
 * Any Intel processor supporting `SSE 4.2`
 
-This project won't compile on something else, for now.
+This project won't compile on something else (for now).
 
 # Build instructions
 To build the project (server, tools):
