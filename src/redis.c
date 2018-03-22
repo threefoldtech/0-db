@@ -62,6 +62,33 @@ static void buffer_free(buffer_t *buffer) {
 }
 
 //
+// redis socket response
+//
+int redis_reply(int fd, void *payload, size_t length) {
+    ssize_t remain = length;
+    ssize_t sent;
+
+    while(remain > 0) {
+        debug("[+] redis: sending reply (%ld bytes remains)\n", remain);
+
+        if((sent = send(fd, payload, remain, 0)) < 0) {
+            if(errno != EAGAIN) {
+                perror("[-] redis: reply");
+                return errno;
+            }
+
+            // FIXME: should use select() to know when the socket is ready
+            continue;
+        }
+
+        payload += sent;
+        remain -= sent;
+    }
+
+    return 0;
+}
+
+//
 // auto-bulk builder/responder
 //
 void redis_bulk_append(redis_bulk_t *bulk, void *data, size_t length) {
@@ -110,7 +137,7 @@ static void resp_discard(int fd, char *message) {
     sprintf(response, "-%s\r\n", message);
     debug("[-] redis: resp: error: %s\n", message);
 
-    if(send(fd, response, strlen(response), 0) < 0)
+    if(redis_reply(fd, response, strlen(response)) < 0)
         fprintf(stderr, "[-] send failed for error message\n");
 }
 

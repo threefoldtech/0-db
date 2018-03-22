@@ -38,7 +38,7 @@ static int command_scan_send_array(data_entry_header_t *header, redis_client_t *
     offset += header->idlength;
     offset += sprintf(response + offset, "\r\n");
 
-    send(client->fd, response, offset, 0);
+    redis_reply(client->fd, response, offset);
 
     return 0;
 }

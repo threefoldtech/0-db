@@ -10,7 +10,7 @@
     //
     // sizeof(message) will contains the null character, to append \r\n the size will
     // just be +1
-    #define redis_hardsend(fd, message) send(fd, message "\r\n", sizeof(message) + 1, 0)
+    #define redis_hardsend(fd, message) redis_reply(fd, message "\r\n", sizeof(message) + 1)
 
     //
     // redis protocol oriented objects
@@ -132,4 +132,7 @@
     // managing clients
     redis_client_t *socket_client_new(int fd);
     void socket_client_free(int fd);
+
+    // socket generic reply
+    int redis_reply(int fd, void *payload, size_t length);
 #endif

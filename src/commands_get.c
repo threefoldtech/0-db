@@ -124,7 +124,7 @@ int command_get(redis_client_t *client) {
         return 0;
     }
 
-    send(client->fd, response.buffer, response.length, 0);
+    redis_reply(client->fd, response.buffer, response.length);
 
     free(response.buffer);
     free(payload.buffer);

@@ -144,7 +144,7 @@ int command_nslist(redis_client_t *client) {
 
     // streaming list to the client
     sprintf(line, "*%lu\r\n", nsroot->length);
-    send(client->fd, line, strlen(line), 0);
+    redis_reply(client->fd, line, strlen(line));
 
     debug("[+] command: nslist: sending %lu items\n", nsroot->length);
 
@@ -153,7 +153,7 @@ int command_nslist(redis_client_t *client) {
         namespace_t *ns = nsroot->namespaces[i];
 
         sprintf(line, "$%ld\r\n%s\r\n", strlen(ns->name), ns->name);
-        send(client->fd, line, strlen(line), 0);
+        redis_reply(client->fd, line, strlen(line));
     }
 
     return 0;
@@ -202,7 +202,7 @@ int command_nsinfo(redis_client_t *client) {
         return 0;
     }
 
-    send(client->fd, response.buffer, response.length, 0);
+    redis_reply(client->fd, response.buffer, response.length);
 
     free(response.buffer);
 
@@ -307,7 +307,7 @@ int command_dbsize(redis_client_t *client) {
     char response[64];
 
     sprintf(response, ":%lu\r\n", client->ns->index->entries);
-    send(client->fd, response, strlen(response), 0);
+    redis_reply(client->fd, response, strlen(response));
 
     return 0;
 }
