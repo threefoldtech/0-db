@@ -38,7 +38,7 @@ int command_exists(redis_client_t *client) {
     char response[32];
     sprintf(response, ":%d\r\n", found);
 
-    redis_reply(client, response, strlen(response));
+    redis_reply_stack(client, response, strlen(response));
 
     return 0;
 }
@@ -85,7 +85,7 @@ int command_check(redis_client_t *client) {
     char response[32];
     sprintf(response, ":%d\r\n", status);
 
-    redis_reply(client, response, strlen(response));
+    redis_reply_stack(client, response, strlen(response));
 
     return 0;
 }

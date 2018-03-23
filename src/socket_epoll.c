@@ -26,7 +26,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 
         // epoll issue
         // discarding this client
-        if((ev->events & EPOLLERR) || (ev->events & EPOLLHUP) || (!(ev->events & EPOLLIN))) {
+        if((ev->events & EPOLLERR) || (ev->events & EPOLLHUP)) {
             warnp("epoll");
             socket_client_free(ev->data.fd);
             continue;
@@ -53,7 +53,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             memset(&event, 0, sizeof(struct epoll_event));
 
             event.data.fd = clientfd;
-            event.events = EPOLLIN | EPOLLET;
+            event.events = EPOLLIN | EPOLLOUT | EPOLLET;
 
             if(epoll_ctl(redis->evfd, EPOLL_CTL_ADD, clientfd, &event) < 0) {
                 warnp("epoll_ctl");
@@ -63,20 +63,31 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             continue;
         }
 
-        // calling the redis chunk event handler
-        resp_status_t ctrl = redis_chunk(ev->data.fd);
+        // data available for reading
+        // let's read what'a available and checking
+        // the response code
+        if(ev->events & EPOLLIN) {
+            // calling the redis chunk event handler
+            resp_status_t ctrl = redis_chunk_read(ev->data.fd);
 
-        // client error, we discard it
-        if(ctrl == RESP_STATUS_DISCARD || ctrl == RESP_STATUS_DISCONNECTED) {
-            socket_client_free(ev->data.fd);
-            continue;
+            // client error, we discard it
+            if(ctrl == RESP_STATUS_DISCARD || ctrl == RESP_STATUS_DISCONNECTED) {
+                socket_client_free(ev->data.fd);
+                continue;
+            }
+
+            // (dirty) way the STOP event is handled
+            if(ctrl == RESP_STATUS_SHUTDOWN) {
+                printf("[+] stopping daemon\n");
+                close(redis->mainfd);
+                return 1;
+            }
         }
 
-        // (dirty) way the STOP event is handled
-        if(ctrl == RESP_STATUS_SHUTDOWN) {
-            printf("[+] stopping daemon\n");
-            close(redis->mainfd);
-            return 1;
+        // client is ready for writing, let's check if any
+        // data still needs to be sent or not
+        if(ev->events & EPOLLOUT) {
+            redis_delayed_write(ev->data.fd);
         }
     }
 

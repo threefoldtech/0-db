@@ -66,8 +66,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client) {
         return 0;
     }
 
-    redis_reply(client, response.buffer, response.length);
-    free(response.buffer);
+    redis_reply(client, response.buffer, response.length, free);
 
     return offset;
 }
@@ -125,8 +124,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client) {
         return 0;
     }
 
-    redis_reply(client, response.buffer, response.length);
-    free(response.buffer);
+    redis_reply(client, response.buffer, response.length, free);
 
     return offset;
 }
@@ -189,8 +187,7 @@ static size_t redis_set_handler_directkey(redis_client_t *client) {
         return 0;
     }
 
-    redis_reply(client, response.buffer, response.length);
-    free(response.buffer);
+    redis_reply(client, response.buffer, response.length, free);
 
     return offset;
 }

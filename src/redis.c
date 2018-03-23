@@ -64,26 +64,83 @@ static void buffer_free(buffer_t *buffer) {
 //
 // redis socket response
 //
-int redis_reply(redis_client_t *client, void *payload, size_t length) {
-    ssize_t remain = length;
+// we use non-blocking socket for all clients
+// since sending response to (slow) client can takes more than one send call
+// we need a way to deal with theses slow clients without loosing performance
+// for the others client connected, and threading or anything parallele execution
+// is prohibed by design in this project
+//
+//
+//
+// int redis_reply(redis_client_t *client, void *payload, size_t length, void (*destructor)(void *target)) {
+int redis_reply(redis_client_t *client, void *payload, size_t length, void (*destructor)(void *payload)) {
+    redis_response_t *response = &client->response;
+
+    // for now, in any case we put the response
+    // in the response queue and waits for the kernel
+    // to trigger the write operator
+    //
+    // this could be optimized by trying to send anyway the payload
+    // and only copy/duplicate non-freeable payload if we could not
+    // send data because now every stack allocated or literal string
+    // will be duplicated
+    if(destructor) {
+        response->destructor = destructor;
+        response->buffer = payload;
+
+    } else {
+        if(!(response->buffer = malloc(length))) {
+            warnp("[-] redis_reply: malloc");
+            return 0;
+        }
+
+        response->destructor = free;
+        memcpy(response->buffer, payload, length);
+    }
+
+    response->reader = response->buffer;
+    response->length = length;
+
+    return 0;
+}
+
+inline int redis_reply_stack(redis_client_t *client, void *payload, size_t length) {
+    return redis_reply(client, payload, length, NULL);
+}
+
+int redis_send_reply(redis_client_t *client) {
     ssize_t sent;
+    redis_response_t *response = &client->response;
 
-    while(remain > 0) {
-        debug("[+] redis: sending reply (%ld bytes remains)\n", remain);
+    while(response->length > 0) {
+        debug("[+] redis: sending reply to %d (%ld bytes remains)\n", client->fd, response->length);
 
-        if((sent = send(client->fd, payload, remain, 0)) < 0) {
+        if((sent = send(client->fd, response->reader, response->length, 0)) < 0) {
             if(errno != EAGAIN) {
                 perror("[-] redis: reply");
                 return errno;
             }
 
-            // FIXME: should use select() to know when the socket is ready
-            continue;
+            // we still have some data to send, which could not
+            // be sent because the socket is not ready, and we are in
+            // non-blocking mode
+            //
+            // we don't change anything to the buffer
+            // and we wait the next trigger from the polling system
+            // to ask us the write is available again
+            return 0;
         }
 
-        payload += sent;
-        remain -= sent;
+        response->reader += sent;
+        response->length -= sent;
     }
+
+    // the buffer was fully sent, let's clean everything
+    // which was related to this
+    response->destructor(response->buffer);
+    response->buffer = NULL;
+    response->reader = NULL;
+    response->length = 0;
 
     return 0;
 }
@@ -135,9 +192,9 @@ redis_bulk_t redis_bulk(void *payload, size_t length) {
 #define resp_discard(client, message) resp_discard_real(client, "-" message "\r\n")
 
 static void resp_discard_real(redis_client_t *client, const char *message) {
-    debug("[-] redis: resp: error: %s\n", message);
+    debug("[-] redis: resp: error: %s", message); // message needs to have CRLF
 
-    if(redis_reply(client, (void *) message, strlen(message)) < 0)
+    if(redis_reply_stack(client, (void *) message, strlen(message)) < 0)
         fprintf(stderr, "[-] send failed for error message\n");
 }
 
@@ -280,7 +337,7 @@ static resp_status_t redis_handle_resp_payload(redis_client_t *client, int fd) {
         argument->filled += available;
 
         buffer_reset(&client->buffer);
-        return redis_chunk(fd);
+        return redis_chunk_read(fd);
     }
 
     // computing the amount of data we need to extract
@@ -317,7 +374,7 @@ static resp_status_t redis_handle_resp_finished(redis_client_t *client) {
 }
 
 // int redis_read_client(int fd) {
-resp_status_t redis_chunk(int fd) {
+resp_status_t redis_chunk_read(int fd) {
     redis_client_t *client = clients.list[fd];
     resp_request_t *request = client->request;
     buffer_t *buffer = &client->buffer;
@@ -381,6 +438,18 @@ resp_status_t redis_chunk(int fd) {
                 return value;
         }
     }
+
+    return 0;
+}
+
+resp_status_t redis_delayed_write(int fd) {
+    redis_client_t *client = clients.list[fd];
+
+    if(!client->response.buffer)
+        return 0;
+
+    debug("[+] redis: write available to socket %d, sending data\n", fd);
+    redis_send_reply(client);
 
     return 0;
 }
