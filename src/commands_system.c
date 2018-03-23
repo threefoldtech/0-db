@@ -37,7 +37,7 @@ int command_time(redis_client_t *client) {
     // [usec]         \r\n  -- second value payload
     sprintf(response, "*2\r\n$%lu\r\n%s\r\n$%lu\r\n%s\r\n", strlen(sec), sec, strlen(usec), usec);
 
-    redis_reply(client, response, strlen(response));
+    redis_reply_stack(client, response, strlen(response));
 
     return 0;
 }
