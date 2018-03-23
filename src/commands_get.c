@@ -80,7 +80,7 @@ int command_get(redis_client_t *client) {
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         printf("[-] invalid key size\n");
-        redis_hardsend(client->fd, "-Invalid key");
+        redis_hardsend(client, "-Invalid key");
         return 1;
     }
 
@@ -93,14 +93,14 @@ int command_get(redis_client_t *client) {
     // key not found at all
     if(!entry) {
         debug("[-] command: get: key not found\n");
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 1;
     }
 
     // key found but deleted
     if(entry->flags & INDEX_ENTRY_DELETED) {
         verbose("[-] command: get: key deleted\n");
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 1;
     }
 
@@ -113,18 +113,18 @@ int command_get(redis_client_t *client) {
 
     if(!payload.buffer) {
         printf("[-] command: get: cannot read payload\n");
-        redis_hardsend(client->fd, "-Internal Error");
+        redis_hardsend(client, "-Internal Error");
         free(payload.buffer);
         return 0;
     }
 
     redis_bulk_t response = redis_bulk(payload.buffer, payload.length);
     if(!response.buffer) {
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 0;
     }
 
-    redis_reply(client->fd, response.buffer, response.length);
+    redis_reply(client, response.buffer, response.length);
 
     free(response.buffer);
     free(payload.buffer);

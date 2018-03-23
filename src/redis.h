@@ -134,5 +134,5 @@
     void socket_client_free(int fd);
 
     // socket generic reply
-    int redis_reply(int fd, void *payload, size_t length);
+    int redis_reply(redis_client_t *client, void *payload, size_t length);
 #endif

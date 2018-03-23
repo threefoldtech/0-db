@@ -38,7 +38,7 @@ static int command_scan_send_array(data_entry_header_t *header, redis_client_t *
     offset += header->idlength;
     offset += sprintf(response + offset, "\r\n");
 
-    redis_reply(client->fd, response, offset);
+    redis_reply(client, response, offset);
 
     return 0;
 }
@@ -56,13 +56,13 @@ int command_scan(redis_client_t *client) {
     // grabbing original entry
     if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
         debug("[-] command: scan: key not found\n");
-        redis_hardsend(client->fd, "-Invalid index");
+        redis_hardsend(client, "-Invalid index");
         return 1;
     }
 
     if(index_entry_is_deleted(entry)) {
         verbose("[-] command: scan: key deleted\n");
-        redis_hardsend(client->fd, "-Invalid index");
+        redis_hardsend(client, "-Invalid index");
         return 1;
     }
 
@@ -74,12 +74,12 @@ int command_scan(redis_client_t *client) {
     }
 
     if(scan.status == DATA_SCAN_UNEXPECTED) {
-        redis_hardsend(client->fd, "-Internal Error");
+        redis_hardsend(client, "-Internal Error");
         return 1;
     }
 
     if(scan.status == DATA_SCAN_NO_MORE_DATA) {
-        redis_hardsend(client->fd, "-No more data");
+        redis_hardsend(client, "-No more data");
         return 1;
     }
 
@@ -99,13 +99,13 @@ int command_rscan(redis_client_t *client) {
     // grabbing original entry
     if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
         debug("[-] command: scan: key not found\n");
-        redis_hardsend(client->fd, "-Invalid index");
+        redis_hardsend(client, "-Invalid index");
         return 1;
     }
 
     if(index_entry_is_deleted(entry)) {
         verbose("[-] command: scan: key deleted\n");
-        redis_hardsend(client->fd, "-Invalid index");
+        redis_hardsend(client, "-Invalid index");
         return 1;
     }
 
@@ -117,12 +117,12 @@ int command_rscan(redis_client_t *client) {
     }
 
     if(scan.status == DATA_SCAN_UNEXPECTED) {
-        redis_hardsend(client->fd, "-Internal Error");
+        redis_hardsend(client, "-Internal Error");
         return 1;
     }
 
     if(scan.status == DATA_SCAN_NO_MORE_DATA) {
-        redis_hardsend(client->fd, "-No more data");
+        redis_hardsend(client, "-No more data");
         return 1;
     }
 

@@ -22,13 +22,13 @@
 // ensure number of argument and their validity
 int command_args_validate(redis_client_t *client, int expected) {
     if(client->request->argc != expected) {
-        redis_hardsend(client->fd, "-Unexpected arguments");
+        redis_hardsend(client, "-Unexpected arguments");
         return 0;
     }
 
     for(int i = 0; i < expected; i++) {
         if(client->request->argv[i]->length == 0) {
-            redis_hardsend(client->fd, "-Invalid argument");
+            redis_hardsend(client, "-Invalid argument");
             return 0;
         }
     }
@@ -38,7 +38,7 @@ int command_args_validate(redis_client_t *client, int expected) {
 
 int command_admin_authorized(redis_client_t *client) {
     if(!client->admin) {
-        redis_hardsend(client->fd, "-Permission denied");
+        redis_hardsend(client, "-Permission denied");
         return 0;
     }
 
@@ -98,7 +98,7 @@ int redis_dispatcher(redis_client_t *client) {
 
     // unknown
     printf("[-] command: unsupported redis command\n");
-    redis_hardsend(client->fd, "-Command not supported");
+    redis_hardsend(client, "-Command not supported");
 
     return 1;
 }

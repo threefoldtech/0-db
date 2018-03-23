@@ -22,7 +22,7 @@ int command_exists(redis_client_t *client) {
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         printf("[-] invalid key size\n");
-        redis_hardsend(client->fd, "-Invalid key");
+        redis_hardsend(client, "-Invalid key");
         return 1;
     }
 
@@ -38,7 +38,7 @@ int command_exists(redis_client_t *client) {
     char response[32];
     sprintf(response, ":%d\r\n", found);
 
-    redis_reply(client->fd, response, strlen(response));
+    redis_reply(client, response, strlen(response));
 
     return 0;
 }
@@ -51,7 +51,7 @@ int command_check(redis_client_t *client) {
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         printf("[-] invalid key size\n");
-        redis_hardsend(client->fd, "-Invalid key");
+        redis_hardsend(client, "-Invalid key");
         return 1;
     }
 
@@ -64,14 +64,14 @@ int command_check(redis_client_t *client) {
     // key not found at all
     if(!entry) {
         debug("[-] command: check: key not found\n");
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 1;
     }
 
     // key found but deleted
     if(entry->flags & INDEX_ENTRY_DELETED) {
         verbose("[-] command: check: key deleted\n");
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 1;
     }
 
@@ -85,7 +85,7 @@ int command_check(redis_client_t *client) {
     char response[32];
     sprintf(response, ":%d\r\n", status);
 
-    redis_reply(client->fd, response, strlen(response));
+    redis_reply(client, response, strlen(response));
 
     return 0;
 }
@@ -98,13 +98,13 @@ int command_del(redis_client_t *client) {
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         printf("[-] command: del: invalid key size\n");
-        redis_hardsend(client->fd, "-Invalid key");
+        redis_hardsend(client, "-Invalid key");
         return 1;
     }
 
     if(!client->writable) {
         debug("[-] command: set: denied, read-only namespace\n");
-        redis_hardsend(client->fd, "-Namespace is in read-only mode");
+        redis_hardsend(client, "-Namespace is in read-only mode");
         return 1;
     }
 
@@ -115,32 +115,32 @@ int command_del(redis_client_t *client) {
     // grabbing original entry
     if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
         debug("[-] command: del: key not found\n");
-        redis_hardsend(client->fd, "-Key not found");
+        redis_hardsend(client, "-Key not found");
         return 1;
     }
 
     // avoid double deletion
     if(index_entry_is_deleted(entry)) {
         debug("[-] command: del: key already deleted\n");
-        redis_hardsend(client->fd, "-Key not found");
+        redis_hardsend(client, "-Key not found");
         return 1;
     }
 
     // add a new entry containing new flag
     if(!index_entry_delete(index, entry)) {
         debug("[-] command: del: index delete flag failed\n");
-        redis_hardsend(client->fd, "-Cannot delete key");
+        redis_hardsend(client, "-Cannot delete key");
         return 0;
     }
 
     // deleting data part
     if(!data_delete(data, entry->offset, entry->dataid)) {
         debug("[-] command: del: deleting data failed\n");
-        redis_hardsend(client->fd, "-Cannot delete key");
+        redis_hardsend(client, "-Cannot delete key");
         return 0;
     }
 
-    redis_hardsend(client->fd, "+OK");
+    redis_hardsend(client, "+OK");
 
     return 0;
 }

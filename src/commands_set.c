@@ -38,7 +38,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client) {
     // if we couldn't write the data, we won't add entry on the index
     // and report to the client an error
     if(offset == 0) {
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 0;
     }
 
@@ -51,7 +51,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client) {
     // inserting this offset with the id on the index
     if(!index_entry_insert(index, id, idlength, offset, request->argv[2]->length)) {
         // cannot insert index (disk issue)
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 0;
     }
 
@@ -62,11 +62,11 @@ static size_t redis_set_handler_userkey(redis_client_t *client) {
     // this is how the sequential-id can returns the id generated
     redis_bulk_t response = redis_bulk(id, idlength);
     if(!response.buffer) {
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 0;
     }
 
-    redis_reply(client->fd, response.buffer, response.length);
+    redis_reply(client, response.buffer, response.length);
     free(response.buffer);
 
     return offset;
@@ -95,7 +95,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client) {
     // if we couldn't write the data, we won't add entry on the index
     // and report to the client an error
     if(offset == 0) {
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 0;
     }
 
@@ -109,7 +109,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client) {
     // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
     if(!index_entry_insert(index, &id, idlength, offset, request->argv[2]->length)) {
         // cannot insert index (disk issue)
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 0;
     }
 
@@ -121,11 +121,11 @@ static size_t redis_set_handler_sequential(redis_client_t *client) {
     // redis_bulk_t response = redis_bulk(id, idlength);
     redis_bulk_t response = redis_bulk(&id, idlength);
     if(!response.buffer) {
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 0;
     }
 
-    redis_reply(client->fd, response.buffer, response.length);
+    redis_reply(client, response.buffer, response.length);
     free(response.buffer);
 
     return offset;
@@ -158,7 +158,7 @@ static size_t redis_set_handler_directkey(redis_client_t *client) {
     // if we couldn't write the data, we won't add entry on the index
     // and report to the client an error
     if(offset == 0) {
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 0;
     }
 
@@ -174,7 +174,7 @@ static size_t redis_set_handler_directkey(redis_client_t *client) {
     // memory, the memory part is skipped but index is still written
     if(!index_entry_insert(index, &id, idlength, offset, request->argv[2]->length)) {
         // cannot insert index (disk issue)
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 0;
     }
 
@@ -185,11 +185,11 @@ static size_t redis_set_handler_directkey(redis_client_t *client) {
     // this is how the direct-id can returns the id generated
     redis_bulk_t response = redis_bulk(&id, idlength);
     if(!response.buffer) {
-        redis_hardsend(client->fd, "$-1");
+        redis_hardsend(client, "$-1");
         return 0;
     }
 
-    redis_reply(client->fd, response.buffer, response.length);
+    redis_reply(client, response.buffer, response.length);
     free(response.buffer);
 
     return offset;
@@ -209,13 +209,13 @@ int command_set(redis_client_t *client) {
         return 1;
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
-        redis_hardsend(client->fd, "-Key too large");
+        redis_hardsend(client, "-Key too large");
         return 1;
     }
 
     if(!client->writable) {
         debug("[-] command: set: denied, read-only namespace\n");
-        redis_hardsend(client->fd, "-Namespace is in read-only mode");
+        redis_hardsend(client, "-Namespace is in read-only mode");
         return 1;
     }
 
@@ -238,7 +238,7 @@ int command_set(redis_client_t *client) {
 
         // check if there is still enough space
         if(index->datasize + request->argv[2]->length > limits) {
-            redis_hardsend(client->fd, "-No space left on this namespace");
+            redis_hardsend(client, "-No space left on this namespace");
             return 1;
         }
     }

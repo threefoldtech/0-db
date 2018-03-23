@@ -14,7 +14,7 @@
 #include "commands.h"
 
 int command_ping(redis_client_t *client) {
-    redis_hardsend(client->fd, "+PONG");
+    redis_hardsend(client, "+PONG");
     return 0;
 }
 
@@ -37,7 +37,7 @@ int command_time(redis_client_t *client) {
     // [usec]         \r\n  -- second value payload
     sprintf(response, "*2\r\n$%lu\r\n%s\r\n$%lu\r\n%s\r\n", strlen(sec), sec, strlen(usec), usec);
 
-    redis_reply(client->fd, response, strlen(response));
+    redis_reply(client, response, strlen(response));
 
     return 0;
 }
@@ -49,12 +49,12 @@ int command_auth(redis_client_t *client) {
         return 1;
 
     if(!rootsettings.adminpwd) {
-        redis_hardsend(client->fd, "-Authentification disabled");
+        redis_hardsend(client, "-Authentification disabled");
         return 0;
     }
 
     if(request->argv[1]->length > 128) {
-        redis_hardsend(client->fd, "-Password too long");
+        redis_hardsend(client, "-Password too long");
         return 1;
     }
 
@@ -63,11 +63,11 @@ int command_auth(redis_client_t *client) {
 
     if(strcmp(password, rootsettings.adminpwd) == 0) {
         client->admin = 1;
-        redis_hardsend(client->fd, "+OK");
+        redis_hardsend(client, "+OK");
         return 0;
     }
 
-    redis_hardsend(client->fd, "-Access denied");
+    redis_hardsend(client, "-Access denied");
     return 1;
 }
 
@@ -79,16 +79,16 @@ int command_auth(redis_client_t *client) {
 // in production, a user should not be able to stop the daemon
 int command_stop(redis_client_t *client) {
     #ifndef RELEASE
-        redis_hardsend(client->fd, "+Stopping");
+        redis_hardsend(client, "+Stopping");
         return RESP_STATUS_SHUTDOWN;
     #else
-        redis_hardsend(client->fd, "-Unauthorized");
+        redis_hardsend(client, "-Unauthorized");
         return 0;
     #endif
 }
 
 int command_info(redis_client_t *client) {
-    redis_hardsend(client->fd, "+0-db server (" REVISION ")\n");
+    redis_hardsend(client, "+0-db server (" REVISION ")\n");
     return 0;
 }
 

@@ -64,14 +64,14 @@ static void buffer_free(buffer_t *buffer) {
 //
 // redis socket response
 //
-int redis_reply(int fd, void *payload, size_t length) {
+int redis_reply(redis_client_t *client, void *payload, size_t length) {
     ssize_t remain = length;
     ssize_t sent;
 
     while(remain > 0) {
         debug("[+] redis: sending reply (%ld bytes remains)\n", remain);
 
-        if((sent = send(fd, payload, remain, 0)) < 0) {
+        if((sent = send(client->fd, payload, remain, 0)) < 0) {
             if(errno != EAGAIN) {
                 perror("[-] redis: reply");
                 return errno;
@@ -131,13 +131,13 @@ redis_bulk_t redis_bulk(void *payload, size_t length) {
     return bulk;
 }
 
-static void resp_discard(int fd, char *message) {
-    char response[512];
+// macro to wrap literal discard error message
+#define resp_discard(client, message) resp_discard_real(client, "-" message "\r\n")
 
-    sprintf(response, "-%s\r\n", message);
+static void resp_discard_real(redis_client_t *client, const char *message) {
     debug("[-] redis: resp: error: %s\n", message);
 
-    if(redis_reply(fd, response, strlen(response)) < 0)
+    if(redis_reply(client, (void *) message, strlen(message)) < 0)
         fprintf(stderr, "[-] send failed for error message\n");
 }
 
@@ -170,7 +170,7 @@ static resp_status_t redis_handle_resp_empty(redis_client_t *client) {
     // since any command are send using array
     if(*buffer->buffer != '*') {
         debug("[-] resp: request is not an array, rejecting\n");
-        resp_discard(client->fd, "Malformed request, array expected");
+        resp_discard(client, "Malformed request, array expected");
         return RESP_STATUS_DISCARD;
     }
 
@@ -179,12 +179,12 @@ static resp_status_t redis_handle_resp_empty(redis_client_t *client) {
     debug("[+] redis: resp: %d arguments\n", request->argc);
 
     if(request->argc == 0) {
-        resp_discard(client->fd, "Missing arguments");
+        resp_discard(client, "Missing arguments");
         return RESP_STATUS_ABNORMAL;
     }
 
     if(request->argc > 16) {
-        resp_discard(client->fd, "Too many arguments");
+        resp_discard(client, "Too many arguments");
         return RESP_STATUS_ABNORMAL;
     }
 
@@ -233,7 +233,7 @@ static resp_status_t redis_handle_resp_header(redis_client_t *client) {
     request->argv[request->fillin]->length = atoi(buffer->reader + 1);
 
     if(argument->length > REDIS_MAX_PAYLOAD) {
-        resp_discard(client->fd, "Payload too big");
+        resp_discard(client, "Payload too big");
         return RESP_STATUS_DISCARD;
     }
 
