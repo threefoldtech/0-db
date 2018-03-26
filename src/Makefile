@@ -11,13 +11,14 @@ ifneq ($(REVISION),)
 	CFLAGS+=-DREVISION=\"$(REVISION)\"
 endif
 
+ifeq ($(STATIC),1)
+	LDFLAGS+=-static
+endif
+
 all: $(EXEC)
 
 release: CFLAGS+=-DRELEASE -O2
 release: clean $(EXEC)
-
-static: LDFLAGS+=-static
-static: clean $(EXEC)
 
 $(EXEC): $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)

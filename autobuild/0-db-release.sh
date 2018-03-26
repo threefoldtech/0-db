@@ -6,10 +6,10 @@ apt-get install -y build-essential
 
 pushd /0-db
 pushd src
-make STATIC=1
+make release STATIC=1
 popd
 make
 popd
 
 mkdir -p /tmp/archives/
-tar -czf "/tmp/archives/0-db.tar.gz" -C /0-db/ bin
+tar -czf "/tmp/archives/0-db-release.tar.gz" -C /0-db/ bin
