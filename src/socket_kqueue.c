@@ -50,27 +50,39 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
 
             EV_SET(&evset, clientfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
             if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1) {
-                warnp("kevent");
+                warnp("kevent: filter read");
+                continue;
+            }
+
+            EV_SET(&evset, clientfd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
+            if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1) {
+                warnp("kevent: filter write");
                 continue;
             }
 
             continue;
         }
 
-        // calling the redis chunk event handler
-        resp_status_t ctrl = redis_chunk(ev->ident);
+        if(ev->filter == EVFILT_READ) {
+            // calling the redis chunk event handler
+            resp_status_t ctrl = redis_chunk_read(ev->ident);
 
-        // client error, we discard it
-        if(ctrl == RESP_STATUS_DISCARD || ctrl == RESP_STATUS_DISCONNECTED) {
-            socket_client_free(ev->ident);
-            continue;
+            // client error, we discard it
+            if(ctrl == RESP_STATUS_DISCARD || ctrl == RESP_STATUS_DISCONNECTED) {
+                socket_client_free(ev->ident);
+                continue;
+            }
+
+            // (dirty) way the STOP event is handled
+            if(ctrl == RESP_STATUS_SHUTDOWN) {
+                printf("[+] stopping daemon\n");
+                close(redis->mainfd);
+                return 1;
+            }
         }
 
-        // (dirty) way the STOP event is handled
-        if(ctrl == RESP_STATUS_SHUTDOWN) {
-            printf("[+] stopping daemon\n");
-            close(redis->mainfd);
-            return 1;
+        if(ev->filter == EVFILT_WRITE) {
+            redis_delayed_write(ev->ident);
         }
     }
 
