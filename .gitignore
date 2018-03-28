@@ -52,6 +52,8 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+bin/zdb*
+
 
 # binary files
 bin/zdb
