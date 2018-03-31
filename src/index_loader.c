@@ -381,6 +381,7 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
     root->status = INDEX_NOT_LOADED | INDEX_HEALTHY;
     root->branches = branches;
     root->namespace = namespace;
+    root->mode = settings->mode;
 
     // since this function will be called for each namespace
     // we will not allocate all the time the reusable variables

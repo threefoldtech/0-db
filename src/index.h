@@ -99,6 +99,7 @@
         int sync;           // flag to force write sync
         int synctime;       // force sync index after this amount of time
         time_t lastsync;    // keep track when the last sync was explictly made
+        db_mode_t mode;     // running mode for that index
 
         void *namespace;    // see index_entry_t, same reason
 

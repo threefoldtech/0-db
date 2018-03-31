@@ -36,7 +36,7 @@
         int dump;         // ask to dump index on the load-time
         int sync;         // force to sync each write
         int synctime;     // force to sync writes after this amount of seconds
-        db_mode_t mode;   // running mode
+        db_mode_t mode;   // default index running mode
         char *adminpwd;   // admin password, if NULL, all users are admin
         char *socket;     // unix socket path
 
