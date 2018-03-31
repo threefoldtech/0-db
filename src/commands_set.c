@@ -23,6 +23,11 @@ static size_t redis_set_handler_userkey(redis_client_t *client) {
     unsigned char *id = request->argv[1]->buffer;
     uint8_t idlength = request->argv[1]->length;
 
+    if(idlength == 0) {
+        redis_hardsend(client, "-Invalid argument, key needed");
+        return 0;
+    }
+
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
 
@@ -77,8 +82,30 @@ static size_t redis_set_handler_sequential(redis_client_t *client) {
     data_root_t *data = client->ns->data;
 
     // create some easier accessor
+    // grab the next id, this may be replaced
+    // by user input if the key exists
     uint32_t id = index_next_id(index);
     uint8_t idlength = sizeof(uint32_t);
+
+    if(request->argv[1]->length) {
+        if(request->argv[1]->length != idlength) {
+            debug("[-] redis: set: trying to insert key with invalid size\n");
+            redis_hardsend(client, "-Invalid key, use empty key for auto-generated key");
+            return 0;
+        }
+
+        index_entry_t *found = NULL;
+
+        // looking for the requested key
+        if(!(found = redis_get_handlers[SEQUENTIAL](client))) {
+            debug("[-] redis: set: trying to insert invalid key\n");
+            redis_hardsend(client, "-Invalid key, only update authorized");
+            return 0;
+        }
+
+        memcpy(&id, found->id, idlength);
+        debug("[+] redis: set: updating existing key: %08x\n", id);
+    }
 
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
@@ -202,7 +229,7 @@ static size_t (*redis_set_handlers[])(redis_client_t *client) = {
 int command_set(redis_client_t *client) {
     resp_request_t *request = client->request;
 
-    if(!command_args_validate(client, 3))
+    if(!command_args_validate_null(client, 3))
         return 1;
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
@@ -225,8 +252,11 @@ int command_set(redis_client_t *client) {
     // and the maxsize of the namespace is reached, we need
     // to know if the replacement data is shorter, this is
     // a valid and legitimate insert request
-    if((entry = redis_get_handlers[rootsettings.mode](client))) {
-        floating = entry->length;
+    if(request->argv[1]->length) {
+        // userkey id is not null
+        if((entry = redis_get_handlers[rootsettings.mode](client))) {
+            floating = entry->length;
+        }
     }
 
     // check if namespace limitation is set

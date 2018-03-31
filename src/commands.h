@@ -12,5 +12,6 @@
     int redis_dispatcher(redis_client_t *client);
 
     int command_args_validate(redis_client_t *client, int expected);
+    int command_args_validate_null(redis_client_t *client, int expected);
     int command_admin_authorized(redis_client_t *client);
 #endif

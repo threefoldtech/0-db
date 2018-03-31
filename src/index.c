@@ -116,7 +116,7 @@ size_t index_jump_next(index_root_t *root) {
 uint64_t index_next_id(index_root_t *root) {
     // this is only used on sequential-id
     // it gives the next id
-    return root->nextentry++;
+    return root->nextentry;
 }
 
 // perform the basic "hashing" (crc based) used to point to the expected branch
@@ -202,6 +202,9 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
     root->entries += 1;
     root->datasize += length;
     root->indexsize += entrysize;
+
+    // update next entry id
+    root->nextentry += 1;
 
     return entry;
 }

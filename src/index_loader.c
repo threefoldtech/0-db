@@ -275,7 +275,6 @@ static size_t index_load_file(index_root_t *root) {
         // this allows us to keep a generic way of inserting data and keeping a
         // single point of logic when adding data (logic for overwrite, resize bucket, ...)
         index_entry_insert_memory(root, entry->id, entry->idlength, entry->offset, entry->length, entry->flags);
-        root->nextentry += 1;
     }
 
     free(entry);

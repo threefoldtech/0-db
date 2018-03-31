@@ -20,12 +20,17 @@
 #include "commands_system.h"
 
 // ensure number of argument and their validity
-int command_args_validate(redis_client_t *client, int expected) {
+static int real_command_args_validate(redis_client_t *client, int expected, int nullallowed) {
     if(client->request->argc != expected) {
         redis_hardsend(client, "-Unexpected arguments");
         return 0;
     }
 
+    // if we accept null (empty) arguments, we are done
+    if(nullallowed)
+        return 1;
+
+    // checking for empty arguments
     for(int i = 0; i < expected; i++) {
         if(client->request->argv[i]->length == 0) {
             redis_hardsend(client, "-Invalid argument");
@@ -34,6 +39,14 @@ int command_args_validate(redis_client_t *client, int expected) {
     }
 
     return 1;
+}
+
+int command_args_validate_null(redis_client_t *client, int expected) {
+    return real_command_args_validate(client, expected, 1);
+}
+
+int command_args_validate(redis_client_t *client, int expected) {
+    return real_command_args_validate(client, expected, 0);
 }
 
 int command_admin_authorized(redis_client_t *client) {
