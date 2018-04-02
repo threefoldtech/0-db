@@ -494,7 +494,7 @@ resp_status_t redis_chunk_read(int fd) {
 resp_status_t redis_delayed_write(int fd) {
     redis_client_t *client = clients.list[fd];
 
-    if(!client->response.buffer)
+    if(!client || !client->response.buffer)
         return 0;
 
     debug("[+] redis: write available to socket %d, sending data\n", fd);
