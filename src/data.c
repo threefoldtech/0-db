@@ -556,6 +556,9 @@ uint16_t data_dataid(data_root_t *root) {
     return root->dataid;
 }
 
+//
+// walk functions
+//
 static inline data_scan_t data_scan_error(data_scan_t original, data_scan_status_t error) {
     // clean any remaning memory
     free(original.header);
@@ -774,6 +777,95 @@ data_scan_t data_next_header(data_root_t *root, uint16_t dataid, size_t offset) 
 
         // trying to get entry
         scan = data_next_header_real(scan);
+
+        // release dataid
+        data_release_dataid(root, dataid, scan.fd);
+
+        if(scan.status == DATA_SCAN_SUCCESS)
+            return scan;
+
+        if(scan.status == DATA_SCAN_UNEXPECTED)
+            return scan;
+
+        // entry was deleted, scan object is updated
+        // we need to retry fetching new data
+        if(scan.status == DATA_SCAN_DELETED)
+            continue;
+
+        if(scan.status == DATA_SCAN_EOF_REACHED) {
+            debug("[-] data: next-header: eof reached\n");
+            dataid += 1;
+        }
+    }
+
+    // never reached
+}
+
+static data_scan_t data_first_header_real(data_scan_t scan) {
+    data_entry_header_t source;
+
+    // jumping to next object
+    lseek(scan.fd, scan.target, SEEK_SET);
+
+    // reading the fixed-length
+    if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
+        warnp("data: first-header: could not read next offset datafile");
+        // this mean the data expected is the first of the next datafile
+        scan.target = sizeof(data_header_t);
+        return data_scan_error(scan, DATA_SCAN_EOF_REACHED);
+    }
+
+    // checking if entry is deleted
+    if(source.flags & DATA_ENTRY_DELETED) {
+        debug("[+] data: first-header: data is deleted, going one further\n");
+
+        // jump to the next entry
+        scan.target += sizeof(data_entry_header_t);
+        scan.target += source.idlength + source.datalength;
+
+        // let's notify source this entry was deleted and we
+        // should retrigger the fetch
+        return data_scan_error(scan, DATA_SCAN_DELETED);
+    }
+
+    if(!(scan.header = (data_entry_header_t *) malloc(sizeof(data_entry_header_t) + source.idlength))) {
+        warnp("data: first-header: malloc");
+        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+    }
+
+    // reading the full header to target
+    *scan.header = source;
+
+    if(read(scan.fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
+        warnp("data: first-header: could not read id from datafile");
+        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+    }
+
+    debug("[+] data: first-header: entry found\n");
+    scan.status = DATA_SCAN_SUCCESS;
+
+    return scan;
+}
+
+
+data_scan_t data_first_header(data_root_t *root) {
+    uint16_t dataid = 0;
+    data_scan_t scan = {
+        .fd = 0,
+        .original = sizeof(data_header_t), // offset of the first key
+        .target = sizeof(data_header_t),   // again offset of the first key
+        .header = NULL,
+        .status = DATA_SCAN_UNEXPECTED,
+    };
+
+    while(1) {
+        // acquire data id fd
+        if((scan.fd = data_grab_dataid(root, dataid)) < 0) {
+            debug("[-] data: next-header: could not open requested file id (%u)\n", dataid);
+            return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
+        }
+
+        scan = data_first_header_real(scan);
 
         // release dataid
         data_release_dataid(root, dataid, scan.fd);
