@@ -36,10 +36,14 @@ This is a default mode, a simple key-value store. User can `SET` their own keys,
 Even in this mode, the key itself is returned by the `SET` command.
 
 ## Sequential
-In this mode, the key is a sequential key autoincremented, whatever the key you provide during the
-`SET` command, the returned key need to be used to fetch the data back. This id is a little-indian integer key.
+In this mode, the key is a sequential key autoincremented.
 
-All the keys are kept in memory.
+You need to provide a null-length key, to generate a new key.
+If you provide a key, this key should exists (a valid generated key), and the `SET` will update that key.
+
+Providing any other key will fails.
+
+The id is a little-indian integer key. All the keys are kept in memory.
 
 ## Direct Key
 This mode works like the sequential mode, except that returned key contains enough information to fetch the
