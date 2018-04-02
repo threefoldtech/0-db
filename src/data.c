@@ -614,7 +614,7 @@ static data_scan_t data_previous_header_real(data_scan_t scan) {
         return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
     }
 
-    // jumping to next object
+    // jumping to previous object
     lseek(scan.fd, scan.target, SEEK_SET);
 
     // reading the fixed-length
@@ -874,7 +874,7 @@ data_scan_t data_first_header(data_root_t *root) {
     while(1) {
         // acquire data id fd
         if((scan.fd = data_grab_dataid(root, dataid)) < 0) {
-            debug("[-] data: next-header: could not open requested file id (%u)\n", dataid);
+            debug("[-] data: first-header: could not open requested file id (%u)\n", dataid);
             return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
         }
 
@@ -902,6 +902,107 @@ data_scan_t data_first_header(data_root_t *root) {
 
     // never reached
 }
+
+static data_scan_t data_last_header_real(data_scan_t scan) {
+    data_entry_header_t source;
+
+    debug("[+] data: last-header: trying previous offset: %lu\n", scan.target);
+
+    // at that point, we know scan.target is set to the expected value
+    if(scan.target == 0) {
+        debug("[+] data: last-header: zero reached, nothing to rollback\n");
+        return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
+    }
+
+    // jumping to previous object
+    lseek(scan.fd, scan.target, SEEK_SET);
+
+    // reading the fixed-length
+    if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
+        warnp("data: previous-header: could not read previous offset datafile");
+        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+    }
+
+    data_entry_header_dump(&source);
+
+    // checking if entry is deleted
+    if(source.flags & DATA_ENTRY_DELETED) {
+        debug("[+] data: last-header: data is deleted, going one further\n");
+
+        // reset target, so next time we come here, we will refetch previous
+        // entry and use the mechanism to check if it's the previous file and
+        // so on
+        scan.target = source.previous;
+
+        // let's notify source this entry was deleted and we
+        // should retrigger the fetch
+        return data_scan_error(scan, DATA_SCAN_DELETED);
+    }
+
+    if(!(scan.header = (data_entry_header_t *) malloc(sizeof(data_entry_header_t) + source.idlength))) {
+        warnp("data: last-header: malloc");
+        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+    }
+
+    // reading the full header to target
+    *scan.header = source;
+
+    if(read(scan.fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
+        warnp("data: last-header: could not read id from datafile");
+        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
+    }
+
+    debug("[+] data: last-header: entry found\n");
+    scan.status = DATA_SCAN_SUCCESS;
+
+    return scan;
+}
+
+
+data_scan_t data_last_header(data_root_t *root) {
+    uint16_t dataid = root->dataid;
+    data_scan_t scan = {
+        .fd = 0,
+        .original = root->previous, // offset of the last key
+        .target = root->previous,   // again offset of the last key
+        .header = NULL,
+        .status = DATA_SCAN_UNEXPECTED,
+    };
+
+    while(1) {
+        // acquire data id fd
+        if((scan.fd = data_grab_dataid(root, dataid)) < 0) {
+            debug("[-] data: last-header: could not open requested file id (%u)\n", dataid);
+            return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
+        }
+
+        // trying to get entry
+        scan = data_last_header_real(scan);
+
+        // release dataid
+        data_release_dataid(root, dataid, scan.fd);
+
+        if(scan.status == DATA_SCAN_SUCCESS)
+            return scan;
+
+        if(scan.status == DATA_SCAN_UNEXPECTED)
+            return scan;
+
+        if(scan.status == DATA_SCAN_NO_MORE_DATA)
+            return scan;
+
+        // entry was deleted, scan object is updated
+        // we need to retry fetching new data
+        if(scan.status == DATA_SCAN_DELETED)
+            continue;
+
+        if(scan.status == DATA_SCAN_REQUEST_PREVIOUS)
+            dataid -= 1;
+    }
+
+    // never reached
+}
+
 
 //
 // data constructor and destructor

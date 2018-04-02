@@ -96,8 +96,10 @@ int command_rscan(redis_client_t *client) {
     index_entry_t *entry = NULL;
     data_scan_t scan;
 
-    if(!command_args_validate(client, 2))
-        return 1;
+    if(client->request->argc == 1) {
+        scan = data_last_header(client->ns->data);
+        goto gotscan;
+    }
 
     // grabbing original entry
     if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
@@ -114,6 +116,7 @@ int command_rscan(redis_client_t *client) {
 
     scan = data_previous_header(client->ns->data, entry->dataid, entry->offset);
 
+gotscan:
     if(scan.status == DATA_SCAN_SUCCESS) {
         command_scan_send_array(scan.header, client);
         free(scan.header);

@@ -101,6 +101,7 @@
     data_scan_t data_previous_header(data_root_t *root, uint16_t dataid, size_t offset);
     data_scan_t data_next_header(data_root_t *root, uint16_t dataid, size_t offset);
     data_scan_t data_first_header(data_root_t *root);
+    data_scan_t data_last_header(data_root_t *root);
 
     int data_entry_is_deleted(data_entry_header_t *entry);
 #endif
