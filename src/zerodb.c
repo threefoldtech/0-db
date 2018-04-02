@@ -119,6 +119,7 @@ static void sighandler(int signal) {
             // which will try to save and flush buffers
 
         case SIGINT:
+        case SIGTERM:
             printf("\n[+] signal: request cleaning\n");
             namespace_emergency();
 
@@ -134,6 +135,7 @@ static int proceed(struct settings_t *settings) {
     verbose("[+] system: setting up environments\n");
     signal_intercept(SIGSEGV, sighandler);
     signal_intercept(SIGINT, sighandler);
+    signal_intercept(SIGTERM, sighandler);
 
     // namespace is the root of the whole index/data system
     // anything related to data is always attached to at least
