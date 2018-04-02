@@ -75,6 +75,7 @@ static command_t commands_handlers[] = {
     {.command = "EXISTS", .handler = command_exists}, // default EXISTS command
     {.command = "CHECK",  .handler = command_check},  // custom command to verify data integrity
     {.command = "SCAN",   .handler = command_scan},   // modified SCAN which walk forward dataset
+    {.command = "SCANX",  .handler = command_scan},   // alias for SCAN command
     {.command = "RSCAN",  .handler = command_rscan},  // custom command to walk backward dataset
 
     // query
