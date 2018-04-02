@@ -231,8 +231,10 @@ static size_t index_load_file(index_root_t *root) {
     if(header.mode != rootsettings.mode) {
         danger("[!] ========================================================");
         danger("[!] DANGER: index created in another mode than running mode");
-        danger("[!] DANGER: unexpected result could occures, be careful");
+        danger("[!] DANGER: stopping here, to ensure no data loss");
         danger("[!] ========================================================");
+
+        exit(EXIT_FAILURE);
     }
 
     printf("[+] index: populating: %s\n", root->indexfile);
