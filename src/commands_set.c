@@ -270,17 +270,20 @@ int command_set(redis_client_t *client) {
         }
     }
 
-    size_t offset = redis_set_handlers[rootsettings.mode](client);
-    if(offset == 0)
-        return 0;
-
-    // checking if we need to jump to the next files
+    // checking if we need to jump to the next files _before_ adding data
     // we do this check here and not from data (event if this is like a
     // datafile event) to keep data and index code completly distinct
-    if(offset + request->argv[2]->length > DATA_MAXSIZE) {
+    //
+    // if we do this after adding data, we could have an empty data file
+    // which will fake the 'previous' offset when computing it on reload
+    if(data_next_offset(client->ns->data) + request->argv[2]->length > DATA_MAXSIZE) {
         size_t newid = index_jump_next(client->ns->index);
         data_jump_next(client->ns->data, newid);
     }
+
+    size_t offset = redis_set_handlers[rootsettings.mode](client);
+    if(offset == 0)
+        return 0;
 
     return 0;
 }
