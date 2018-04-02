@@ -15,6 +15,19 @@
 #include "data.h"
 #include "index.h" // for key max length
 
+// dump a data entry
+static void data_entry_header_dump(data_entry_header_t *entry) {
+#ifdef RELEASE
+    (void) entry;
+#else
+    debug("[+] data: entry dump: id length  : %u\n", entry->idlength);
+    debug("[+] data: entry dump: data length: %u\n", entry->datalength);
+    debug("[+] data: entry dump: previous   : %u\n", entry->previous);
+    debug("[+] data: entry dump: integrity  : %X\n", entry->integrity);
+    debug("[+] data: entry dump: flags      : %u\n", entry->flags);
+#endif
+}
+
 // force to sync data buffer into the underlaying device
 static inline int data_sync(data_root_t *root, int fd) {
     fsync(fd);
