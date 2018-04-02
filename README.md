@@ -49,6 +49,10 @@ The id is a little-indian integer key. All the keys are kept in memory.
 This mode works like the sequential mode, except that returned key contains enough information to fetch the
 data back, without using any index. This mode doesn't use index in memory.
 
+There is no update possible in this mode (since the key itself contains data to the real location
+and we use always append method, we can't update existing data). Providing a key has no effect and
+is ignored.
+
 The key returned by the `SET` command is a binary key.
 
 # Implementation
