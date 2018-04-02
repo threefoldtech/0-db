@@ -571,6 +571,9 @@ static inline data_scan_t data_scan_error(data_scan_t original, data_scan_status
 static data_scan_t data_previous_header_real(data_scan_t scan) {
     data_entry_header_t source;
 
+    // if scan.target is not set yet, we don't know the expected
+    // offset of the previous header, let's read the header
+    // of the current entry and find out which is the next one
     if(scan.target == 0) {
         off_t current = lseek(scan.fd, scan.original, SEEK_SET);
 
@@ -604,6 +607,23 @@ static data_scan_t data_previous_header_real(data_scan_t scan) {
         return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
     }
 
+    // checking if entry is deleted
+    if(source.flags & DATA_ENTRY_DELETED) {
+        debug("[+] data: previous-header: data is deleted, going one further\n");
+
+        // set the 'new' original to this offset
+        scan.original = scan.target;
+
+        // reset target, so next time we come here, we will refetch previous
+        // entry and use the mechanism to check if it's the previous file and
+        // so on
+        scan.target = 0;
+
+        // let's notify source this entry was deleted and we
+        // should retrigger the fetch
+        return data_scan_error(scan, DATA_SCAN_DELETED);
+    }
+
     if(!(scan.header = (data_entry_header_t *) malloc(sizeof(data_entry_header_t) + source.idlength))) {
         warnp("data: previous-header: malloc");
         return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
@@ -626,9 +646,9 @@ static data_scan_t data_previous_header_real(data_scan_t scan) {
 data_scan_t data_previous_header(data_root_t *root, uint16_t dataid, size_t offset) {
     data_scan_t scan = {
         .fd = 0,
-        .original = offset,
-        .target = 0,
-        .header = NULL,
+        .original = offset, // offset of the 'current' key
+        .target = 0,        // offset of the 'previous' key
+        .header = NULL,     // the previous header
         .status = DATA_SCAN_UNEXPECTED,
     };
 
@@ -654,6 +674,11 @@ data_scan_t data_previous_header(data_root_t *root, uint16_t dataid, size_t offs
         if(scan.status == DATA_SCAN_NO_MORE_DATA)
             return scan;
 
+        // entry was deleted, scan object is updated
+        // we need to retry fetching new data
+        if(scan.status == DATA_SCAN_DELETED)
+            continue;
+
         if(scan.status == DATA_SCAN_REQUEST_PREVIOUS)
             dataid -= 1;
     }
@@ -665,6 +690,9 @@ data_scan_t data_previous_header(data_root_t *root, uint16_t dataid, size_t offs
 static data_scan_t data_next_header_real(data_scan_t scan) {
     data_entry_header_t source;
 
+    // if scan.target is not set yet, we don't know the expected
+    // offset of the next header, let's read the header
+    // of the current entry and find out which is the next one
     if(scan.target == 0) {
         lseek(scan.fd, scan.original, SEEK_SET);
 
@@ -691,6 +719,24 @@ static data_scan_t data_next_header_real(data_scan_t scan) {
         return data_scan_error(scan, DATA_SCAN_EOF_REACHED);
     }
 
+    // checking if entry is deleted
+    if(source.flags & DATA_ENTRY_DELETED) {
+        debug("[+] data: next-header: data is deleted, going one further\n");
+
+        // set the 'new' original to this offset
+        scan.original = scan.target;
+
+        // reset target, so next time we come here, we will refetch previous
+        // entry and use the mechanism to check if it's the previous file and
+        // so on
+        scan.target = 0;
+
+        // let's notify source this entry was deleted and we
+        // should retrigger the fetch
+        return data_scan_error(scan, DATA_SCAN_DELETED);
+    }
+
+
     if(!(scan.header = (data_entry_header_t *) malloc(sizeof(data_entry_header_t) + source.idlength))) {
         warnp("data: next-header: malloc");
         return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
@@ -713,9 +759,9 @@ static data_scan_t data_next_header_real(data_scan_t scan) {
 data_scan_t data_next_header(data_root_t *root, uint16_t dataid, size_t offset) {
     data_scan_t scan = {
         .fd = 0,
-        .original = offset,
-        .target = 0,
-        .header = NULL,
+        .original = offset, // offset of the 'current' key
+        .target = 0,        // offset of the expected next header
+        .header = NULL,     // the new header
         .status = DATA_SCAN_UNEXPECTED,
     };
 
@@ -737,6 +783,11 @@ data_scan_t data_next_header(data_root_t *root, uint16_t dataid, size_t offset) 
 
         if(scan.status == DATA_SCAN_UNEXPECTED)
             return scan;
+
+        // entry was deleted, scan object is updated
+        // we need to retry fetching new data
+        if(scan.status == DATA_SCAN_DELETED)
+            continue;
 
         if(scan.status == DATA_SCAN_EOF_REACHED) {
             debug("[-] data: next-header: eof reached\n");

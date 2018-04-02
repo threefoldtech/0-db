@@ -68,6 +68,7 @@
         DATA_SCAN_EOF_REACHED,      // end of datafile reached, last key of next datafile requested
         DATA_SCAN_UNEXPECTED,       // unexpected (memory, ...) error
         DATA_SCAN_NO_MORE_DATA,     // last item requested, nothing more
+        DATA_SCAN_DELETED,          // entry was deleted, scan is updated to go further
 
     } data_scan_status_t;
 
