@@ -202,7 +202,7 @@ static void data_open_final(data_root_t *root) {
     debug("[+] data: reading file, finding last entry\n");
 
     while(read(root->datafd, &header, sizeof(data_entry_header_t)) == sizeof(data_entry_header_t)) {
-        root->previous = lseek(root->datafd, 0, SEEK_CUR) - sizeof(data_header_t);
+        root->previous = lseek(root->datafd, 0, SEEK_CUR) - sizeof(data_entry_header_t);
         lseek(root->datafd, header.datalength + header.idlength, SEEK_CUR);
 
         entries += 1;
