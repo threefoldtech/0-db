@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "usertests.h"
+#include "tests_user.h"
 #include "tests.h"
 
 static char *project = "0-db";
@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
 
     for(unsigned int i = 0; i < tests.length; i++) {
         runtest_t *test = &tests.list[i];
-        printf("[+]   % 2d) %-*s [%p]\n", i + 1, tests.longest + 2, test->name, test->test);
+        printf("[+]   % 3d) %-*s [%p]\n", i + 1, tests.longest + 2, test->name, test->test);
     }
 
     printf("[+] \n");
