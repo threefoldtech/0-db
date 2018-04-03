@@ -54,7 +54,7 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
                 continue;
             }
 
-            EV_SET(&evset, clientfd, EVFILT_WRITE | EV_ONESHOT, EV_ADD, 0, 0, NULL);
+            EV_SET(&evset, clientfd, EVFILT_WRITE, EV_ADD | EV_ONESHOT, 0, 0, NULL);
             if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1) {
                 warnp("kevent: filter write");
                 continue;
