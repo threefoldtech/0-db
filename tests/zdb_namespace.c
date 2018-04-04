@@ -10,24 +10,19 @@
 static char *namespace_created = "test_ns_create";
 static char *namespace_protected = "test_ns_protected";
 static char *namespace_password = "helloworld";
+static char *namespace_password_try1 = "blabla";
+static char *namespace_password_try2 = "hellowo";
+static char *namespace_password_try3 = "helloworldhello";
 
 // select not existing namespace
 runtest_prio(sp, namespace_select_not_existing) {
-    redisReply *reply;
-
-    if(!(reply = redisCommand(test->zdb, "SELECT notfound")))
-        return zdb_result(reply, TEST_FAILED_FATAL);
-
-    if(reply->type != REDIS_REPLY_ERROR)
-        return zdb_result(reply, TEST_FAILED);
-
-    return zdb_result(reply, TEST_SUCCESS);
+    const char *argv[] = {"SELECT", "notfound"};
+    return zdb_command_error(test, argvsz(argv), argv);
 }
 
 // create a new namespace
 runtest_prio(sp, namespace_create) {
-    const char *argv[] = {"NSNEW", namespace_created};
-    return zdb_command(test, argvsz(argv), argv);
+    return zdb_nsnew(test, namespace_created);
 }
 
 // select this new namespace
@@ -67,3 +62,64 @@ runtest_prio(sp, namespace_default_ensure) {
     const char *argv[] = {"GET", "special-key"};
     return zdb_command_error(test, argvsz(argv), argv);
 }
+
+// create a new namespace
+runtest_prio(sp, namespace_create_protected) {
+    return zdb_nsnew(test, namespace_created);
+}
+
+// set password on this namespace
+runtest_prio(sp, namespace_set_password) {
+    const char *argv[] = {"NSSET", namespace_protected, "password", namespace_password};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+// set it as private
+runtest_prio(sp, namespace_set_protected) {
+    const char *argv[] = {"NSSET", namespace_protected, "public", "0"};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+// try to select it with a wrong password
+runtest_prio(sp, namespace_select_protected_pass_try1) {
+    const char *argv[] = {"SELECT", namespace_protected, namespace_password_try1};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// try to select it with a correct prefix-password (see #21)
+runtest_prio(sp, namespace_select_protected_pass_try2) {
+    const char *argv[] = {"SELECT", namespace_protected, namespace_password_try2};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// try to select it with a longer prefix-correct password (see #21)
+runtest_prio(sp, namespace_select_protected_pass_try3) {
+    const char *argv[] = {"SELECT", namespace_protected, namespace_password_try3};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// try to select it without password
+runtest_prio(sp, namespace_select_protected_nopass) {
+    const char *argv[] = {"SELECT", namespace_protected};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// try to select it with the right password
+runtest_prio(sp, namespace_select_protected_correct_pass) {
+    const char *argv[] = {"SELECT", namespace_protected, namespace_password};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+// go back to default, again
+runtest_prio(sp, namespace_switchback_default_2) {
+    const char *argv[] = {"SELECT", "default"};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+// try to switch to the same namespace we currently are
+runtest_prio(sp, namespace_switchback_default_again) {
+    const char *argv[] = {"SELECT", "default"};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+

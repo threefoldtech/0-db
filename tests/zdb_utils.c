@@ -80,3 +80,24 @@ int zdb_check(test_t *test, char *key, char *value) {
 
     return zdb_result(reply, TEST_SUCCESS);
 }
+
+int zdb_nsnew(test_t *test, char *nsname) {
+    redisReply *reply;
+
+    if(!(reply = redisCommand(test->zdb, "NSNEW %s", nsname)))
+        return zdb_result(reply, TEST_FAILED_FATAL);
+
+    if(reply->type == REDIS_REPLY_ERROR) {
+        if(strcmp(reply->str, "This namespace is not available") == 0) {
+            log("namespace seems already exists, not an error\n");
+            return zdb_result(reply, TEST_WARNING);
+        }
+    }
+
+    if(reply->type != REDIS_REPLY_STATUS) {
+        log("%s\n", reply->str);
+        return zdb_result(reply, TEST_FAILED);
+    }
+
+    return zdb_result(reply, TEST_SUCCESS);
+}

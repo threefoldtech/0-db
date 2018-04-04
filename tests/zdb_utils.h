@@ -6,6 +6,7 @@
     int zdb_command_error(test_t *test, int argc, const char *argv[]);
     int zdb_set(test_t *test, char *key, char *value);
     int zdb_check(test_t *test, char *key, char *value);
+    int zdb_nsnew(test_t *test, char *nsname);
 
     #define argvsz(x) (sizeof(x) / sizeof(char *))
 #endif
