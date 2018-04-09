@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include "tests_user.h"
 #include "tests.h"
 #include "zdb_utils.h"
@@ -16,15 +17,38 @@ runtest_prio(101, simple_ping) {
     return zdb_result(reply, TEST_SUCCESS);
 }
 
+runtest_prio(102, ensure_db_empty) {
+    const char *argv[] = {"DBSIZE"};
+    long long value = zdb_command_integer(test, argvsz(argv), argv);
 
-runtest_prio(102, default_set_hello) {
+    if(value > 0) {
+        log("Database not empty !\n");
+        log("Theses tests expect empty database.\n");
+        log("Some unexpected or false-positive issue could occures.\n");
+        log("\n");
+        log("You've been warned.\n");
+        log("(test will go on in 4 secondes)\n");
+        usleep(4000000);
+
+        return TEST_WARNING;
+    }
+
+    return TEST_SUCCESS;
+}
+
+
+runtest_prio(110, default_set_hello) {
     return zdb_set(test, "hello", "world");
 }
 
-runtest_prio(103, default_get_hello) {
+runtest_prio(110, default_get_hello) {
     return zdb_check(test, "hello", "world");
 }
 
+runtest_prio(110, default_del_hello) {
+    const char *argv[] = {"DEL", "hello"};
+    return zdb_command(test, argvsz(argv), argv);
+}
 
 static int overwrite(test_t *test, char *key, char *original, char *newvalue) {
     redisReply *reply;
@@ -54,14 +78,14 @@ static int overwrite(test_t *test, char *key, char *original, char *newvalue) {
 
 }
 
-runtest_prio(104, simple_overwrite_same_length) {
+runtest_prio(115, simple_overwrite_same_length) {
     return overwrite(test, "overwrite_normal", "original", "newvalue");
 }
 
-runtest_prio(104, simple_overwrite_shorter) {
+runtest_prio(115, simple_overwrite_shorter) {
     return overwrite(test, "overwrite_shorter", "original", "new");
 }
 
-runtest_prio(104, simple_overwrite_longer) {
+runtest_prio(115, simple_overwrite_longer) {
     return overwrite(test, "overwrite_longer", "original", "newvaluelonger");
 }
