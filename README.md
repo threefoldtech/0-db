@@ -216,3 +216,15 @@ OK
 "foo"
 
 ```
+
+# Tests
+You can run a sets of test on a running 0-db instance.
+Theses tests (optional) requires `hiredis` library.
+
+To build the tests, type `make` in the `tests` directory.
+
+To run the tests, run `./zdbtests` in the `tests` directory.
+
+Warning: for now, only a local 0-db using `/tmp/zdb.sock` unix socket is supported.
+
+Warning 2: please use an empty database, otherwise tests may fails as false-positive issue.
