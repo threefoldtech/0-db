@@ -10,6 +10,33 @@
 
 static char *namespace_payload = "test_payload";
 
+int payload_execute(test_t *test, size_t length, int (*command)(test_t *, void *, size_t, void *, size_t)) {
+    char key[64];
+    char *payload;
+
+    sprintf(key, "data-%lu", length);
+
+    if(!(payload = malloc(length)))
+        return TEST_FAILED_FATAL;
+
+    memset(payload, 0x42, length);
+
+    int response = command(test, key, strlen(key), payload, length);
+
+    free(payload);
+    return response;
+
+}
+
+int set_fixed_payload(test_t *test, size_t length) {
+    return payload_execute(test, length, zdb_bset);
+}
+
+int get_fixed_payload(test_t *test, size_t length) {
+    return payload_execute(test, length, zdb_bcheck);
+}
+
+
 // create a new namespace
 runtest_prio(sp, payload_init) {
     return zdb_nsnew(test, namespace_payload);
@@ -21,22 +48,6 @@ runtest_prio(sp, payload_select) {
     return zdb_command(test, argvsz(argv), argv);
 }
 
-int set_fixed_payload(test_t *test, size_t length) {
-    char key[64];
-    char *payload;
-
-    sprintf(key, "data-%lu", length);
-
-    if(!(payload = malloc(length)))
-        return TEST_FAILED_FATAL;
-
-    memset(payload, 0x42, length);
-
-    int response = zdb_bset(test, key, strlen(key), payload, length);
-
-    free(payload);
-    return response;
-}
 
 // set different datasize, know payload
 runtest_prio(sp, payload_set_512b) {
@@ -75,6 +86,9 @@ runtest_prio(sp, payload_set_8m) {
     return set_fixed_payload(test, 8 * 1024 * 1024);
 }
 
+/*
+// client is disconnected if payload is too big
+//
 // this test should fail (limit is set to 8 MB)
 runtest_prio(sp, payload_set_10m_fail) {
     int response = set_fixed_payload(test, 10 * 1024 * 1024);
@@ -82,6 +96,45 @@ runtest_prio(sp, payload_set_10m_fail) {
         return TEST_SUCCESS;
 
     return TEST_FAILED;
+}
+*/
+
+
+// read the differents key sets and ensure response
+runtest_prio(sp, payload_get_512b) {
+    return get_fixed_payload(test, 512);
+}
+
+runtest_prio(sp, payload_get_1k) {
+    return get_fixed_payload(test, 1024);
+}
+
+runtest_prio(sp, payload_get_4k) {
+    return get_fixed_payload(test, 4096);
+}
+
+runtest_prio(sp, payload_get_64k) {
+    return get_fixed_payload(test, 64 * 1024);
+}
+
+runtest_prio(sp, payload_get_512k) {
+    return get_fixed_payload(test, 512 * 1024);
+}
+
+runtest_prio(sp, payload_get_1m) {
+    return get_fixed_payload(test, 1024 * 1024);
+}
+
+runtest_prio(sp, payload_get_2m) {
+    return get_fixed_payload(test, 2 * 1024 * 1024);
+}
+
+runtest_prio(sp, payload_get_4m) {
+    return get_fixed_payload(test, 4 * 1024 * 1024);
+}
+
+runtest_prio(sp, payload_get_8m) {
+    return get_fixed_payload(test, 8 * 1024 * 1024);
 }
 
 
