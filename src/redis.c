@@ -289,7 +289,7 @@ static resp_status_t redis_handle_resp_empty(redis_client_t *client) {
         return RESP_STATUS_ABNORMAL;
     }
 
-    if(request->argc > 16) {
+    if(request->argc > 8) {
         resp_discard(client, "Too many arguments");
         return RESP_STATUS_ABNORMAL;
     }
