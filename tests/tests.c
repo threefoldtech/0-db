@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include "tests_user.h"
 #include "tests.h"
 
@@ -78,6 +79,7 @@ void initialize() {
         exit(EXIT_FAILURE);
     }
 
+    signal(SIGPIPE, SIG_IGN);
 }
 
 int main(int argc, char *argv[]) {
