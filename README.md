@@ -101,7 +101,7 @@ to works on disks which contains failure and would be remounted in read-only by 
 
 This mode is not possible if you don't have any data/index already available.
 
-# Supported redis command
+# Supported commands
 - `PING`
 - `SET key value`
 - `GET key`
@@ -118,8 +118,10 @@ This mode is not possible if you don't have any data/index already available.
 - `DBSIZE`
 - `TIME`
 - `AUTH`
+- `SCAN [optional key]`
+- `RSCAN [optional key]`
 
-`SET`, `GET` and `DEL` supports binary keys.
+`SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
 
 > Compared to real redis protocol, during a `SET`, the key is returned as response.
 
@@ -129,6 +131,25 @@ Returns 1 or 0 if the key exists
 ## CHECK
 Check internally if the data is corrupted or not. A CRC check is done internally.
 Returns 1 if integrity is validated, 0 otherwise.
+
+## SCAN
+Walk forward over a dataset (namespace).
+
+- If `SCAN` is called without argument, it returns the first key (first in time) available in the dataset.
+- If `SCAN` is called with an argument, it returns the next key after the argument.
+
+If the dataset is empty, or you reach the end of the chain, `-No more data` is returned.
+
+If you provide a non-existing (or deleted) key as argument, `-Invalid index` is returned.
+
+Otherwise, an array (like redis `SCAN`) is returned. Only the first item is relevant, and it's the next
+key expected.
+
+By calling `SCAN` with each time the key responded on the previous call, you can walk forward a complete
+dataset.
+
+## RSCAN
+Same as scan, but backward (last-to-first key)
 
 ## NSNEW
 Create a new namespace. Only admin can do this.
