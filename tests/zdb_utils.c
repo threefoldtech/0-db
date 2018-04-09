@@ -140,3 +140,44 @@ int zdb_nsnew(test_t *test, char *nsname) {
 
     return zdb_result(reply, TEST_SUCCESS);
 }
+
+redisReply *zdb_response_scan(test_t *test, int argc, const char *argv[]) {
+    redisReply *reply;
+
+    if(!(reply = redisCommandArgv(test->zdb, argc, argv, NULL)))
+        return NULL;
+
+    if(reply->type != REDIS_REPLY_ARRAY) {
+        log("%s\n", reply->str);
+        freeReplyObject(reply);
+        return NULL;
+    }
+
+    if(reply->elements != 2) {
+        log("Unexpected array length: %lu\n", reply->elements);
+        freeReplyObject(reply);
+        return NULL;
+    }
+
+    return reply;
+}
+
+long long zdb_command_integer(test_t *test, int argc, const char *argv[]) {
+    redisReply *reply;
+
+    if(!(reply = redisCommandArgv(test->zdb, argc, argv, NULL)))
+        return zdb_result(reply, TEST_FAILED_FATAL);
+
+    if(reply->type != REDIS_REPLY_INTEGER) {
+        log("Not an integer\n");
+        zdb_result(reply, TEST_FAILED);
+
+        return -1; // could be false positive
+    }
+
+    long long value = reply->integer;
+    zdb_result(reply, TEST_SUCCESS);
+
+    return value;
+}
+
