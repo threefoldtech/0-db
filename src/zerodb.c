@@ -150,8 +150,9 @@ static int proceed(struct settings_t *settings) {
     // and the destruction
     namespace_init(settings);
 
-    // main worker point
-    redis_listen(settings->listen, settings->port, settings->socket);
+    // main worker point (if dump not enabled)
+    if(!settings->dump)
+        redis_listen(settings->listen, settings->port, settings->socket);
 
     // we should not reach this point in production
     // this case is handled when calling explicitly
@@ -173,7 +174,7 @@ void usage() {
     printf("  --port        listen port (default 9900)\n");
     printf("  --socket      unix socket path (override listen and port)\n");
     printf("  --verbose     enable verbose (debug) information\n");
-    printf("  --dump        only dump index contents (debug)\n");
+    printf("  --dump        only dump index contents, then exit (debug)\n");
     printf("  --sync        force all write to be sync'd\n");
     printf("  --background  run in background (daemon), when ready\n");
     printf("  --logfile     log file (only in daemon mode)\n");
