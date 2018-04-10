@@ -211,9 +211,21 @@ runtest_prio(121, basic_suit_select) {
     return zdb_basic_check(test, "SELECT");
 }
 
+runtest_prio(121, basic_suit_auth) {
+    return zdb_basic_check(test, "AUTH");
+}
+
+
 runtest_prio(122, default_auth) {
     const char *argv[] = {"AUTH", "blabla"};
     return zdb_command_error(test, argvsz(argv), argv);
+}
+
+runtest_prio(122, default_auth_maybe_correct) {
+    const char *argv[] = {"AUTH", "root"};
+    zdb_command(test, argvsz(argv), argv);
+
+    return TEST_SUCCESS;
 }
 
 runtest_prio(990, default_stop) {

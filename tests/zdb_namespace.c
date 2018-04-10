@@ -311,6 +311,28 @@ runtest_prio(sp, namespace_nsinfo_suite) {
     return zdb_basic_check(test, "NSINFO");
 }
 
+// nsnew protection
+runtest_prio(sp, namespace_nsnew_suite) {
+    const char *argv[] = {"NSNEW"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, namespace_nsset_few_argument) {
+    const char *argv[] = {"NSSET", "hello"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, namespace_nsset_long_value) {
+    const char lvalue[128] = {0};
+    memset((char *) lvalue, 'x', sizeof(lvalue) - 1);
+
+    const char *argv[] = {"NSSET", namespace_protected, "public", lvalue};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+
+
+
 runtest_prio(sp, namespace_nsinfo_notfound) {
     const char *argv[] = {"NSINFO", "notexistingns"};
     return zdb_command_error(test, argvsz(argv), argv);
@@ -343,7 +365,7 @@ runtest_prio(sp, namespace_nslist) {
         return zdb_result(reply, TEST_FAILED_FATAL);
     }
 
-    if(reply->elements < 2) {
+    if(reply->elements < 1) {
         log("Not enough elements in list: %lu found\n", reply->elements);
         return zdb_result(reply, TEST_FAILED_FATAL);
     }
