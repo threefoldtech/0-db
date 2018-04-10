@@ -73,7 +73,11 @@ runtest_prio(110, default_get_deleted) {
     return zdb_command_error(test, argvsz(argv), argv);
 }
 
-
+// not existing command
+runtest_prio(110, default_unknown_command) {
+    const char *argv[] = {"BIPBIPBIP"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
 
 static int overwrite(test_t *test, char *key, char *original, char *newvalue) {
     redisReply *reply;
@@ -180,7 +184,18 @@ runtest_prio(120, default_check) {
 }
 
 
+// run bunch of basic test on some commands
+runtest_prio(121, basic_suit_check) {
+    return zdb_basic_check(test, "CHECK");
+}
 
+runtest_prio(121, basic_suit_get) {
+    return zdb_basic_check(test, "GET");
+}
+
+runtest_prio(121, basic_suit_del) {
+    return zdb_basic_check(test, "DEL");
+}
 
 
 runtest_prio(990, default_stop) {

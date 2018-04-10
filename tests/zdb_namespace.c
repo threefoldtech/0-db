@@ -231,3 +231,37 @@ runtest_prio(sp, namespace_limit_write_in_shrink) {
     return zdb_set(test, "key5", "67890");
 }
 
+
+// checking list/information
+runtest_prio(sp, namespace_nsinfo) {
+    redisReply *reply;
+
+    if(!(reply = redisCommand(test->zdb, "NSINFO default")))
+        return zdb_result(reply, TEST_FAILED_FATAL);
+
+    if(reply->type != REDIS_REPLY_STRING) {
+        log("%s\n", reply->str);
+        return zdb_result(reply, TEST_FAILED_FATAL);
+    }
+
+    return TEST_SUCCESS;
+}
+
+runtest_prio(sp, namespace_nslist) {
+    redisReply *reply;
+
+    if(!(reply = redisCommand(test->zdb, "NSLIST")))
+        return zdb_result(reply, TEST_FAILED_FATAL);
+
+    if(reply->type != REDIS_REPLY_ARRAY) {
+        log("%s\n", reply->str);
+        return zdb_result(reply, TEST_FAILED_FATAL);
+    }
+
+    if(reply->elements < 2) {
+        log("Not enough elements in list: %lu found\n", reply->elements);
+        return zdb_result(reply, TEST_FAILED_FATAL);
+    }
+
+    return zdb_result(reply, TEST_SUCCESS);
+}
