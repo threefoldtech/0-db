@@ -39,6 +39,8 @@
         db_mode_t mode;   // default index running mode
         char *adminpwd;   // admin password, if NULL, all users are admin
         char *socket;     // unix socket path
+        int background;   // flag to run in background
+        char *logfile;    // where to redirect logs in background mode
 
         // the synctime can be useful to add basic security without killing
         // performance
