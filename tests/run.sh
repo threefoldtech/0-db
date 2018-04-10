@@ -26,9 +26,13 @@ sleep 1
 pkill -INT zdb
 sleep 1
 
+rm -rf /tmp/zdbtest
+
 ./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --admin protect
 ./tests/zdbtests
 sleep 1
+
+rm -rf /tmp/zdbtest
 
 ./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --admin root
 ./tests/zdbtests
