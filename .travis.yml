@@ -18,7 +18,7 @@ before_install:
 language: c
 sudo: false
 script:
-  - make
+  - make COVERAGE=1
   - cd tests
   - make
   - cd ..
