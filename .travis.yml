@@ -7,6 +7,7 @@ matrix:
             - ubuntu-toolchain-r-test
           packages:
             - gcc-7
+            - libhiredis-dev
       env:
         - MATRIX_EVAL="CC=gcc-7"
 
@@ -17,3 +18,4 @@ language: c
 sudo: false
 script:
   - make
+  - cd tests; make
