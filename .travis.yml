@@ -19,7 +19,9 @@ language: c
 sudo: false
 script:
   - make
-  - cd tests; make
+  - cd tests
+  - make
+  - cd ..
   - ./src/zdb -s /tmp/zdb.sock &
   - ./tests/zdbtests
   - pkill zdb
