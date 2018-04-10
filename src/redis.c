@@ -652,7 +652,7 @@ static void daemonize() {
         diep("fork");
 
     if(pid != 0) {
-        success("[+] system: forking to background (pid: %d)\n", pid);
+        success("[+] system: forking to background (pid: %d)", pid);
         exit(EXIT_FAILURE);
     }
 
@@ -667,7 +667,7 @@ static void daemonize() {
         setvbuf(stdout, NULL, _IOLBF, 0);
     }
 
-    verbose("[+] system: working on background now\n");
+    verbose("[+] system: working on background now");
 }
 
 int redis_listen(char *listenaddr, int port, char *socket) {
