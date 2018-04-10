@@ -34,5 +34,5 @@ sleep 1
 
 rm -rf /tmp/zdbtest
 
-./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --admin root
+./src/zdb -v --data /tmp/zdbtest/ --index /tmp/zdbtest/ --admin root --logfile /tmp/zdb.logs
 ./tests/zdbtests

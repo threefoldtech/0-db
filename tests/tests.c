@@ -67,16 +67,31 @@ void testsuite(test_t *maintest) {
 
 static test_t settings;
 
+int initialize_tcp() {
+    char *host = "localhost";
+    int port = 9900;
+
+    settings.zdb = redisConnect(host, port);
+
+    if(!settings.zdb || settings.zdb->err) {
+        const char *error = (settings.zdb->err) ? settings.zdb->errstr : "memory error";
+        log("%s:%d: %s\n", host, port, error);
+        return 1;
+    }
+
+    return 0;
+}
+
 void initialize() {
     char *socket = "/tmp/zdb.sock";
-
     settings.zdb = redisConnectUnix(socket);
 
     if(!settings.zdb || settings.zdb->err) {
         const char *error = (settings.zdb->err) ? settings.zdb->errstr : "memory error";
-
         log("%s: %s\n", socket, error);
-        exit(EXIT_FAILURE);
+
+        if(initialize_tcp())
+            exit(EXIT_FAILURE);
     }
 
     signal(SIGPIPE, SIG_IGN);
