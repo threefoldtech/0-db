@@ -179,3 +179,11 @@ runtest_prio(120, default_check) {
     return TEST_FAILED_FATAL;
 }
 
+
+
+
+
+runtest_prio(990, default_stop) {
+    const char *argv[] = {"STOP"};
+    return zdb_command(test, argvsz(argv), argv);
+}

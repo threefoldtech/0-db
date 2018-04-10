@@ -22,11 +22,7 @@ script:
   - cd tests
   - make
   - cd ..
-  - ./src/zdb --socket /tmp/zdb.sock &
-  - sleep 3
-  - ./tests/zdbtests
-  - pkill zdb
-  - sleep 2
+  - bash tests/run.sh
 
 after_success:
   - cd src
