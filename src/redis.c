@@ -653,7 +653,7 @@ static void daemonize() {
 
     if(pid != 0) {
         success("[+] system: forking to background (pid: %d)", pid);
-        exit(EXIT_FAILURE);
+        exit(EXIT_SUCCESS);
     }
 
     if(rootsettings.logfile) {
