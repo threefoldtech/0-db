@@ -33,6 +33,13 @@ int command_exists(redis_client_t *client) {
     index_entry_t *entry = redis_get_handlers[rootsettings.mode](client);
 
     debug("[+] command: exists: entry found: %s\n", (entry ? "yes" : "no"));
+
+    // key found but deleted
+    if(entry && entry->flags & INDEX_ENTRY_DELETED) {
+        debug("[+] command: exists: entry found but deleted\n");
+        entry = NULL;
+    }
+
     int found = (entry == NULL) ? 0 : 1;
 
     char response[32];
