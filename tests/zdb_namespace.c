@@ -29,6 +29,21 @@ runtest_prio(sp, namespace_create) {
     return zdb_nsnew(test, namespace_created);
 }
 
+// re-create it, this should fails
+runtest_prio(sp, namespace_create_again) {
+    const char *argv[] = {"NSNEW", namespace_created};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// create a namespace with very long name
+runtest_prio(sp, namespace_create_too_long) {
+    const char lkey[512] = {0};
+    memset((char *) lkey, 'x', sizeof(lkey) - 1);
+
+    const char *argv[] = {"NSNEW", lkey};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
 // select this new namespace
 runtest_prio(sp, namespace_select_created) {
     const char *argv[] = {"SELECT", namespace_created};
@@ -114,6 +129,15 @@ runtest_prio(sp, namespace_select_protected_nopass) {
     return zdb_command_error(test, argvsz(argv), argv);
 }
 
+// try with a long password
+runtest_prio(sp, namespace_select_protected_long_pwd) {
+    const char lkey[512] = {0};
+    memset((char *) lkey, 'x', sizeof(lkey) - 1);
+
+    const char *argv[] = {"SELECT", namespace_protected, lkey};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
 // try to select it with the right password
 runtest_prio(sp, namespace_select_protected_correct_pass) {
     const char *argv[] = {"SELECT", namespace_protected, namespace_password};
@@ -161,10 +185,48 @@ runtest_prio(sp, namespace_write_on_protected) {
     return zdb_command_error(test, argvsz(argv), argv);
 }
 
+// still in read-only
 runtest_prio(sp, namespace_del_on_protected) {
     const char *argv[] = {"DEL", "hello"};
     return zdb_command_error(test, argvsz(argv), argv);
 }
+
+// clear password
+runtest_prio(sp, namespace_protected_clear_password) {
+    const char *argv[] = {"NSSET", namespace_protected, "password", "*"};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+// now, we should be able to select it without password
+runtest_prio(sp, namespace_select_protected_cleared) {
+    const char *argv[] = {"SELECT", namespace_protected};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+// change settings on non-existing namespace
+runtest_prio(sp, namespace_nsset_notfound) {
+    const char *argv[] = {"NSSET", "nsnotfound", "public", "0"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// nsset on unknown property
+runtest_prio(sp, namespace_nsset_unknown_property) {
+    const char *argv[] = {"NSSET", namespace_protected, "blabla", "blibli"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// nsset on long namespace
+runtest_prio(sp, namespace_nsset_long_name) {
+    const char lkey[512] = {0};
+    memset((char *) lkey, 'x', sizeof(lkey) - 1);
+
+    const char *argv[] = {"NSSET", lkey, "public", "0"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+
+
+
 
 
 
@@ -241,6 +303,17 @@ runtest_prio(sp, namespace_limit_write_over_shrink) {
 // try to write exact size again
 runtest_prio(sp, namespace_limit_write_in_shrink) {
     return zdb_set(test, "key5", "67890");
+}
+
+
+// run basic test on NSINFO
+runtest_prio(sp, namespace_nsinfo_suite) {
+    return zdb_basic_check(test, "NSINFO");
+}
+
+runtest_prio(sp, namespace_nsinfo_notfound) {
+    const char *argv[] = {"NSINFO", "notexistingns"};
+    return zdb_command_error(test, argvsz(argv), argv);
 }
 
 

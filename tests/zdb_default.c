@@ -146,6 +146,15 @@ runtest_prio(120, default_exists_deleted) {
     return TEST_FAILED_FATAL;
 }
 
+runtest_prio(120, default_exists_large_key) {
+    const char lkey[512] = {0};
+    memset((char *) lkey, 'x', sizeof(lkey) - 1);
+
+    const char *argv[] = {"EXISTS", lkey};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+
 runtest_prio(120, default_exists) {
     const char *argv[] = {"EXISTS", "hello"};
     long long value = zdb_command_integer(test, argvsz(argv), argv);
@@ -155,6 +164,7 @@ runtest_prio(120, default_exists) {
 
     return TEST_FAILED_FATAL;
 }
+
 
 // command: check
 runtest_prio(120, default_check_missing_args) {
@@ -201,7 +211,10 @@ runtest_prio(121, basic_suit_select) {
     return zdb_basic_check(test, "SELECT");
 }
 
-
+runtest_prio(122, default_auth) {
+    const char *argv[] = {"AUTH", "blabla"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
 
 runtest_prio(990, default_stop) {
     const char *argv[] = {"STOP"};

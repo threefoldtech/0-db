@@ -103,4 +103,38 @@ runtest_prio(sp, scan_get_new_last_key) {
     return scan_check(test, argvsz(argv), argv, "key5");
 }
 
+// scan on unknown key
+runtest_prio(sp, scan_non_existing) {
+    const char *argv[] = {"SCAN", "nonexisting"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, rscan_non_existing) {
+    const char *argv[] = {"RSCAN", "nonexisting"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// scan on deleted key
+runtest_prio(sp, scan_deleted_key) {
+    const char *argv[] = {"SCAN", "key1"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, rscan_deleted_key) {
+    const char *argv[] = {"RSCAN", "key1"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// scan from last key
+runtest_prio(sp, scan_ask_after_last) {
+    const char *argv[] = {"SCAN", "key5"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// rscan from first key
+runtest_prio(sp, scan_ask_before_first) {
+    const char *argv[] = {"RSCAN", "key2"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
 
