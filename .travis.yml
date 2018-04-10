@@ -8,6 +8,7 @@ matrix:
           packages:
             - gcc-7
             - libhiredis-dev
+            - pkg-config
       env:
         - MATRIX_EVAL="CC=gcc-7"
 
@@ -19,3 +20,10 @@ sudo: false
 script:
   - make
   - cd tests; make
+  - ./src/zdb -s /tmp/zdb.sock &
+  - ./tests/zdbtests
+  - pkill zdb
+  - gcov src/*.c
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
