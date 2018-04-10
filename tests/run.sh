@@ -1,4 +1,6 @@
 #!/bin/bash
+set -ex
+
 if [ ! -d src ]; then
     echo "Please run this script from root project directory"
     exit 1
@@ -24,9 +26,9 @@ sleep 1
 pkill -INT zdb
 sleep 1
 
-./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --password protect
+./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --admin protect
 ./tests/zdbtests
 sleep 1
 
-./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --password root
+./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --admin root
 ./tests/zdbtests
