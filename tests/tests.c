@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
 
     for(unsigned int i = 0; i < tests.length; i++) {
         runtest_t *test = &tests.list[i];
-        printf("[+]   % 3d) %-*s [%p]\n", i + 1, tests.longest + 2, test->name, test->test);
+        printf("[+]   % 4d) %-*s [%p]\n", i + 1, tests.longest + 2, test->name, test->test);
     }
 
     printf("[+] \n");

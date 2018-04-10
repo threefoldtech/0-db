@@ -120,6 +120,13 @@ runtest_prio(sp, namespace_select_protected_correct_pass) {
     return zdb_command(test, argvsz(argv), argv);
 }
 
+// write on protected, but authentificated
+runtest_prio(sp, namespace_write_protected_authentificated) {
+    return zdb_set(test, "hello", "protected");
+}
+
+
+
 
 
 // go back to default, again
@@ -151,6 +158,11 @@ runtest_prio(sp, namespace_select_public) {
 // we should be in read-only now
 runtest_prio(sp, namespace_write_on_protected) {
     const char *argv[] = {"SET", "should", "fails"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, namespace_del_on_protected) {
+    const char *argv[] = {"DEL", "hello"};
     return zdb_command_error(test, argvsz(argv), argv);
 }
 

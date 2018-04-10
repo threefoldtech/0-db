@@ -217,7 +217,7 @@ int zdb_basic_check(test_t *test, const char *command) {
     const char lkey[512] = {0};
     memset((char *) lkey, 'x', sizeof(lkey) - 1);
 
-    const char *argv5[] = {command, "non-existing", lkey};
+    const char *argv5[] = {command, lkey};
     if(zdb_command_error(test, argvsz(argv5), argv5) != TEST_SUCCESS)
         return TEST_FAILED_FATAL;
 

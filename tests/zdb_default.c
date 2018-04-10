@@ -197,6 +197,11 @@ runtest_prio(121, basic_suit_del) {
     return zdb_basic_check(test, "DEL");
 }
 
+runtest_prio(121, basic_suit_select) {
+    return zdb_basic_check(test, "SELECT");
+}
+
+
 
 runtest_prio(990, default_stop) {
     const char *argv[] = {"STOP"};
