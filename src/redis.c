@@ -645,6 +645,31 @@ static int redis_unix_listen(char *socketpath) {
     return fd;
 }
 
+static void daemonize() {
+    pid_t pid = fork();
+
+    if(pid == -1)
+        diep("fork");
+
+    if(pid != 0) {
+        success("[+] system: forking to background (pid: %d)", pid);
+        exit(EXIT_FAILURE);
+    }
+
+    if(rootsettings.logfile) {
+        if(!(freopen(rootsettings.logfile, "w", stdout)))
+            diep(rootsettings.logfile);
+
+        if(!(freopen(rootsettings.logfile, "w", stderr)))
+            diep(rootsettings.logfile);
+
+        // reset stdout to line-buffered
+        setvbuf(stdout, NULL, _IOLBF, 0);
+    }
+
+    verbose("[+] system: working on background now");
+}
+
 int redis_listen(char *listenaddr, int port, char *socket) {
     redis_handler_t redis;
 
@@ -672,6 +697,9 @@ int redis_listen(char *listenaddr, int port, char *socket) {
     } else {
         success("[+] listening on: %s", socket);
     }
+
+    if(rootsettings.background)
+        daemonize();
 
     // entering the worker loop
     int handler = socket_handler(&redis);

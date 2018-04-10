@@ -29,21 +29,25 @@ settings_t rootsettings = {
     .mode = KEYVALUE,
     .adminpwd = NULL,
     .socket = NULL,
+    .background = 0,
+    .logfile = NULL,
 };
 
 static struct option long_options[] = {
-    {"data",      required_argument, 0, 'd'},
-    {"index",     required_argument, 0, 'i'},
-    {"listen",    required_argument, 0, 'l'},
-    {"port",      required_argument, 0, 'p'},
-    {"socket",    required_argument, 0, 'u'},
-    {"verbose",   no_argument,       0, 'v'},
-    {"sync",      no_argument,       0, 's'},
-    {"synctime",  required_argument, 0, 't'},
-    {"dump",      no_argument,       0, 'x'},
-    {"mode",      required_argument, 0, 'm'},
-    {"admin",     required_argument, 0, 'a'},
-    {"help",      no_argument,       0, 'h'},
+    {"data",       required_argument, 0, 'd'},
+    {"index",      required_argument, 0, 'i'},
+    {"listen",     required_argument, 0, 'l'},
+    {"port",       required_argument, 0, 'p'},
+    {"socket",     required_argument, 0, 'u'},
+    {"verbose",    no_argument,       0, 'v'},
+    {"sync",       no_argument,       0, 's'},
+    {"synctime",   required_argument, 0, 't'},
+    {"dump",       no_argument,       0, 'x'},
+    {"mode",       required_argument, 0, 'm'},
+    {"background", no_argument,       0, 'b'},
+    {"logfile",    required_argument, 0, 'o'},
+    {"admin",      required_argument, 0, 'a'},
+    {"help",       no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
 
@@ -146,8 +150,9 @@ static int proceed(struct settings_t *settings) {
     // and the destruction
     namespace_init(settings);
 
-    // main worker point
-    redis_listen(settings->listen, settings->port, settings->socket);
+    // main worker point (if dump not enabled)
+    if(!settings->dump)
+        redis_listen(settings->listen, settings->port, settings->socket);
 
     // we should not reach this point in production
     // this case is handled when calling explicitly
@@ -163,21 +168,23 @@ static int proceed(struct settings_t *settings) {
 
 void usage() {
     printf("Command line arguments:\n");
-    printf("  --data      datafile directory (default ./data)\n");
-    printf("  --index     indexfiles directory (default ./index)\n");
-    printf("  --listen    listen address (default 0.0.0.0)\n");
-    printf("  --port      listen port (default 9900)\n");
-    printf("  --socket    unix socket path (override listen and port)\n");
-    printf("  --verbose   enable verbose (debug) information\n");
-    printf("  --dump      only dump index contents (debug)\n");
-    printf("  --sync      force all write to be sync'd\n");
-    printf("  --mode      select mode:\n");
-    printf("               > user: default user key-value mode\n");
-    printf("               > seq: sequential keys generated\n");
-    printf("               > direct: direct position by key\n");
-    printf("               > block: fixed blocks length (smaller direct)\n");
-    printf("  --admin     set admin password\n");
-    printf("  --help      print this message\n");
+    printf("  --data        datafile directory (default ./data)\n");
+    printf("  --index       indexfiles directory (default ./index)\n");
+    printf("  --listen      listen address (default 0.0.0.0)\n");
+    printf("  --port        listen port (default 9900)\n");
+    printf("  --socket      unix socket path (override listen and port)\n");
+    printf("  --verbose     enable verbose (debug) information\n");
+    printf("  --dump        only dump index contents, then exit (debug)\n");
+    printf("  --sync        force all write to be sync'd\n");
+    printf("  --background  run in background (daemon), when ready\n");
+    printf("  --logfile     log file (only in daemon mode)\n");
+    printf("  --mode        select mode:\n");
+    printf("                 > user: default user key-value mode\n");
+    printf("                 > seq: sequential keys generated\n");
+    printf("                 > direct: direct position by key\n");
+    printf("                 > block: fixed blocks length (smaller direct)\n");
+    printf("  --admin       set admin password\n");
+    printf("  --help        print this message\n");
 
     exit(EXIT_FAILURE);
 }
@@ -220,6 +227,15 @@ int main(int argc, char *argv[]) {
                 verbose("[+] system: verbose mode enabled\n");
                 break;
 
+            case 'b':
+                settings->background = 1;
+                verbose("[+] system: background fork enabled\n");
+                break;
+
+            case 'o':
+                settings->logfile = optarg;
+                break;
+
             case 'x':
                 settings->dump = 1;
                 break;
@@ -259,7 +275,6 @@ int main(int argc, char *argv[]) {
                 break;
 
             case 'u':
-                printf("socket\n");
                 settings->socket = optarg;
                 break;
 
