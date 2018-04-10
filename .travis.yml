@@ -27,7 +27,6 @@ script:
   - ./tests/zdbtests
   - pkill zdb
   - sleep 2
-  - gcov src/*.c
 
 after_success:
   - cd src
