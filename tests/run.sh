@@ -8,7 +8,7 @@ fi
 
 rm -rf /tmp/zdbtest
 
-./src/zdb --help
+./src/zdb --help || true
 ./src/zdb -v --dump --data /tmp/zdbtest --index /tmp/zdbtest
 ./src/zdb -v --dump --data /tmp/zdbtest/ --index /tmp/zdbtest/
 ./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/
