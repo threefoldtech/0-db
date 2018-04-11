@@ -72,15 +72,15 @@ void testsuite(test_t *maintest) {
 static test_t settings;
 
 int initialize_tcp() {
-    char *host = "localhost";
-    int port = 9900;
+    settings.host = "localhost";
+    settings.port = 9900;
 
-    settings.zdb = redisConnect(host, port);
+    settings.zdb = redisConnect(settings.host, settings.port);
     settings.type = CONNECTION_TYPE_TCP;
 
     if(!settings.zdb || settings.zdb->err) {
         const char *error = (settings.zdb->err) ? settings.zdb->errstr : "memory error";
-        log("%s:%d: %s\n", host, port, error);
+        log("%s:%d: %s\n", settings.host, settings.port, error);
         return 1;
     }
 

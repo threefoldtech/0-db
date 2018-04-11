@@ -9,6 +9,8 @@
     typedef struct test_t {
         redisContext *zdb;
         int type;
+        char *host;
+        int port;
 
     } test_t;
 

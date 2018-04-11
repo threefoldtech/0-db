@@ -21,6 +21,7 @@ int lowlevel_send_invalid(test_t *test, char *buffer, size_t buflen) {
 
     if(buffer[0] == '-') {
         // connection was closed, reopen it
+        // redisReconnect(test->zdb);
         initialize_tcp();
         return TEST_SUCCESS;
     }
@@ -110,7 +111,7 @@ runtest_prio(sp, lowlevel_open_many_connection) {
         return TEST_SKIPPED;
 
     for(unsigned int i = 0; i < MAX_CONNECTIONS; i++) {
-        ctx[i] = redisConnect(test->zdb->tcp.host, test->zdb->tcp.port);
+        ctx[i] = redisConnect(test->host, test->port);
         if(!ctx[i] || ctx[i]->err) {
             response = TEST_FAILED;
             break;
