@@ -126,4 +126,3 @@ runtest_prio(sp, lowlevel_open_many_connection) {
     return response;
 }
 
-
