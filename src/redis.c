@@ -250,7 +250,7 @@ static void resp_discard_real(redis_client_t *client, const char *message) {
 static void redis_free_request(resp_request_t *request) {
     for(int i = 0; i < request->argc; i++) {
         // prematured end and argv was not yet allocated
-        if(!request->argv[i])
+        if(!request->argv || !request->argv[i])
             continue;
 
         free(request->argv[i]->buffer);
