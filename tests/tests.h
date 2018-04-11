@@ -27,6 +27,7 @@
     #define TEST_FAILED_FATAL  (-1)
     #define TEST_FAILED        (-2)
     #define TEST_WARNING       (-3)
+    #define TEST_SKIPPED       (-4)
 
     // test logger
     #define log(...)  { printf("[ ]    " __VA_ARGS__); }
@@ -81,10 +82,15 @@
     #define COLOR_YELLOW "\033[33;1m"
     #define COLOR_GREEN  "\033[32;1m"
     #define COLOR_CYAN   "\033[36;1m"
+    #define COLOR_GREY   "\033[30;1m"
     #define COLOR_RESET  "\033[0m"
 
     #define RED(x)    COLOR_RED x COLOR_RESET
     #define YELLOW(x) COLOR_YELLOW x COLOR_RESET
     #define GREEN(x)  COLOR_GREEN x COLOR_RESET
     #define CYAN(x)   COLOR_CYAN x COLOR_RESET
+    #define GREY(x)   COLOR_GREY x COLOR_RESET
+
+    void initialize();
+    int initialize_tcp();
 #endif

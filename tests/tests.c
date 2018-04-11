@@ -60,6 +60,10 @@ void testsuite(test_t *maintest) {
                 printf("[-] >> " CYAN("%s") ": " YELLOW("warning") "\n", test->name);
                 tests.warning += 1;
                 break;
+
+            case TEST_SKIPPED:
+                printf("[-] >> " CYAN("%s") ": " GREY("skipped") "\n", test->name);
+                break;
         }
     }
 
@@ -72,6 +76,7 @@ int initialize_tcp() {
     int port = 9900;
 
     settings.zdb = redisConnect(host, port);
+    settings.type = CONNECTION_TYPE_TCP;
 
     if(!settings.zdb || settings.zdb->err) {
         const char *error = (settings.zdb->err) ? settings.zdb->errstr : "memory error";
@@ -84,7 +89,9 @@ int initialize_tcp() {
 
 void initialize() {
     char *socket = "/tmp/zdb.sock";
+
     settings.zdb = redisConnectUnix(socket);
+    settings.type = CONNECTION_TYPE_UNIX;
 
     if(!settings.zdb || settings.zdb->err) {
         const char *error = (settings.zdb->err) ? settings.zdb->errstr : "memory error";
