@@ -9,6 +9,8 @@ fi
 rm -rf /tmp/zdbtest
 
 ./src/zdb --help || true
+./src/zdb --blabla || true
+
 ./src/zdb -v --dump --data /tmp/zdbtest --index /tmp/zdbtest
 ./src/zdb -v --dump --data /tmp/zdbtest/ --index /tmp/zdbtest/
 ./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/
@@ -28,11 +30,21 @@ sleep 1
 
 rm -rf /tmp/zdbtest
 
-./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --admin protect
+./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ \
+    --admin protect \
+    --synctime 10 \
+    --mode user
+
 ./tests/zdbtests
 sleep 1
 
 rm -rf /tmp/zdbtest
 
-./src/zdb --background -v --data /tmp/zdbtest/ --index /tmp/zdbtest/ --admin root --logfile /tmp/zdb.logs
+./src/zdb --background -v --data /tmp/zdbtest/ --index /tmp/zdbtest/ --admin root \
+  --logfile /tmp/zdb.logs \
+  --listen 127.0.0.1 --port 9900 \
+  --sync
+
 ./tests/zdbtests
+
+./src/zdb -v --data /tmp/zdbtest/ --index /tmp/zdbtest/ --dump --mode seq || true
