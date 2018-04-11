@@ -69,3 +69,9 @@ rm -rf /tmp/zdbtest-index
 
 # create empty dataset in direct mode
 ./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --mode direct
+rm -rf /tmp/zdbtest
+
+./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --mode nonexist || true
+rm -rf /tmp/zdbtest
+
+./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --mode block
