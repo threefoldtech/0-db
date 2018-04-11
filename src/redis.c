@@ -296,6 +296,7 @@ static resp_status_t redis_handle_resp_empty(redis_client_t *client) {
 
     if(!(request->argv = (resp_object_t **) calloc(sizeof(resp_type_t *), request->argc))) {
         warnp("request argv malloc");
+        resp_discard(client, "Internal memory error");
         return RESP_STATUS_DISCARD;
     }
 
@@ -325,11 +326,13 @@ static resp_status_t redis_handle_resp_header(redis_client_t *client) {
     // checking if it's a string request
     if(*buffer->reader != '$') {
         debug("[-] resp: request is not a string, rejecting\n");
+        resp_discard(client, "Malformed query string");
         return RESP_STATUS_ABNORMAL;
     }
 
     if(!(request->argv[request->fillin] = calloc(sizeof(resp_object_t), 1))) {
         warnp("request argc calloc");
+        resp_discard(client, "Internal memory error");
         return RESP_STATUS_DISCARD;
     }
 
@@ -345,6 +348,7 @@ static resp_status_t redis_handle_resp_header(redis_client_t *client) {
 
     if(!(argument->buffer = (unsigned char *) malloc(argument->length))) {
         warnp("argument buffer malloc");
+        resp_discard(client, "Internal memory error");
         return RESP_STATUS_DISCARD;
     }
 
