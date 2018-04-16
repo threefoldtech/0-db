@@ -5,6 +5,11 @@
         #define REVISION "(unknown)"
     #endif
 
+    #define ZDB_DEFAULT_DATAPATH    "./zdb-data"
+    #define ZDB_DEFAULT_INDEXPATH   "./zdb-index"
+    #define ZDB_DEFAULT_LISTENADDR  "0.0.0.0"
+    #define ZDB_DEFAULT_PORT        9900
+
     typedef enum db_mode_t {
         // default key-value store
         KEYVALUE = 0,

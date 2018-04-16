@@ -18,10 +18,10 @@
 // global system settings
 //
 settings_t rootsettings = {
-    .datapath = "./zdb-data",
-    .indexpath = "./zdb-index",
-    .listen = "0.0.0.0",
-    .port = 9900,
+    .datapath = ZDB_DEFAULT_DATAPATH,
+    .indexpath = ZDB_DEFAULT_INDEXPATH,
+    .listen = ZDB_DEFAULT_LISTENADDR,
+    .port = ZDB_DEFAULT_PORT,
     .verbose = 0,
     .dump = 0,
     .sync = 0,
@@ -168,10 +168,10 @@ static int proceed(struct settings_t *settings) {
 
 void usage() {
     printf("Command line arguments:\n");
-    printf("  --data        datafile directory (default ./data)\n");
-    printf("  --index       indexfiles directory (default ./index)\n");
-    printf("  --listen      listen address (default 0.0.0.0)\n");
-    printf("  --port        listen port (default 9900)\n");
+    printf("  --data        datafile directory (default " ZDB_DEFAULT_DATAPATH ")\n");
+    printf("  --index       indexfiles directory (default " ZDB_DEFAULT_INDEXPATH ")\n");
+    printf("  --listen      listen address (default " ZDB_DEFAULT_LISTENADDR ")\n");
+    printf("  --port        listen port (default %d)\n", ZDB_DEFAULT_PORT);
     printf("  --socket      unix socket path (override listen and port)\n");
     printf("  --verbose     enable verbose (debug) information\n");
     printf("  --dump        only dump index contents, then exit (debug)\n");
