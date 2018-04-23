@@ -30,6 +30,9 @@ On the runtime, you can choose between multiple mode:
 * `seq`: sequential mode
 * `direct`: direct-position key mode
 
+**Warning**: in any case, please ensure data and index directories used by 0-db are empty, or
+contains only valid database namespaces directories.
+
 ## User Key
 This is a default mode, a simple key-value store. User can `SET` their own keys, like any key-value store.
 
@@ -110,14 +113,14 @@ This mode is not possible if you don't have any data/index already available.
 - `EXISTS key`
 - `CHECK key`
 - `INFO`
-- `NSNEW`
-- `NSINFO`
+- `NSNEW namespace`
+- `NSINFO namespace`
 - `NSLIST`
-- `NSSET`
-- `SELECT`
+- `NSSET namespace property value`
+- `SELECT namespace`
 - `DBSIZE`
 - `TIME`
-- `AUTH`
+- `AUTH password`
 - `SCAN [optional key]`
 - `RSCAN [optional key]`
 
