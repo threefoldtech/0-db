@@ -15,4 +15,5 @@
     index_branch_t *index_branch_get(index_root_t *root, uint32_t branchid);
     index_branch_t *index_branch_get_allocate(index_root_t *root, uint32_t branchid);
     index_entry_t *index_branch_append(index_root_t *root, uint32_t branchid, index_entry_t *entry);
+    index_entry_t *index_branch_remove(index_branch_t *branch, index_entry_t *entry, index_entry_t *previous);
 #endif

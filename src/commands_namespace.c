@@ -35,7 +35,7 @@ int command_nsnew(redis_client_t *client) {
 
     // deny already existing namespace
     if(namespace_get(target)) {
-        debug("[-] command: mkns: namespace already exists\n");
+        debug("[-] command: nsnew: namespace already exists\n");
         redis_hardsend(client, "-This namespace is not available");
         return 1;
     }
@@ -51,6 +51,58 @@ int command_nsnew(redis_client_t *client) {
 
     return 0;
 }
+
+// delete a namespace (delete files and free memory)
+//   NSDEL [namespace]
+int command_nsdel(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    namespace_t *namespace;
+    char target[COMMAND_MAXLEN];
+
+    if(!command_admin_authorized(client))
+        return 1;
+
+    if(!command_args_validate(client, 2))
+        return 1;
+
+    if(request->argv[1]->length > 128) {
+        redis_hardsend(client, "-Namespace too long");
+        return 1;
+    }
+
+    // get string formatted namespace
+    sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
+
+    if(strcmp(target, NAMESPACE_DEFAULT) == 0) {
+        debug("[-] command: nsdel: trying to remove default namespace\n");
+        redis_hardsend(client, "-Cannot remove default namespace");
+        return 1;
+    }
+
+    // deny not existing namespace
+    if(!(namespace = namespace_get(target))) {
+        debug("[-] command: nsdel: namespace not found\n");
+        redis_hardsend(client, "-This namespace doesn't exists");
+        return 1;
+    }
+
+    if(client->ns == namespace) {
+        debug("[-] command: nsdel: trying to remove currently used namespace\n");
+        redis_hardsend(client, "-Cannot remove namespace you're currently using.");
+        return 1;
+    }
+
+    // creating the new namespace
+    if(namespace_delete(namespace)) {
+        redis_hardsend(client, "-Could not delete this namespace");
+        return 1;
+    }
+
+    redis_hardsend(client, "+OK");
+
+    return 0;
+}
+
 
 // change user active namespace
 //   SELECT [namespace]
@@ -140,18 +192,16 @@ int command_select(redis_client_t *client) {
 //   NSLIST (no arguments)
 int command_nslist(redis_client_t *client) {
     char line[512];
-    ns_root_t *nsroot = namespace_get_list();
+    namespace_t *ns = NULL;
 
     // streaming list to the client
-    sprintf(line, "*%lu\r\n", nsroot->length);
+    sprintf(line, "*%lu\r\n", namespace_length());
     redis_reply_stack(client, line, strlen(line));
 
-    debug("[+] command: nslist: sending %lu items\n", nsroot->length);
+    debug("[+] command: nslist: sending %lu items\n", namespace_length());
 
-    // sending each namespace line by line
-    for(size_t i = 0; i < nsroot->length; i++) {
-        namespace_t *ns = nsroot->namespaces[i];
-
+    // sending each namespace line by line**
+    for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
         sprintf(line, "$%ld\r\n%s\r\n", strlen(ns->name), ns->name);
         redis_reply_stack(client, line, strlen(line));
     }

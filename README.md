@@ -114,6 +114,7 @@ This mode is not possible if you don't have any data/index already available.
 - `CHECK key`
 - `INFO`
 - `NSNEW namespace`
+- `NSDEL namespace`
 - `NSINFO namespace`
 - `NSLIST`
 - `NSSET namespace property value`
@@ -158,6 +159,13 @@ Same as scan, but backward (last-to-first key)
 Create a new namespace. Only admin can do this.
 
 By default, a namespace is not password protected, is public and not size limited.
+
+## NSDEL
+Delete a namespace. Only admin can do this.
+
+Warning:
+- You can't remove the namespace you're currently using.
+- Any other clients using this namespace will be moved to a special state, awaiting to be disconnected.
 
 ## NSINFO
 Returns basic informations about a namespace

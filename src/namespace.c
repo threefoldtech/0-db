@@ -16,6 +16,7 @@
 #include "data.h"
 #include "namespace.h"
 #include "filesystem.h"
+#include "redis.h"
 
 // we keep a list of namespace currently used
 // each namespace used will keep file descriptor opened
@@ -25,43 +26,49 @@
 // if this namespace is already used by someone else, we gives
 // the same object back, like this they will all share the same
 // state
-//
-// as soon as nobody use anymore one namespace, we free it
-// from memory and close descriptors, waiting the the next one
 static ns_root_t *nsroot = NULL;
 
 //
 // public namespace endpoint
 //
-int namespace_delete(unsigned char *name) {
-    (void) name;
 
-    return 0;
+// iterate over available namespaces
+size_t namespace_length() {
+    return nsroot->effective;
 }
 
-// be careful with this.
-ns_root_t *namespace_get_list() {
-    return nsroot;
-}
-
-namespace_t *namespace_get_default() {
+namespace_t *namespace_iter() {
     return nsroot->namespaces[0];
 }
 
-namespace_t *namespace_get(char *name) {
-    for(size_t i = 0; i < nsroot->length; i++) {
-        if(strcmp(nsroot->namespaces[i]->name, name) == 0)
+namespace_t *namespace_iter_next(namespace_t *namespace) {
+    for(size_t i = namespace->idlist + 1; i < nsroot->length; i++) {
+        // skipping empty slot
+        if(nsroot->namespaces[i])
             return nsroot->namespaces[i];
     }
 
     return NULL;
 }
 
-int namespace_set(unsigned char *name, int settings) {
-    (void) name;
-    (void) settings;
+// getters
+//
+// get the default namespace
+// there is always at least one namespace (the default one)
+namespace_t *namespace_get_default() {
+    return nsroot->namespaces[0];
+}
 
-    return 0;
+// get a namespace from it's name
+namespace_t *namespace_get(char *name) {
+    namespace_t *ns;
+
+    for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
+        if(strcmp(ns->name, name) == 0)
+            return ns;
+    }
+
+    return NULL;
 }
 
 void namespace_descriptor_update(namespace_t *namespace, int fd) {
@@ -200,6 +207,7 @@ static namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
     namespace->datapath = namespace_path(nsroot->settings->datapath, name);
     namespace->public = 1;  // by default, namespace are public (no password)
     namespace->maxsize = 0; // by default, there is no limits
+    namespace->idlist = 0;  // by default, no list set
 
     if(!namespace_ensure(namespace))
         return NULL;
@@ -221,12 +229,37 @@ static namespace_t *namespace_push(ns_root_t *root, namespace_t *namespace) {
     size_t newlength = root->length + 1;
     namespace_t **newlist = NULL;
 
+    // looking for an empty namespace slot
+    for(size_t i = 0; i < root->length; i++) {
+        if(root->namespaces[i])
+            continue;
+
+        debug("[+] namespace: empty slot reusable found: %lu\n", i);
+
+        // empty slot found, updating
+        namespace->idlist = i;
+        root->namespaces[i] = namespace;
+        root->effective += 1;
+
+        return namespace;
+    }
+
+    debug("[+] namespace: allocating new slot\n");
+
+    // no empty slot, allocating a new one
     if(!(newlist = realloc(root->namespaces, sizeof(namespace_t) * newlength)))
         return warnp("realloc namespaces list");
 
+    // set list id
+    namespace->idlist = root->length;
+
+    // insert to list
     root->namespaces = newlist;
     root->namespaces[root->length] = namespace;
     root->length = newlength;
+
+    // one new effective namespace
+    root->effective += 1;
 
     return namespace;
 }
@@ -256,6 +289,8 @@ int namespace_create(char *name) {
 static int namespace_valid_name(char *name) {
     if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
         return 0;
+
+    // FIXME: better support (slash, coma, ...)
 
     if(strcmp(name, NAMESPACE_DEFAULT) == 0)
         return 0;
@@ -325,6 +360,7 @@ int namespace_init(settings_t *settings) {
         diep("namespaces malloc");
 
     nsroot->length = 1;             // we start with the default one, only
+    nsroot->effective = 1;          // no namespace really loaded yet
     nsroot->settings = settings;    // keep reference to the settings, needed for paths
     nsroot->branches = NULL;        // maybe we don't need the branches, see below
 
@@ -377,11 +413,21 @@ int namespace_destroy() {
 
     // freeing each namespace's index and data buffers
     debug("[+] namespaces: cleaning index and data\n");
-    for(size_t i = 0; i < nsroot->length; i++) {
-        index_destroy(nsroot->namespaces[i]->index);
-        data_destroy(nsroot->namespaces[i]->data);
-        namespace_free(nsroot->namespaces[i]);
+
+    namespace_t *ns;
+    for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
+        index_destroy(ns->index);
+        data_destroy(ns->data);
     }
+
+    // freeing all slots
+    for(size_t i = 0; i < nsroot->length; i++) {
+        if(nsroot->namespaces[i])
+            namespace_free(nsroot->namespaces[i]);
+    }
+
+    // clean globally allocated index stuff
+    index_destroy_global();
 
     // freeing internal namespaces support
     free(nsroot->namespaces);
@@ -392,15 +438,63 @@ int namespace_destroy() {
     return 0;
 }
 
-int namespace_emergency() {
+static void namespace_kick_slot(namespace_t *namespace) {
     for(size_t i = 0; i < nsroot->length; i++) {
-        printf("[+] namespaces: flushing index [%s]\n", nsroot->namespaces[i]->name);
+        if(nsroot->namespaces[i] == namespace) {
+            // freeing this namespace slot
+            nsroot->namespaces[i] = NULL;
+            return;
+        }
+    }
+}
 
-        if(index_emergency(nsroot->namespaces[i]->index)) {
-            printf("[+] namespaces: flushing data [%s]\n", nsroot->namespaces[i]->name);
+//
+// delete (clean and remove files) a namespace
+//
+// note: this function assume namespace exists, you should
+// call this by checking before if everything was okay to delete it.
+int namespace_delete(namespace_t *namespace) {
+    debug("[+] namespace: removing: %s\n", namespace->name);
+
+    // detach all clients attached to this namespace
+    redis_detach_clients(namespace);
+
+    // unallocating keys attached to this namespace
+    index_clean_namespace(namespace->index, namespace);
+
+    // cleaning and closing namespace links
+    index_destroy(namespace->index);
+    data_destroy(namespace->data);
+
+    // removing namespace slot
+    namespace_kick_slot(namespace);
+
+    // removing files
+    debug("[+] namespace: removing: %s\n", namespace->indexpath);
+    dir_remove(namespace->indexpath);
+
+    debug("[+] namespace: removing: %s\n", namespace->datapath);
+    dir_remove(namespace->datapath);
+
+    // unallocating this namespace
+    namespace_free(namespace);
+    nsroot->effective -= 1;
+
+    return 0;
+}
+
+
+int namespace_emergency() {
+    namespace_t *ns;
+
+    for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
+        printf("[+] namespaces: flushing index [%s]\n", ns->name);
+
+        if(index_emergency(ns->index)) {
+            printf("[+] namespaces: flushing data [%s]\n", ns->name);
             // only flusing data if index flush was accepted
             // if index flush returns 0, we are probably in an initializing stage
-            data_emergency(nsroot->namespaces[i]->data);
+            data_emergency(ns->data);
         }
     }
 

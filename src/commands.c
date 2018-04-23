@@ -85,6 +85,7 @@ static command_t commands_handlers[] = {
     // namespace
     {.command = "DBSIZE", .handler = command_dbsize},  // default DBSIZE command
     {.command = "NSNEW",  .handler = command_nsnew},   // custom command to create a namespace
+    {.command = "NSDEL",  .handler = command_nsdel},   // custom command to remove a namespace
     {.command = "NSLIST", .handler = command_nslist},  // custom command to list namespaces
     {.command = "NSSET",  .handler = command_nsset},   // custom command to edit namespace settings
     {.command = "NSINFO", .handler = command_nsinfo},  // custom command to get namespace information
@@ -94,6 +95,18 @@ static command_t commands_handlers[] = {
 int redis_dispatcher(redis_client_t *client) {
     resp_request_t *request = client->request;
     resp_object_t *key = request->argv[0];
+
+    // client have no running namespace
+    // this will happens when namespace is removed
+    // and a client was still attached to this namespace
+    //
+    // in that special case, we notify this client it's namespace
+    // is not available anymore and we disconnect it
+    if(client->ns == NULL) {
+        debug("[-] command: request fd: %d, no namespace, disconnecting.\n", client->fd);
+        redis_hardsend(client, "-Your active namespace is not available anymore (probably removed).");
+        return RESP_STATUS_DISCARD;
+    }
 
     debug("[+] command: request fd: %d, namespace: %s\n", client->fd, client->ns->name);
     client->commands += 1;
@@ -110,7 +123,7 @@ int redis_dispatcher(redis_client_t *client) {
             return commands_handlers[i].handler(client);
     }
 
-    // unknown
+    // unknown command
     printf("[-] command: unsupported redis command\n");
     redis_hardsend(client, "-Command not supported");
 

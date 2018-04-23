@@ -133,6 +133,8 @@
     index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry);
     int index_entry_is_deleted(index_entry_t *entry);
 
+    int index_clean_namespace(index_root_t *root, void *namespace);
+
     extern index_entry_t *index_reusable_entry;
 
     // extern but not really public functions

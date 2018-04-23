@@ -150,6 +150,7 @@
     // managing clients
     redis_client_t *socket_client_new(int fd);
     void socket_client_free(int fd);
+    int redis_detach_clients(namespace_t *namespace);
 
     // socket generic reply
     int redis_reply(redis_client_t *client, void *payload, size_t length, void (*destructor)(void *target));

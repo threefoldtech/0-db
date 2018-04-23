@@ -405,7 +405,9 @@ void index_destroy(index_root_t *root) {
     // delete root object
     free(root->indexfile);
     free(root);
+}
 
+void index_destroy_global() {
     // this function could be called multiple time for any index
     // and then index_transition could be free'd multiple time
     // we set it as NULL to ensure next call will not fails
