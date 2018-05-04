@@ -332,7 +332,7 @@ static void index_load(index_root_t *root) {
     index_open_final(root);
 }
 
-static void index_allocate_single(settings_t *settings) {
+static void index_allocate_single() {
     // if variables are already allocated
     // this process is silently skipped
 
@@ -348,22 +348,22 @@ static void index_allocate_single(settings_t *settings) {
     if(!(index_transition = malloc(sizeof(index_item_t) + MAX_KEY_LENGTH + 1)))
         diep("malloc");
 
-    if(settings->mode == DIRECTKEY) {
-        // avoid already allocated buffer
-        if(index_reusable_entry)
-            return;
+    // avoid already allocated buffer
+    if(index_reusable_entry)
+        return;
 
-        // in direct key mode, more over, we allocate a re-usable
-        // index_entry_t which will be adapted each time
-        // using the requested key, like this we can use the same
-        // implementation for everything
-        //
-        // in the default mode, the key is always kept in memory
-        // and never free'd, that's why we will allocate a one-time
-        // object now and reuse the same all the time
-        if(!(index_reusable_entry = (index_entry_t *) malloc(sizeof(index_entry_t))))
-            diep("malloc");
-    }
+    // in direct key mode, more over, we allocate a re-usable
+    // index_entry_t which will be adapted each time
+    // using the requested key, like this we can use the same
+    // implementation for everything
+    //
+    // in the default mode, the key is always kept in memory
+    // and never free'd, that's why we will allocate a one-time
+    // object now and reuse the same all the time
+    //
+    // this is allocated, when index mode can be different on runtime
+    if(!(index_reusable_entry = (index_entry_t *) malloc(sizeof(index_entry_t))))
+        diep("malloc");
 }
 
 // create an index and load files
@@ -388,7 +388,7 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
     // we will not allocate all the time the reusable variables
     // but this is the 'main entry' of index loading, so doing this
     // here makes sens
-    index_allocate_single(settings);
+    index_allocate_single();
     index_load(root);
 
     if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL)
@@ -407,10 +407,14 @@ void index_destroy(index_root_t *root) {
     free(root);
 }
 
+// clean single-time allocated variable
+// this will be called a single time when we're sure
+// nothing will be used anymore on any indexes
+// (basicly graceful shutdown)
 void index_destroy_global() {
-    // this function could be called multiple time for any index
-    // and then index_transition could be free'd multiple time
-    // we set it as NULL to ensure next call will not fails
     free(index_transition);
     index_transition = NULL;
+
+    free(index_reusable_entry);
+    index_reusable_entry = NULL;
 }
