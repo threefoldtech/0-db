@@ -60,9 +60,9 @@
 
     void namespace_commit(namespace_t *namespace);
 
-    int namespace_init(settings_t *settings);
-    int namespace_destroy();
-    int namespace_emergency();
+    int namespaces_init(settings_t *settings);
+    int namespaces_destroy();
+    int namespaces_emergency();
 
     namespace_t *namespace_get_default();
 #endif

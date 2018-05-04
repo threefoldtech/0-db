@@ -352,7 +352,7 @@ static int namespace_scanload(ns_root_t *root) {
 //
 // this is why it's here we take care about cleaning and emergencies, it's the only
 // place where we __knows__ what we needs to clean
-int namespace_init(settings_t *settings) {
+int namespaces_init(settings_t *settings) {
     verbose("[+] namespaces: initializing\n");
 
     // we start by the default namespace
@@ -397,7 +397,7 @@ static void namespace_free(namespace_t *namespace) {
 
 // this is called when we receive a graceful exit request
 // let's clean all index, data and namespace stuff
-int namespace_destroy() {
+int namespaces_destroy() {
     // freeing the big index buffer
     // since branch want an index as argument, let's use
     // the first namespace (default), since they all share
@@ -484,7 +484,7 @@ int namespace_delete(namespace_t *namespace) {
 }
 
 
-int namespace_emergency() {
+int namespaces_emergency() {
     namespace_t *ns;
 
     for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {

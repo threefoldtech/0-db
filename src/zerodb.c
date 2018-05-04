@@ -125,7 +125,7 @@ static void sighandler(int signal) {
         case SIGINT:
         case SIGTERM:
             printf("\n[+] signal: request cleaning\n");
-            namespace_emergency();
+            namespaces_emergency();
 
         break;
     }
@@ -148,7 +148,7 @@ static int proceed(struct settings_t *settings) {
     //
     // the namespace system will take care about all the loading
     // and the destruction
-    namespace_init(settings);
+    namespaces_init(settings);
 
     // main worker point (if dump not enabled)
     if(!settings->dump)
@@ -161,7 +161,7 @@ static int proceed(struct settings_t *settings) {
     // this is useful when profiling to ensure there
     // is no memory leaks, if everything is cleaned as
     // expected.
-    namespace_destroy();
+    namespaces_destroy();
 
     return 0;
 }
