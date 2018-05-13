@@ -145,4 +145,7 @@
 
     extern index_item_t *index_transition;
     extern index_entry_t *index_reusable_entry;
+
+    size_t index_next_offset(index_root_t *root);
+    uint16_t index_indexid(index_root_t *root);
 #endif

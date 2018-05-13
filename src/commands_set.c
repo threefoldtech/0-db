@@ -162,11 +162,11 @@ static size_t redis_set_handler_directkey(redis_client_t *client) {
     data_root_t *data = client->ns->data;
 
     // create some easier accessor
-    index_dkey_t id = {
-        .dataid = data_dataid(data),      // current data fileid
-        .offset = data_next_offset(data), // needed now, we write it to the datafile
-    };
     uint8_t idlength = sizeof(index_dkey_t);
+    index_dkey_t id = {
+        .dataid = index_indexid(index),     // current index fileid
+        .offset = index_next_offset(index), // needed now, it's part of the id
+    };
 
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
