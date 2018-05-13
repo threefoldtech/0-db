@@ -120,7 +120,7 @@ uint64_t index_next_id(index_root_t *root) {
 }
 
 // perform the basic "hashing" (crc based) used to point to the expected branch
-// we only keep partial amount of the result to now fill the memory too fast
+// we only keep partial amount of the result to not fill the memory too fast
 static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
     uint64_t *input = (uint64_t *) id;
     uint32_t hash = 0;
@@ -182,7 +182,7 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
         return exists;
     }
 
-    // calloc will ensure any unset fields (eg: flags) to zero
+    // calloc will ensure any unset fields (eg: flags) are zero
     size_t entrysize = sizeof(index_entry_t) + idlength;
     index_entry_t *entry = calloc(entrysize, 1);
 
@@ -287,11 +287,26 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
     return entry;
 }
 
+// return the offset of the next entry which will be added
+// this could be needed, for exemple in direct key mode,
+// when the key depends of the offset itself
+size_t index_next_offset(index_root_t *root) {
+    return lseek(root->indexfd, 0, SEEK_END);
+}
+
+
+// return current fileid in use
+uint16_t index_indexid(index_root_t *root) {
+    return root->indexid;
+}
+
 // return 1 or 0 if index entry is deleted or not
 int index_entry_is_deleted(index_entry_t *entry) {
     return (entry->flags & INDEX_ENTRY_DELETED);
 }
 
+// iterate over all entries in a single branch
+// and remove if this entry is related to requested namespace
 static inline size_t index_clean_namespace_branch(index_branch_t *branch, void *namespace) {
     index_entry_t *entry = branch->list;
     index_entry_t *previous = NULL;
