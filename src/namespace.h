@@ -30,11 +30,13 @@
         data_root_t *data;     // data structure-pointer
         char public;           // publicly readable (read without password)
         size_t maxsize;        // maximum size allowed
+        size_t idlist;         // nsroot list index
 
     } namespace_t;
 
     typedef struct ns_root_t {
         size_t length;             // amount of namespaces allocated
+        size_t effective;          // amount of namespace currently loaded
         namespace_t **namespaces;  // pointers to namespaces
         settings_t *settings;      // global settings reminder
         index_branch_t **branches; // unique global branches list
@@ -48,16 +50,19 @@
 
     } ns_root_t;
 
-    ns_root_t *namespace_get_list();
+    size_t namespace_length();
+    namespace_t *namespace_iter();
+    namespace_t *namespace_iter_next(namespace_t *namespace);
 
     int namespace_create(char *name);
+    int namespace_delete(namespace_t *namespace);
     namespace_t *namespace_get(char *name);
 
     void namespace_commit(namespace_t *namespace);
 
-    int namespace_init(settings_t *settings);
-    int namespace_destroy();
-    int namespace_emergency();
+    int namespaces_init(settings_t *settings);
+    int namespaces_destroy();
+    int namespaces_emergency();
 
     namespace_t *namespace_get_default();
 #endif

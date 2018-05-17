@@ -237,6 +237,7 @@ index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlengt
     index_transition->length = entry->length;
     index_transition->flags = entry->flags;
     index_transition->dataid = entry->dataid;
+    index_transition->timestamp = (uint32_t) time(NULL);
 
     if(!index_write(root->indexfd, index_transition, entrylength, root)) {
         fprintf(stderr, "[-] index: cannot write index entry on disk\n");
@@ -278,6 +279,7 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
     index_transition->length = entry->length;
     index_transition->flags = entry->flags;
     index_transition->dataid = entry->dataid;
+    index_transition->timestamp = (uint32_t) time(NULL);
 
     if(!index_write(root->indexfd, index_transition, entrylength, root))
         return NULL;
@@ -288,6 +290,64 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
 // return 1 or 0 if index entry is deleted or not
 int index_entry_is_deleted(index_entry_t *entry) {
     return (entry->flags & INDEX_ENTRY_DELETED);
+}
+
+static inline size_t index_clean_namespace_branch(index_branch_t *branch, void *namespace) {
+    index_entry_t *entry = branch->list;
+    index_entry_t *previous = NULL;
+    size_t deleted  = 0;
+
+    while(entry) {
+        if(entry->namespace != namespace) {
+            // keeping this key, looking forward
+            previous = entry;
+            entry = entry->next;
+            continue;
+        }
+
+        #ifndef RELEASE
+        printf("[+] index: namespace cleaner: free: ");
+        hexdump(entry->id, entry->idlength);
+        printf("\n");
+        #endif
+
+        // okay, we need to remove this key
+        index_entry_t *next = entry->next;
+        index_entry_t *removed = index_branch_remove(branch, entry, previous);
+
+        free(removed);
+        deleted += 1;
+
+        entry = next;
+    }
+
+    return deleted;
+}
+
+// remove specific namespace from the index
+//
+// we use a global index for everything, when removing a
+// namespace, we walk over all the keys and remove keys matching
+// to this namespace
+int index_clean_namespace(index_root_t *root, void *namespace) {
+    index_branch_t **branches = root->branches;
+    size_t deleted = 0;
+
+    if(!branches)
+        return 0;
+
+    debug("[+] index: starting namespace cleaner\n");
+
+    for(uint32_t b = 0; b < buckets_branches; b++) {
+        if(!branches[b])
+            continue;
+
+        deleted += index_clean_namespace_branch(branches[b], namespace);
+    }
+
+    debug("[+] index: namespace cleaner: %lu keys removed\n", deleted);
+
+    return 0;
 }
 
 //

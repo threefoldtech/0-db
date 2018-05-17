@@ -30,6 +30,9 @@ On the runtime, you can choose between multiple mode:
 * `seq`: sequential mode
 * `direct`: direct-position key mode
 
+**Warning**: in any case, please ensure data and index directories used by 0-db are empty, or
+contains only valid database namespaces directories.
+
 ## User Key
 This is a default mode, a simple key-value store. User can `SET` their own keys, like any key-value store.
 
@@ -110,14 +113,15 @@ This mode is not possible if you don't have any data/index already available.
 - `EXISTS key`
 - `CHECK key`
 - `INFO`
-- `NSNEW`
-- `NSINFO`
+- `NSNEW namespace`
+- `NSDEL namespace`
+- `NSINFO namespace`
 - `NSLIST`
-- `NSSET`
-- `SELECT`
+- `NSSET namespace property value`
+- `SELECT namespace`
 - `DBSIZE`
 - `TIME`
-- `AUTH`
+- `AUTH password`
 - `SCAN [optional key]`
 - `RSCAN [optional key]`
 
@@ -155,6 +159,13 @@ Same as scan, but backward (last-to-first key)
 Create a new namespace. Only admin can do this.
 
 By default, a namespace is not password protected, is public and not size limited.
+
+## NSDEL
+Delete a namespace. Only admin can do this.
+
+Warning:
+- You can't remove the namespace you're currently using.
+- Any other clients using this namespace will be moved to a special state, awaiting to be disconnected.
 
 ## NSINFO
 Returns basic informations about a namespace

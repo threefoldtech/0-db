@@ -608,6 +608,27 @@ void socket_client_free(int fd) {
     // maybe we could reduce the list usage now
 }
 
+// walk over all clients and match them by provided namespace
+// if they matches, moving them to special state awaiting
+// for disconnection (with alert)
+int redis_detach_clients(namespace_t *namespace) {
+    for(size_t i = 0; i < clients.length; i++) {
+        if(!clients.list[i])
+            continue;
+
+        if(clients.list[i]->ns == namespace) {
+            debug("[+] redis: client %d: waiting for disconnection\n", clients.list[i]->fd);
+            clients.list[i]->ns = NULL;
+        }
+    }
+
+    return 0;
+}
+
+// one namespace is removed
+// we need to move client attached to this namespace
+// to a none-valid namespace, in order to notify them
+
 // classic tcp socket
 static int redis_tcp_listen(char *listenaddr, int port) {
     struct sockaddr_in addr;

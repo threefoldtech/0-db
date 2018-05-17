@@ -45,6 +45,7 @@
         uint32_t previous;    // previous entry offset
         uint32_t integrity;   // simple integrity check (crc32)
         uint8_t flags;        // keep deleted flags (should be data_flags_t type)
+        uint32_t timestamp;   // when did the entry was created (unix timestamp)
         char id[];            // accessor to the id, dynamically
 
     } __attribute__((packed)) data_entry_header_t;

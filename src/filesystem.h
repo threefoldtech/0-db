@@ -3,4 +3,5 @@
 
     int dir_exists(char *path);
     int dir_create(char *path);
+    int dir_remove(char *path);
 #endif

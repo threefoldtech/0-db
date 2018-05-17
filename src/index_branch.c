@@ -122,3 +122,29 @@ index_entry_t *index_branch_append(index_root_t *root, uint32_t branchid, index_
 
     return entry;
 }
+
+// remove one entry on this branch
+// since it's a linked-list, we need to know which entry was the previous one
+// we use a single-direction linked-list
+//
+// removing an entry from the list don't free this entry, is just re-order
+// list to keep it coherent
+index_entry_t *index_branch_remove(index_branch_t *branch, index_entry_t *entry, index_entry_t *previous) {
+    // removing the first entry
+    if(branch->list == entry)
+        branch->list = entry->next;
+
+    // skipping this entry, linking next from previous
+    // to our next one
+    if(previous)
+        previous->next = entry->next;
+
+    // if our entry was the last one
+    // the new last one is the previous one
+    if(branch->last == entry)
+        branch->last = previous;
+
+    branch->length -= 1;
+
+    return entry;
+}

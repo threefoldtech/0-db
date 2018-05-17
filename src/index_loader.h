@@ -9,4 +9,5 @@
 
     // gracefully clean everything
     void index_destroy(index_root_t *root);
+    void index_destroy_global();
 #endif

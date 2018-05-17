@@ -25,6 +25,7 @@ static void data_entry_header_dump(data_entry_header_t *entry) {
     debug("[+] data: entry dump: previous   : %u\n", entry->previous);
     debug("[+] data: entry dump: integrity  : %X\n", entry->integrity);
     debug("[+] data: entry dump: flags      : %u\n", entry->flags);
+    debug("[+] data: entry dump: timestamp  : %u\n", entry->timestamp);
 #endif
 }
 
@@ -389,6 +390,7 @@ size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, 
     header->previous = root->previous;
     header->integrity = data_crc32(data, datalength);
     header->flags = 0;
+    header->timestamp = time(NULL);
 
     memcpy(header->id, id, idlength);
 

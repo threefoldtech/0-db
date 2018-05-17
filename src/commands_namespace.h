@@ -2,6 +2,7 @@
     #define ZDB_COMMANDS_NAMESPACE_H
 
     int command_nsnew(redis_client_t *client);
+    int command_nsdel(redis_client_t *client);
     int command_select(redis_client_t *client);
     int command_nslist(redis_client_t *client);
     int command_nsinfo(redis_client_t *client);

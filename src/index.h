@@ -23,6 +23,7 @@
         uint64_t length;     // length of the payload on the datafile
         uint8_t flags;       // flags not used yet, could provide information about deletion
         uint16_t dataid;     // datafile id where is stored the payload
+        uint32_t timestamp;  // when did the key was created (unix timestamp)
         unsigned char id[];  // the id accessor, dynamically loaded
 
     } __attribute__((packed)) index_item_t;
@@ -132,6 +133,8 @@
 
     index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry);
     int index_entry_is_deleted(index_entry_t *entry);
+
+    int index_clean_namespace(index_root_t *root, void *namespace);
 
     extern index_entry_t *index_reusable_entry;
 
