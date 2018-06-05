@@ -85,7 +85,7 @@ int index_dump(int fd) {
             diep("realloc");
 
         // rollback the 1 byte read for the id length
-        lseek(fd, -1, SEEK_CUR);
+        off_t curoff = lseek(fd, -1, SEEK_CUR);
 
         if(read(fd, entry, entrylength) != entrylength)
             diep("index header read failed");
@@ -94,7 +94,8 @@ int index_dump(int fd) {
 
         index_date(entry->timestamp, entrydate, sizeof(entrydate));
 
-        printf("[+] index entry: %lu, id length: %d\n", entrycount, entry->idlength);
+        printf("[+] index entry: %lu, offset: %lu\n", entrycount, curoff);
+        printf("[+]   id length  : %d\n", entry->idlength);
         printf("[+]   data length: %" PRIu64 "\n", entry->length);
         printf("[+]   data offset: %" PRIu64 "\n", entry->offset);
         printf("[+]   data fileid: %u\n", entry->dataid);
