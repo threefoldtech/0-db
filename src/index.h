@@ -116,7 +116,7 @@
     // key used by direct mode
     typedef struct index_dkey_t {
         uint16_t dataid;
-        uint32_t offset;
+        uint32_t idobj;
 
     } __attribute__((packed)) index_dkey_t;
 
@@ -148,5 +148,6 @@
     extern index_entry_t *index_reusable_entry;
 
     size_t index_next_offset(index_root_t *root);
+    size_t index_offset_objectid(uint32_t idobj);
     uint16_t index_indexid(index_root_t *root);
 #endif
