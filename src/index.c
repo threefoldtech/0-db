@@ -114,7 +114,7 @@ size_t index_jump_next(index_root_t *root) {
 // index manipulation
 //
 uint64_t index_next_id(index_root_t *root) {
-    // this is only used on sequential-id
+    // this is used on sequential-id and direct-mode
     // it gives the next id
     return root->nextentry;
 }
@@ -301,6 +301,24 @@ uint16_t index_indexid(index_root_t *root) {
 // return 1 or 0 if index entry is deleted or not
 int index_entry_is_deleted(index_entry_t *entry) {
     return (entry->flags & INDEX_ENTRY_DELETED);
+}
+
+// returns offset in the indexfile from idobject
+size_t index_offset_objectid(uint32_t idobj) {
+    // skip index header
+    size_t offset = sizeof(index_t);
+
+    // index is linear like this
+    // [header][obj-1][obj-2][obj-3][...]
+    //
+    // object X offset can be found by computing
+    // size of each entry, in direct mode, keys are
+    // always fixed-length
+    //
+    //                       each entry          fixed-key-length
+    offset += (idobj * (sizeof(index_item_t) + sizeof(index_dkey_t)));
+
+    return offset;
 }
 
 // iterate over all entries in a single branch

@@ -164,8 +164,8 @@ static size_t redis_set_handler_directkey(redis_client_t *client) {
     // create some easier accessor
     uint8_t idlength = sizeof(index_dkey_t);
     index_dkey_t id = {
-        .dataid = index_indexid(index),     // current index fileid
-        .offset = index_next_offset(index), // needed now, it's part of the id
+        .dataid = index_indexid(index),  // current index fileid
+        .idobj = index_next_id(index),   // needed now, it's part of the id
     };
 
     unsigned char *value = request->argv[2]->buffer;
@@ -175,9 +175,7 @@ static size_t redis_set_handler_directkey(redis_client_t *client) {
 
     // insert the data on the datafile
     // this will returns us the offset where the header is
-    // size_t offset = data_insert(value, valuelength, id, idlength);
     size_t offset = data_insert(data, value, valuelength, &id, idlength);
-    id.offset = offset;
 
     // checking for writing error
     // if we couldn't write the data, we won't add entry on the index

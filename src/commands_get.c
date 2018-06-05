@@ -35,10 +35,11 @@ static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
     memcpy(index_reusable_entry->id, request->argv[1]->buffer, sizeof(index_dkey_t));
 
     index_reusable_entry->idlength = sizeof(index_dkey_t);
-    index_reusable_entry->offset = directkey.offset;
+    index_reusable_entry->offset = index_offset_objectid(directkey.idobj);
     index_reusable_entry->dataid = directkey.dataid;
     index_reusable_entry->flags = 0;
 
+    #if 0
     // since the user can provide any offset, he could potentially
     // get data not expected and maybe get sensitive data
     //
@@ -61,6 +62,7 @@ static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
     }
 
     index_reusable_entry->length = length;
+    #endif
 
     return index_reusable_entry;
 }
