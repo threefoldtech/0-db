@@ -237,6 +237,7 @@ index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlengt
     index_transition->length = entry->length;
     index_transition->flags = entry->flags;
     index_transition->dataid = entry->dataid;
+    index_transition->timestamp = (uint32_t) time(NULL);
 
     if(!index_write(root->indexfd, index_transition, entrylength, root)) {
         fprintf(stderr, "[-] index: cannot write index entry on disk\n");
@@ -278,6 +279,7 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
     index_transition->length = entry->length;
     index_transition->flags = entry->flags;
     index_transition->dataid = entry->dataid;
+    index_transition->timestamp = (uint32_t) time(NULL);
 
     if(!index_write(root->indexfd, index_transition, entrylength, root))
         return NULL;
