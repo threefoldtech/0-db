@@ -34,10 +34,23 @@ static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
     memcpy(&directkey, request->argv[1]->buffer, sizeof(index_dkey_t));
     memcpy(index_reusable_entry->id, request->argv[1]->buffer, sizeof(index_dkey_t));
 
-    index_reusable_entry->idlength = sizeof(index_dkey_t);
-    index_reusable_entry->offset = index_offset_objectid(directkey.idobj);
-    index_reusable_entry->dataid = directkey.dataid;
-    index_reusable_entry->flags = 0;
+    // extract needed data
+    size_t offset = index_offset_objectid(directkey.objectid);
+
+    // request index entry from disk
+    index_root_t *index = client->ns->index;
+    index_item_t *item = index_item_get_disk(index, directkey.indexid, offset, sizeof(index_dkey_t));
+
+    // something went wrong
+    if(item == NULL)
+        return NULL;
+
+    index_reusable_entry->idlength = item->idlength;
+    index_reusable_entry->offset = item->offset;
+    index_reusable_entry->dataid = item->dataid;
+    index_reusable_entry->flags = item->flags;
+
+    free(item);
 
     #if 0
     // since the user can provide any offset, he could potentially

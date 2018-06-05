@@ -75,6 +75,21 @@ void index_set_id(index_root_t *root) {
     sprintf(root->indexfile, "%s/zdb-index-%05u", root->indexdir, root->indexid);
 }
 
+static int index_open_file(index_root_t *root, int fileid) {
+    char filename[512];
+    int fd;
+
+    sprintf(filename, "%s/zdb-index-%05u", root->indexdir, fileid);
+    debug("[+] index: opening file: %s\n", filename);
+
+    if((fd = open(filename, O_RDONLY)) < 0) {
+        warnp(filename);
+        return -1;
+    }
+
+    return fd;
+}
+
 // open the current filename set on the global struct
 void index_open_final(index_root_t *root) {
     int flags = O_CREAT | O_RDWR | O_APPEND;
@@ -88,7 +103,7 @@ void index_open_final(index_root_t *root) {
         return;
     }
 
-    printf("[+] active index file: %s\n", root->indexfile);
+    printf("[+] index: active file: %s\n", root->indexfile);
 }
 
 // jumping to the next index id file, this needs to be sync'd with
@@ -157,6 +172,44 @@ index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t id
     }
 
     return NULL;
+}
+
+// read an index entry from disk
+// we assume we know enough data to do everything in a single read call
+// which means we need to know offset and id length in advance
+//
+// this is really important in direct mode to use indirection with index
+// to have benefit of compaction etc.
+index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t offset, uint8_t idlength) {
+    int fd;
+    size_t length;
+    index_item_t *item;
+
+    // allocate expected entry
+    length = sizeof(index_item_t) + idlength;
+
+    if(!(item = malloc(length)))
+        return NULL;
+
+    // open requested file
+    if((fd = index_open_file(root, indexid)) < 0)
+        return NULL;
+
+    // seek to requested offset
+    lseek(fd, offset, SEEK_SET);
+
+    // read expected entry
+    if(read(fd, item, length) != (ssize_t) length) {
+        warnp("index_entry_get_disk: read");
+
+        close(fd);
+        free(item);
+        return NULL;
+    }
+
+    close(fd);
+
+    return item;
 }
 
 // insert a key, only in memory, no disk is touched
@@ -294,7 +347,6 @@ size_t index_next_offset(index_root_t *root) {
     return lseek(root->indexfd, 0, SEEK_END);
 }
 
-
 // return current fileid in use
 uint16_t index_indexid(index_root_t *root) {
     return root->indexid;
@@ -306,7 +358,7 @@ int index_entry_is_deleted(index_entry_t *entry) {
 }
 
 // returns offset in the indexfile from idobject
-size_t index_offset_objectid(uint32_t idobj) {
+size_t index_offset_objectid(uint32_t objectid) {
     // skip index header
     size_t offset = sizeof(index_t);
 
@@ -318,7 +370,7 @@ size_t index_offset_objectid(uint32_t idobj) {
     // always fixed-length
     //
     //                       each entry          fixed-key-length
-    offset += (idobj * (sizeof(index_item_t) + sizeof(index_dkey_t)));
+    offset += (objectid * (sizeof(index_item_t) + sizeof(index_dkey_t)));
 
     return offset;
 }
