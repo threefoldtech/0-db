@@ -119,7 +119,7 @@ int redis_dispatcher(redis_client_t *client) {
     debug("[+] command: '%.*s' [+%d args]\n", key->length, (char *) key->buffer, request->argc - 1);
 
     for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
-        if(strncmp(key->buffer, commands_handlers[i].command, key->length) == 0)
+        if(strncasecmp(key->buffer, commands_handlers[i].command, key->length) == 0)
             return commands_handlers[i].handler(client);
     }
 
