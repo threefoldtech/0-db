@@ -430,6 +430,7 @@ int data_entry_is_deleted(data_entry_header_t *entry) {
     return (entry->flags & DATA_ENTRY_DELETED);
 }
 
+#if 0
 // this function will check for a legitime request inside the data set
 // to estimate if a request is legitimate, we assume that
 //  - if the offset provided point to a header
@@ -508,6 +509,7 @@ size_t data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, 
 
     return length;
 }
+#endif
 
 int data_delete_real(int fd, size_t offset) {
     data_entry_header_t header;

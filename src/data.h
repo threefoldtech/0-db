@@ -92,7 +92,8 @@
 
     data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_t dataid, uint8_t idlength);
     int data_check(data_root_t *root, size_t offset, uint16_t dataid);
-    size_t data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, uint16_t dataid);
+
+    // size_t data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, uint16_t dataid);
 
     int data_delete(data_root_t *root, size_t offset, uint16_t dataid);
 

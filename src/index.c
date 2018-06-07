@@ -306,7 +306,7 @@ index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlengt
 }
 
 index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
-    /*
+    #if 0
     index_entry_t *entry = index_entry_get(root, id, idlength);
 
     if(!entry) {
@@ -318,7 +318,7 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
         verbose("[-] index: key already deleted\n");
         return NULL;
     }
-    */
+    #endif
 
     // mark entry as deleted
     entry->flags |= INDEX_ENTRY_DELETED;
