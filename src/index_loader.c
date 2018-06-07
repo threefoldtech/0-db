@@ -102,7 +102,7 @@ index_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
     index_t header;
 
     memcpy(header.magic, "IDX0", 4);
-    header.version = 1;
+    header.version = ZDB_IDXFILE_VERSION;
     header.created = time(NULL);
     header.fileid = indexid;
     header.opened = time(NULL);
@@ -212,6 +212,16 @@ static size_t index_load_file(index_root_t *root) {
         header = index_initialize(root->indexfd, root->indexid, root);
     }
 
+    if(memcmp(header.magic, "IDX0", 4)) {
+        danger("[-] %s: invalid header, wrong magic", root->indexfile);
+        exit(EXIT_FAILURE);
+    }
+
+    if(header.version != ZDB_IDXFILE_VERSION) {
+        danger("[-] %s: unsupported version detected", root->indexfile);
+        danger("[-] file version: %d, supported version: %d", header.version, ZDB_IDXFILE_VERSION);
+        exit(EXIT_FAILURE);
+    }
 
     // re-writing the header, with updated data if the index is writable
     // if the file was just created, it's okay, we have a new struct ready

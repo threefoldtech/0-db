@@ -10,6 +10,9 @@
     #define ZDB_DEFAULT_LISTENADDR  "0.0.0.0"
     #define ZDB_DEFAULT_PORT        9900
 
+    #define ZDB_DATAFILE_VERSION    2
+    #define ZDB_IDXFILE_VERSION     2
+
     typedef enum db_mode_t {
         // default key-value store
         KEYVALUE = 0,
