@@ -67,6 +67,11 @@ int index_dump(int fd) {
         return 1;
     }
 
+    if(header.version != ZDB_IDXFILE_VERSION) {
+        fprintf(stderr, "[-] index version mismatch (%d <> %d)\n", header.version, ZDB_IDXFILE_VERSION);
+        return 1;
+    }
+
     printf("[+] index header seems correct\n");
 
     // now it's time to read each entries

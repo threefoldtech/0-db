@@ -10,6 +10,17 @@
     #define ZDB_DEFAULT_LISTENADDR  "0.0.0.0"
     #define ZDB_DEFAULT_PORT        9900
 
+    // define here version of datafile and indexfile
+    // theses version are written on header of each file created
+    //
+    // the version will only change (increment of 1) if the
+    // format of the binary struct change
+    //
+    // one version of 0-db will only support one version of file
+    // there no backward compatibility planed
+    //
+    // if some update are made, upgrade tools could be written
+    // to update existing database
     #define ZDB_DATAFILE_VERSION    2
     #define ZDB_IDXFILE_VERSION     2
 

@@ -66,6 +66,11 @@ int data_integrity(int fd) {
         return 1;
     }
 
+    if(header.version != ZDB_DATAFILE_VERSION) {
+        fprintf(stderr, "[-] version mismatch (%d <> %d)\n", header.version, ZDB_DATAFILE_VERSION);
+        return 1;
+    }
+
     printf("[+] data header seems correct\n");
 
     // now it's time to read each entries
