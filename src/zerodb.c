@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,6 +32,8 @@ settings_t rootsettings = {
     .socket = NULL,
     .background = 0,
     .logfile = NULL,
+    .hook = NULL,
+    .zdbid = NULL,
 };
 
 static struct option long_options[] = {
@@ -47,6 +50,7 @@ static struct option long_options[] = {
     {"background", no_argument,       0, 'b'},
     {"logfile",    required_argument, 0, 'o'},
     {"admin",      required_argument, 0, 'a'},
+    {"hook",       required_argument, 0, 'k'},
     {"help",       no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
@@ -134,12 +138,25 @@ static void sighandler(int signal) {
     exit(128 + signal);
 }
 
+static void zdbid_set(char *listenaddr, int port, char *socket) {
+    if(socket) {
+        // unix socket
+        asprintf(&rootsettings.zdbid, "unix://%s", socket);
+        return;
+    }
+
+    // default tcp
+    asprintf(&rootsettings.zdbid, "tcp://%s:%d", listenaddr, port);
+}
 
 static int proceed(struct settings_t *settings) {
     verbose("[+] system: setting up environments\n");
     signal_intercept(SIGSEGV, sighandler);
     signal_intercept(SIGINT, sighandler);
     signal_intercept(SIGTERM, sighandler);
+    signal(SIGCHLD, SIG_IGN);
+
+    zdbid_set(settings->listen, settings->port, settings->socket);
 
     // namespace is the root of the whole index/data system
     // anything related to data is always attached to at least
@@ -242,6 +259,11 @@ int main(int argc, char *argv[]) {
 
             case 's':
                 settings->sync = 1;
+                break;
+
+            case 'k':
+                settings->hook = optarg;
+                debug("[+] system: external hook: %s\n", settings->hook);
                 break;
 
             case 't':

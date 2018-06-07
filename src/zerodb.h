@@ -60,6 +60,9 @@
         char *socket;     // unix socket path
         int background;   // flag to run in background
         char *logfile;    // where to redirect logs in background mode
+        char *hook;       // external hook script to execute
+
+        char *zdbid;      // fake-0db id generated based on listening
 
         // the synctime can be useful to add basic security without killing
         // performance

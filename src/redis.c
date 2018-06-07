@@ -716,12 +716,7 @@ int redis_listen(char *listenaddr, int port, char *socket) {
     if(listen(redis.mainfd, SOMAXCONN) == -1)
         diep("listen");
 
-    if(!socket) {
-        success("[+] listening on: %s:%d", listenaddr, port);
-
-    } else {
-        success("[+] listening on: %s", socket);
-    }
+    success("[+] listening on: %s", rootsettings.zdbid);
 
     if(rootsettings.background)
         daemonize();
