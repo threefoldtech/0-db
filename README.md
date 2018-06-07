@@ -11,7 +11,7 @@ Currently supported system:
 * MacOS / FreeBSD (using `kqueue`)
 
 Currently supported hardware:
-* Any Intel processor supporting `SSE 4.2`
+* Any processor supporting `SSE 4.2`
 
 This project won't compile on something else (for now).
 
@@ -50,7 +50,7 @@ The id is a little-indian integer key. All the keys are kept in memory.
 
 ## Direct Key
 This mode works like the sequential mode, except that returned key contains enough information to fetch the
-data back, without using any index. This mode doesn't use index in memory.
+data back, without using in-memory index.
 
 There is no update possible in this mode (since the key itself contains data to the real location
 and we use always append method, we can't update existing data). Providing a key has no effect and
@@ -61,17 +61,18 @@ The key returned by the `SET` command is a binary key.
 # Implementation
 This project doesn't rely on any dependencies, it's from scratch.
 
-A rudimental and very simplified redis protocol is supported, allowing only few commands. See below.
+A rudimental and very simplified RESP protocol is supported, allowing only some commands. See below.
 
-Each index files contains a 26 bytes headers containing a magic 4 bytes identifier,
-a version, creation and last opened date and it's own file-sequential-id.
+Each index files contains a 27 bytes headers containing a magic 4 bytes identifier,
+a version, creation and last opened date and it's own file-sequential-id. In addition it contains
+the mode used when it was created (to avoid mixing mode on different run).
 
-For each entries on the index, 28 bytes (20 bytes + pointer for linked list) 
+For each entries on the index, 36 bytes (28 bytes + pointer for linked list) 
 plus the key itself (limited to 256 bytes) will be consumed.
 
 The data (value) files contains a 26 bytes headers, mostly the same as the index one
-and each entries consumes 7 bytes (1 byte for key length, 4 bytes for payload length, 2 bytes crc)
-plus the key and payload.
+and each entries consumes 18 bytes (1 byte for key length, 4 bytes for payload length, 4 bytes crc,
+4 bytes for previous offset, 1 byte for flags, 4 byte for timestamp) plus the key and payload.
 
 > We keep track of the key on the data file in order to be able to rebuild an index based only on datafile if needed.
 
@@ -80,12 +81,13 @@ Whenever the key already exists, it's appended to disk and entry in memory is re
 
 Each time the server starts, it loads (basicly replay) the index in memory. The index is kept in memory 
 **all the time** and only this in-memory index is reached to fetch a key, index files are
-never read again except during startup (except for 'direct-key mode', where the index is not in memory).
+never read again except during startup (except for 'direct-key mode', where the index is not in memory)
+or in direct-mode where key is the location on the index.
 
 When a key-delete is requested, the key is kept in memory and is flagged as deleted. A new entry is added
 to the index file, with the according flags. When the server restart, the latest state of the entry is used.
 
-# Index
+## Index
 The current index in memory is a really simple implementation (to be improved).
 
 It uses a rudimental kind-of hashtable. A list of branchs (2^24) is pre-allocated.
@@ -97,7 +99,7 @@ Each branch (when allocated) points to a linked-list of keys (collisions).
 
 When the branch is found based on the key, the list is read sequentialy.
 
-# Read-only
+## Read-only
 You can run 0-db using a read-only filesystem (both for keys or data), which will prevent
 any write and let the 0-db serving existing data. This can, in the meantime, allows 0-db
 to works on disks which contains failure and would be remounted in read-only by the kernel.
@@ -189,44 +191,32 @@ any password, the namespace will be accessible in read-only.
 ## AUTH
 If an admin account is set, use `AUTH` command to authentificate yourself as `ADMIN`.
 
-# Namespace (simple demo)
-New commands are implemented to support **Namespaces** notion.
-
-Each namespace can be optionally protected by a password. A namespace is an isolated key-space.
+# Namespaces
+A namespace is a dedicated directory on index and data root directory.
+A namespace is a complete set of key/data. Each namespace can be optionally protected by a password
+and size limited.
 
 You are always attached to a namespace, by default, it's namespace `default`.
 
-Quick demo and exemple how to use namespaces:
-```
-127.0.0.1:9900> NSNEW demo
-OK
+# Hook System
+You can request 0-db to call an external program/script, as hook-system. This allows the host
+machine running 0-db to adapt itself when something happen.
 
-127.0.0.1:9900> SET hello foo
-"hello"
+To use the hook system, just set `--hook /path/to/executable` on argument.
+The file must be executable, no shell are invoked.
 
-127.0.0.1:9900> GET hello
-"foo"
+When 0-db starts, it create it own pseudo `identifier` based on listening address/port/socket.
+This id is used on hooks arguments.
 
-[... switching namespace ...]
+First argument is `Hook Name`, second argument is `Generated ID`, next arguments depends of the hook.
 
-127.0.0.1:9900> SELECT demo
-OK
-
-127.0.0.1:9900> SET hello bar
-"hello"
-
-127.0.0.1:9900> GET hello
-"bar"
-
-[... rolling back to first namespace ...]
-
-127.0.0.1:9900> SELECT default
-OK
-
-127.0.0.1:9900> GET hello
-"foo"
-
-```
+Current supported hooks:
+| Hook Name | Action                  | Arguments                  |
+| --------- | ----------------------- | -------------------------- |
+| `ready`   | Server is ready         | (none)                     | 
+| `close`   | Server closing (nicely) | (none)                     |
+| `jump`    | Data/Index incremented  | Closing and New index file |
+| `crash`   | Server crashed          | (none)                     |
 
 # Tests
 You can run a sets of test on a running 0-db instance.
