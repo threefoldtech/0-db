@@ -197,28 +197,40 @@ static int proceed(struct settings_t *settings) {
     // expected.
     namespaces_destroy();
 
+    free(settings->zdbid);
+    settings->zdbid = NULL;
+
     return 0;
 }
 
 void usage() {
-    printf("Command line arguments:\n");
-    printf("  --data        datafile directory (default " ZDB_DEFAULT_DATAPATH ")\n");
-    printf("  --index       indexfiles directory (default " ZDB_DEFAULT_INDEXPATH ")\n");
-    printf("  --listen      listen address (default " ZDB_DEFAULT_LISTENADDR ")\n");
-    printf("  --port        listen port (default %d)\n", ZDB_DEFAULT_PORT);
-    printf("  --socket      unix socket path (override listen and port)\n");
-    printf("  --verbose     enable verbose (debug) information\n");
-    printf("  --dump        only dump index contents, then exit (debug)\n");
-    printf("  --sync        force all write to be sync'd\n");
-    printf("  --background  run in background (daemon), when ready\n");
-    printf("  --logfile     log file (only in daemon mode)\n");
-    printf("  --mode        select mode:\n");
-    printf("                 > user: default user key-value mode\n");
-    printf("                 > seq: sequential keys generated\n");
-    printf("                 > direct: direct position by key\n");
-    printf("                 > block: fixed blocks length (smaller direct)\n");
-    printf("  --admin       set admin password\n");
-    printf("  --help        print this message\n");
+    printf("Command line arguments:\n\n");
+
+    printf(" Database settings:\n");
+    printf("  --data  <dir>       datafile directory (default " ZDB_DEFAULT_DATAPATH ")\n");
+    printf("  --index <dir>       indexfiles directory (default " ZDB_DEFAULT_INDEXPATH ")\n");
+    printf("  --mode  <mode>      select working mode:\n");
+    printf("                       > user: default user key-value mode\n");
+    printf("                       > seq: sequential keys generated\n");
+    printf("                       > direct: direct position by key\n");
+    printf("                       > block: fixed blocks length (smaller direct)\n\n");
+
+    printf(" Network options:\n");
+    printf("  --listen <addr>     listen address (default " ZDB_DEFAULT_LISTENADDR ")\n");
+    printf("  --port   <port>     listen port (default %d)\n", ZDB_DEFAULT_PORT);
+    printf("  --socket <path>     unix socket path (override listen and port)\n\n");
+
+    printf(" Administrative:\n");
+    printf("  --hook  <file>      execute external hook script\n");
+    printf("  --admin <pass>      set admin password\n\n");
+
+    printf(" Useful tools:\n");
+    printf("  --verbose           enable verbose (debug) information\n");
+    printf("  --dump              only dump index contents, then exit (debug)\n");
+    printf("  --sync              force all write to be sync'd\n");
+    printf("  --background        run in background (daemon), when ready\n");
+    printf("  --logfile <file>    log file (only in daemon mode)\n");
+    printf("  --help              print this message\n");
 
     exit(EXIT_FAILURE);
 }
