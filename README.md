@@ -211,9 +211,10 @@ This id is used on hooks arguments.
 First argument is `Hook Name`, second argument is `Generated ID`, next arguments depends of the hook.
 
 Current supported hooks:
+
 | Hook Name | Action                  | Arguments                  |
 | --------- | ----------------------- | -------------------------- |
-| `ready`   | Server is ready         | (none)                     | 
+| `ready`   | Server is ready         | (none)                     |
 | `close`   | Server closing (nicely) | (none)                     |
 | `jump`    | Data/Index incremented  | Closing and New index file |
 | `crash`   | Server crashed          | (none)                     |
