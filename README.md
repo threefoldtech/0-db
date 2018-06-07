@@ -46,7 +46,7 @@ If you provide a key, this key should exists (a valid generated key), and the `S
 
 Providing any other key will fails.
 
-The id is a little-indian integer key. All the keys are kept in memory.
+The id is a little-endian integer key. All the keys are kept in memory.
 
 ## Direct Key
 This mode works like the sequential mode, except that returned key contains enough information to fetch the
