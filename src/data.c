@@ -163,7 +163,7 @@ void data_initialize(char *filename, data_root_t *root) {
     data_header_t header;
 
     memcpy(header.magic, "DAT0", 4);
-    header.version = 1;
+    header.version = ZDB_DATAFILE_VERSION;
     header.created = time(NULL);
     header.opened = 0; // not supported yet
     header.fileid = root->dataid;
