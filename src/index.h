@@ -96,7 +96,8 @@
         char *indexfile;    // current index filename in use
         uint16_t indexid;   // current index file id in use (sync with data id)
         int indexfd;        // current file descriptor used
-        uint32_t nextentry; // next-entry is a global id used in sequential mode (next seq-id)
+        uint64_t nextentry; // next-entry is a global id used in sequential mode (next seq-id)
+        uint32_t nextid;    // next-id is a localfile id used in direct mode (next id on this file)
         int sync;           // flag to force write sync
         int synctime;       // force sync index after this amount of time
         time_t lastsync;    // keep track when the last sync was explictly made
@@ -125,7 +126,9 @@
 
     size_t index_jump_next(index_root_t *root);
     int index_emergency(index_root_t *root);
+
     uint64_t index_next_id(index_root_t *root);
+    uint32_t index_next_objectid(index_root_t *root);
 
     index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t length);
     index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t offset, uint8_t idlength);

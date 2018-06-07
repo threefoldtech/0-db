@@ -268,6 +268,11 @@ static size_t index_load_file(index_root_t *root) {
     ssize_t ahead;
     index_item_t *entry = NULL;
 
+    // ensure nextid is zero, because this id
+    // is relative to the indexfile, we start to populate
+    // this file, starting from zero
+    root->nextid = 0;
+
     while(read(root->indexfd, &idlength, sizeof(idlength)) == sizeof(idlength)) {
         // we have the length of the key
         ssize_t entrylength = sizeof(index_item_t) + idlength;
@@ -386,6 +391,7 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
     root->indexid = 0;
     root->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
     root->nextentry = 0;
+    root->nextid = 0;
     root->sync = settings->sync;
     root->synctime = settings->synctime;
     root->lastsync = 0;

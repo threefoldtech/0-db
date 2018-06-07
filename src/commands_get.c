@@ -34,8 +34,11 @@ static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
     memcpy(&directkey, request->argv[1]->buffer, sizeof(index_dkey_t));
     memcpy(index_reusable_entry->id, request->argv[1]->buffer, sizeof(index_dkey_t));
 
+    debug("[+] command: get: direct [%d, %d]\n", directkey.indexid, directkey.objectid);
+
     // extract needed data
     size_t offset = index_offset_objectid(directkey.objectid);
+    debug("[+] command: get: resolved [%d, %lu]\n", directkey.indexid, offset);
 
     // request index entry from disk
     index_root_t *index = client->ns->index;
