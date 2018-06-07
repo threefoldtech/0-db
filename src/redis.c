@@ -19,6 +19,7 @@
 #include "namespace.h"
 #include "redis.h"
 #include "commands.h"
+#include "hook.h"
 
 static int yes = 1;
 
@@ -695,6 +696,15 @@ static void daemonize() {
     verbose("[+] system: working on background now");
 }
 
+static void redis_listen_hook() {
+    hook_t *hook = hook_new("ready", 1);
+
+    hook_append(hook, rootsettings.zdbid);
+
+    hook_execute(hook);
+    hook_free(hook);
+}
+
 int redis_listen(char *listenaddr, int port, char *socket) {
     redis_handler_t redis;
 
@@ -720,6 +730,10 @@ int redis_listen(char *listenaddr, int port, char *socket) {
 
     if(rootsettings.background)
         daemonize();
+
+    // notify we are ready
+    if(rootsettings.hook)
+        redis_listen_hook();
 
     // entering the worker loop
     int handler = socket_handler(&redis);

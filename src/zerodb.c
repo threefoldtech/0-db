@@ -14,6 +14,7 @@
 #include "namespace.h"
 #include "redis.h"
 #include "filesystem.h"
+#include "hook.h"
 
 //
 // global system settings
@@ -123,15 +124,31 @@ static void sighandler(int signal) {
 
             fprintf(stderr, "[-] ----------------------------------");
 
-            // no break, we will execute SIGINT handler in SIGSEGV
-            // which will try to save and flush buffers
+            if(rootsettings.hook) {
+                hook_t *hook = hook_new("crash", 1);
+                hook_append(hook, rootsettings.zdbid ? rootsettings.zdbid : "unknown-id");
+                hook_execute(hook);
+                hook_free(hook);
+            }
+
+            // trying to save what we can save
+            printf("\n[+] signal: crashed, trying to clean\n");
+            namespaces_emergency();
+            break;
 
         case SIGINT:
         case SIGTERM:
             printf("\n[+] signal: request cleaning\n");
-            namespaces_emergency();
 
-        break;
+            if(rootsettings.hook) {
+                hook_t *hook = hook_new("close", 1);
+                hook_append(hook, rootsettings.zdbid ? rootsettings.zdbid : "unknown-id");
+                hook_execute(hook);
+                hook_free(hook);
+            }
+
+            namespaces_emergency();
+            break;
     }
 
     // forwarding original error code

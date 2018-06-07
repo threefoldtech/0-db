@@ -15,6 +15,7 @@
 #include "index_loader.h"
 #include "index_branch.h"
 #include "data.h"
+#include "hook.h"
 
 // NOTE: there is no more a global variable for the index
 //       since each namespace have their own index, now
@@ -131,7 +132,15 @@ void index_open_final(index_root_t *root) {
 // data file, we only do this when datafile changes basicly, this is
 // triggered by a datafile too big event
 size_t index_jump_next(index_root_t *root) {
+    hook_t *hook;
+
     verbose("[+] index: jumping to the next file\n");
+
+    if(rootsettings.hook) {
+        hook = hook_new("jump", 4);
+        hook_append(hook, rootsettings.zdbid);
+        hook_append(hook, root->indexfile);
+    }
 
     // closing current file descriptor
     close(root->indexfd);
@@ -143,6 +152,12 @@ size_t index_jump_next(index_root_t *root) {
 
     index_open_final(root);
     index_initialize(root->indexfd, root->indexid, root);
+
+    if(rootsettings.hook) {
+        hook_append(hook, root->indexfile);
+        hook_execute(hook);
+        hook_free(hook);
+    }
 
     return root->indexid;
 }
