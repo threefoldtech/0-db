@@ -69,6 +69,27 @@ int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
     return 1;
 }
 
+static int index_read(int fd, void *buffer, size_t length) {
+    ssize_t response;
+
+    if((response = read(fd, buffer, length)) < 0) {
+        warnp("index read");
+        return 0;
+    }
+
+    if(response == 0) {
+        fprintf(stderr, "[-] index read: eof reached\n");
+        return 0;
+    }
+
+    if(response != (ssize_t) length) {
+        fprintf(stderr, "[-] index read: partial read\n");
+        return 0;
+    }
+
+    return 1;
+}
+
 
 // set global filename based on the index id
 void index_set_id(index_root_t *root) {
@@ -117,6 +138,7 @@ size_t index_jump_next(index_root_t *root) {
 
     // moving to the next file
     root->indexid += 1;
+    root->nextid = 0;
     index_set_id(root);
 
     index_open_final(root);
@@ -129,9 +151,16 @@ size_t index_jump_next(index_root_t *root) {
 // index manipulation
 //
 uint64_t index_next_id(index_root_t *root) {
-    // this is used on sequential-id and direct-mode
+    // this is used on sequential-id
     // it gives the next id
     return root->nextentry;
+}
+
+uint32_t index_next_objectid(index_root_t *root) {
+    // return next object id
+    // this id is used on direct mode
+    // and is a relative id to local file
+    return root->nextid;
 }
 
 // perform the basic "hashing" (crc based) used to point to the expected branch
@@ -199,9 +228,7 @@ index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t o
     lseek(fd, offset, SEEK_SET);
 
     // read expected entry
-    if(read(fd, item, length) != (ssize_t) length) {
-        warnp("index_entry_get_disk: read");
-
+    if(!index_read(fd, item, length)) {
         close(fd);
         free(item);
         return NULL;
@@ -258,6 +285,7 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
 
     // update next entry id
     root->nextentry += 1;
+    root->nextid += 1;
 
     return entry;
 }
