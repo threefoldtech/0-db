@@ -249,23 +249,29 @@ static size_t index_load_file(index_root_t *root) {
 
     printf("[+] index: populating: %s\n", root->indexfile);
 
+    // index seems in a good state
+    // let's load it completely in memory now
+    char *filebuf;
+    off_t fullsize = lseek(root->indexfd, 0, SEEK_END);
+
+    debug("[+] index: loading in memory file: %.2f MB\n", fullsize / (1024 * 1024.0));
+
+    if(!(filebuf = malloc(fullsize)))
+        diep("index buffer: malloc");
+
+    lseek(root->indexfd, 0, SEEK_SET);
+    if(read(root->indexfd, filebuf, fullsize) != fullsize)
+        diep("index buffer: read");
+
+    // positioning seeker to beginin of index entries
+    char *seeker = filebuf + sizeof(index_t);
+
     // reading the index, populating memory
     //
     // here it's again a little bit dirty
     // we assume that key length is maximum 256 bytes, we stored this
     // size in a uint8_t, that means that for knowing each entry size, we
     // need to know the id length, which is the first field of the struct
-    //
-    // we read each time 1 byte, which will gives the id length, then
-    // read sizeof(header) + length of the id which will be the full entry
-    //
-    // we always reuse the same entry object
-    // we could use always a new object and keep the one read/allocated in memory
-    // on the branches directly, but this break the genericity of the code below
-    //
-    // anyway, this is only at the boot-time, performance doesn't really matter
-    uint8_t idlength;
-    ssize_t ahead;
     index_item_t *entry = NULL;
 
     // ensure nextid is zero, because this id
@@ -273,29 +279,22 @@ static size_t index_load_file(index_root_t *root) {
     // this file, starting from zero
     root->nextid = 0;
 
-    while(read(root->indexfd, &idlength, sizeof(idlength)) == sizeof(idlength)) {
-        // we have the length of the key
-        ssize_t entrylength = sizeof(index_item_t) + idlength;
-        if(!(entry = realloc(entry, entrylength)))
-            diep("realloc");
-
-        // rollback the 1 byte read for the id length
-        lseek(root->indexfd, -1, SEEK_CUR);
-
-        if((ahead = read(root->indexfd, entry, entrylength)) != entrylength) {
-            fprintf(stderr, "[-] index: invalid read during populate, skipping\n");
-            fprintf(stderr, "[-] index: %lu bytes expected, %lu bytes read\n", entrylength, ahead);
-            continue;
-        }
+    while(seeker < filebuf + fullsize) {
+        entry = (index_item_t *) seeker;
 
         // insert this entry like it was inserted by a user
         // this allows us to keep a generic way of inserting data and keeping a
         // single point of logic when adding data (logic for overwrite, resize bucket, ...)
         index_entry_insert_memory(root, entry->id, entry->idlength, entry->offset, entry->length, entry->flags);
+
+        // moving seeker to next entry in the buffer
+        seeker += sizeof(index_item_t) + entry->idlength;
     }
 
-    free(entry);
+    // freeing buffer memory
+    free(filebuf);
 
+    // this file is done
     close(root->indexfd);
 
     // if length is greater than 0, the index was existing

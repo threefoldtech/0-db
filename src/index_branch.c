@@ -90,7 +90,7 @@ index_branch_t *index_branch_get_allocate(index_root_t *root, uint32_t branchid)
     if(!root->branches[branchid])
         return index_branch_init(root, branchid);
 
-    debug("[+] branch: exists: %lu entries\n", root->branches[branchid]->length);
+    // debug("[+] branch: exists: %lu entries\n", root->branches[branchid]->length);
     return root->branches[branchid];
 }
 
