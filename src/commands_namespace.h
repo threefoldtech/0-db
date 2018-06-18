@@ -8,4 +8,5 @@
     int command_nsinfo(redis_client_t *client);
     int command_nsset(redis_client_t *client);
     int command_dbsize(redis_client_t *client);
+    int command_reload(redis_client_t *client);
 #endif

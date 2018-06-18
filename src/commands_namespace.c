@@ -362,3 +362,38 @@ int command_dbsize(redis_client_t *client) {
     return 0;
 }
 
+int command_reload(redis_client_t *client) {
+    char target[COMMAND_MAXLEN];
+    namespace_t *namespace = NULL;
+    resp_request_t *request = client->request;
+
+    // command restricted to admin only
+    if(!command_admin_authorized(client))
+        return 1;
+
+    if(!command_args_validate(client, 2))
+        return 1;
+
+    if(request->argv[1]->length > 128) {
+        redis_hardsend(client, "-Namespace too long");
+        return 1;
+    }
+
+    // get name as usable string
+    sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
+
+    // checking for existing namespace
+    if(!(namespace = namespace_get(target))) {
+        debug("[-] command: nsset: namespace not found\n");
+        redis_hardsend(client, "-Namespace not found");
+        return 1;
+    }
+
+    // reload that namespace
+    namespace_reload(client->ns);
+
+    redis_hardsend(client, "+OK");
+
+    return 0;
+}
+

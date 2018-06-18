@@ -190,6 +190,19 @@ namespace_t *namespace_ensure(namespace_t *namespace) {
     return namespace;
 }
 
+// lazy load a namespace
+// this just populate data and index from disk
+// based on an existing namespace object
+// this can be used to load and reload a namespace
+static int namespace_load_lazy(ns_root_t *nsroot, namespace_t *namespace) {
+    // now, we are sure the namespace exists, but it's maybe empty
+    // let's call index and data initializer, they will take care about that
+    namespace->index = index_init(nsroot->settings, namespace->indexpath, namespace, nsroot->branches);
+    namespace->data = data_init(nsroot->settings, namespace->datapath, namespace->index->indexid);
+
+    return 0;
+}
+
 // load (or create if it doesn't exists) a namespace
 static namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
     namespace_t *namespace;
@@ -212,12 +225,9 @@ static namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
     if(!namespace_ensure(namespace))
         return NULL;
 
+    // load data from disk
     namespace_descriptor_load(namespace);
-
-    // now, we are sure the namespace exists, but it's maybe empty
-    // let's call index and data initializer, they will take care about that
-    namespace->index = index_init(nsroot->settings, namespace->indexpath, namespace, nsroot->branches);
-    namespace->data = data_init(nsroot->settings, namespace->datapath, namespace->index->indexid);
+    namespace_load_lazy(nsroot, namespace);
 
     return namespace;
 }
@@ -446,6 +456,22 @@ static void namespace_kick_slot(namespace_t *namespace) {
             return;
         }
     }
+}
+
+int namespace_reload(namespace_t *namespace) {
+    debug("[+] namespace: reloading: %s\n", namespace->name);
+
+    debug("[+] namespace: reload: cleaning index\n");
+    index_clean_namespace(namespace->index, namespace);
+
+    debug("[+] namespace: reload: destroying objects\n")
+    index_destroy(namespace->index);
+    data_destroy(namespace->data);
+
+    debug("[+] namespace: reload: reloading data\n");
+    namespace_load_lazy(nsroot, namespace);
+
+    return 0;
 }
 
 //
