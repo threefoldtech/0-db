@@ -390,7 +390,7 @@ int command_reload(redis_client_t *client) {
     }
 
     // reload that namespace
-    namespace_reload(client->ns);
+    namespace_reload(namespace);
 
     redis_hardsend(client, "+OK");
 
