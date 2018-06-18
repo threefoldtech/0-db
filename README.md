@@ -212,12 +212,15 @@ First argument is `Hook Name`, second argument is `Generated ID`, next arguments
 
 Current supported hooks:
 
-| Hook Name | Action                  | Arguments                  |
-| --------- | ----------------------- | -------------------------- |
-| `ready`   | Server is ready         | (none)                     |
-| `close`   | Server closing (nicely) | (none)                     |
-| `jump`    | Data/Index incremented  | Closing and New index file |
-| `crash`   | Server crashed          | (none)                     |
+| Hook Name             | Action                  | Arguments                  |
+| --------------------- | ----------------------- | -------------------------- |
+| `ready`               | Server is ready         | (none)                     |
+| `close`               | Server closing (nicely) | (none)                     |
+| `jump`                | Data/Index incremented  | Closing and New index file |
+| `crash`               | Server crashed          | (none)                     |
+| `namespace-created`   | New namespace created   | Namespace name             |
+| `namespace-deleted`   | Namespace removed       | Namespace name             |
+| `namespace-reloaded`  | Namespace reloaded      | Namespace name             |
 
 # Tests
 You can run a sets of test on a running 0-db instance.
