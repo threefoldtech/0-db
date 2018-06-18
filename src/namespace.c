@@ -17,6 +17,7 @@
 #include "namespace.h"
 #include "filesystem.h"
 #include "redis.h"
+#include "hook.h"
 
 // we keep a list of namespace currently used
 // each namespace used will keep file descriptor opened
@@ -274,6 +275,17 @@ static namespace_t *namespace_push(ns_root_t *root, namespace_t *namespace) {
     return namespace;
 }
 
+static void namespace_create_hook(namespace_t *namespace) {
+    if(!rootsettings.hook)
+        return;
+
+    hook_t *hook = hook_new("namespace-created", 2);
+    hook_append(hook, rootsettings.zdbid ? rootsettings.zdbid : "unknown-id");
+    hook_append(hook, namespace->name);
+    hook_execute(hook);
+    hook_free(hook);
+}
+
 //
 // create (load) a new namespace
 //
@@ -292,6 +304,9 @@ int namespace_create(char *name) {
     // append the namespace to the main list
     if(!namespace_push(nsroot, namespace))
         return 0;
+
+    // hook notification
+    namespace_create_hook(namespace);
 
     return 1;
 }
@@ -458,6 +473,23 @@ static void namespace_kick_slot(namespace_t *namespace) {
     }
 }
 
+// trigger hook when namespace is reloaded
+static void namespace_reload_hook(namespace_t *namespace) {
+    if(!rootsettings.hook)
+        return;
+
+    hook_t *hook = hook_new("namespace-reloaded", 2);
+    hook_append(hook, rootsettings.zdbid ? rootsettings.zdbid : "unknown-id");
+    hook_append(hook, namespace->name);
+    hook_execute(hook);
+    hook_free(hook);
+}
+
+// start a namespace reload procees
+// when reloading a namespace, we destroy it from
+// memory then reload contents, we don't change anything related
+// to the namespace object itself (this object is linked to users)
+// we only refresh data and index pointers
 int namespace_reload(namespace_t *namespace) {
     debug("[+] namespace: reloading: %s\n", namespace->name);
 
@@ -471,7 +503,21 @@ int namespace_reload(namespace_t *namespace) {
     debug("[+] namespace: reload: reloading data\n");
     namespace_load_lazy(nsroot, namespace);
 
+    // hook notification
+    namespace_reload_hook(namespace);
+
     return 0;
+}
+
+static void namespace_delete_hook(namespace_t *namespace) {
+    if(!rootsettings.hook)
+        return;
+
+    hook_t *hook = hook_new("namespace-deleted", 2);
+    hook_append(hook, rootsettings.zdbid ? rootsettings.zdbid : "unknown-id");
+    hook_append(hook, namespace->name);
+    hook_execute(hook);
+    hook_free(hook);
 }
 
 //
@@ -501,6 +547,9 @@ int namespace_delete(namespace_t *namespace) {
 
     debug("[+] namespace: removing: %s\n", namespace->datapath);
     dir_remove(namespace->datapath);
+
+    // hook notification
+    namespace_delete_hook(namespace);
 
     // unallocating this namespace
     namespace_free(namespace);
