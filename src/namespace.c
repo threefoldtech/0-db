@@ -205,7 +205,8 @@ static int namespace_load_lazy(ns_root_t *nsroot, namespace_t *namespace) {
 }
 
 // load (or create if it doesn't exists) a namespace
-static namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
+
+namespace_t *namespace_load_light(ns_root_t *nsroot, char *name) {
     namespace_t *namespace;
 
     debug("[+] namespaces: loading '%s'\n", name);
@@ -226,12 +227,25 @@ static namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
     if(!namespace_ensure(namespace))
         return NULL;
 
-    // load data from disk
+    // load descriptor from disk
     namespace_descriptor_load(namespace);
+
+    return namespace;
+}
+
+namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
+    namespace_t *namespace;
+
+    // basic namespace loader/creation
+    if(!(namespace = namespace_load_light(nsroot, name)))
+        return NULL;
+
+    // memory populating
     namespace_load_lazy(nsroot, namespace);
 
     return namespace;
 }
+
 
 //
 // add a namespace to the main namespaces list

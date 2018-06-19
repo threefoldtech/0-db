@@ -65,5 +65,8 @@
     int namespaces_destroy();
     int namespaces_emergency();
 
+    namespace_t *namespace_load(ns_root_t *nsroot, char *name);
+    namespace_t *namespace_load_light(ns_root_t *nsroot, char *name);
+
     namespace_t *namespace_get_default();
 #endif
