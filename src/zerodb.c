@@ -158,12 +158,15 @@ static void sighandler(int signal) {
 static void zdbid_set(char *listenaddr, int port, char *socket) {
     if(socket) {
         // unix socket
-        asprintf(&rootsettings.zdbid, "unix://%s", socket);
+        if(asprintf(&rootsettings.zdbid, "unix://%s", socket) < 0)
+            diep("asprintf");
+
         return;
     }
 
     // default tcp
-    asprintf(&rootsettings.zdbid, "tcp://%s:%d", listenaddr, port);
+    if(asprintf(&rootsettings.zdbid, "tcp://%s:%d", listenaddr, port) < 0)
+        diep("asprintf");
 }
 
 static int proceed(struct settings_t *settings) {

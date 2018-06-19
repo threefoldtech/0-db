@@ -132,7 +132,7 @@ void index_open_final(index_root_t *root) {
 // data file, we only do this when datafile changes basicly, this is
 // triggered by a datafile too big event
 size_t index_jump_next(index_root_t *root) {
-    hook_t *hook;
+    hook_t *hook = NULL;
 
     verbose("[+] index: jumping to the next file\n");
 

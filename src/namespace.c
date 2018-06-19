@@ -510,7 +510,7 @@ int namespace_reload(namespace_t *namespace) {
     debug("[+] namespace: reload: cleaning index\n");
     index_clean_namespace(namespace->index, namespace);
 
-    debug("[+] namespace: reload: destroying objects\n")
+    debug("[+] namespace: reload: destroying objects\n");
     index_destroy(namespace->index);
     data_destroy(namespace->data);
 
