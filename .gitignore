@@ -57,8 +57,10 @@ bin/zdb*
 
 # binary files
 bin/zdb
-bin/integrity-check
+bin/zdb-integrity-check
+bin/zdb-index-dump
 bin/zdbtests
 src/zdb
-tools/integrity-check
+tools/integrity-check/integrity-check
+tools/index-dump/index-dump
 tests/zdbtests
