@@ -222,6 +222,14 @@ Current supported hooks:
 | `namespace-deleted`   | Namespace removed       | Namespace name             |
 | `namespace-reloaded`  | Namespace reloaded      | Namespace name             |
 
+# Limitation
+By default, each datafile is split when bigger than 256 MB.
+
+The datafile id is stored on 16 bits, which makes maximum of 65536 files.
+A database can be maximum ~16 TB. Since one single 0-db is made to be used on a single dedicated disk,
+this should be good, but that's still a hard limitation. This limitation can be changed by changing
+the datafile split size (`data.h`: `DATA_MAXSIZE`), limitation will always be `2^16 * DATA_MAXSIZE`.
+
 # Tests
 You can run a sets of test on a running 0-db instance.
 Theses tests (optional) requires `hiredis` library.
