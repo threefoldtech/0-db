@@ -16,13 +16,8 @@
 #include "index.h"
 #include "data.h"
 #include "namespace.h"
-
-typedef struct compaction_t {
-    char *datapath;
-    char *indexpath;
-    char *namespace;
-
-} compaction_t;
+#include "compaction.h"
+#include "validity.h"
 
 static struct option long_options[] = {
     {"data",       required_argument, 0, 'd'},
@@ -58,86 +53,8 @@ void hexdump(void *input, size_t length) {
     free(output);
 }
 
-static char *index_date(uint32_t epoch, char *target, size_t length) {
-    struct tm *timeval;
-    time_t unixtime;
-
-    unixtime = epoch;
-
-    timeval = localtime(&unixtime);
-    strftime(target, length, "%F %T", timeval);
-
-    return target;
-}
-
-int index_dump(int fd) {
-    index_t header;
-    char entrydate[64];
-
-    // first step, let's validate the header
-    if(read(fd, &header, sizeof(index_t)) != (size_t) sizeof(index_t)) {
-        fprintf(stderr, "[-] cannot read index header\n");
-        return 1;
-    }
-
-    if(memcmp(header.magic, "IDX0", 4) != 0) {
-        fprintf(stderr, "[-] index header magic mismatch\n");
-        return 1;
-    }
-
-    if(header.version != ZDB_IDXFILE_VERSION) {
-        fprintf(stderr, "[-] index version mismatch (%d <> %d)\n", header.version, ZDB_IDXFILE_VERSION);
-        return 1;
-    }
-
-    printf("[+] index header seems correct\n");
-
-    // now it's time to read each entries
-    // each time, one entry starts by the entry-header
-    // then entry payload.
-    // the entry headers starts with the amount of bytes
-    // of the key, which is needed to read the full header
-    uint8_t idlength;
-    index_item_t *entry = NULL;
-    size_t entrycount = 0;
-
-    while(read(fd, &idlength, sizeof(idlength)) == sizeof(idlength)) {
-        // we have the length of the key
-        ssize_t entrylength = sizeof(index_item_t) + idlength;
-        if(!(entry = realloc(entry, entrylength)))
-            diep("realloc");
-
-        // rollback the 1 byte read for the id length
-        off_t curoff = lseek(fd, -1, SEEK_CUR);
-
-        if(read(fd, entry, entrylength) != entrylength)
-            diep("index header read failed");
-
-        entrycount += 1;
-
-        index_date(entry->timestamp, entrydate, sizeof(entrydate));
-
-        printf("[+] index entry: %lu, offset: %lu\n", entrycount, curoff);
-        printf("[+]   id length  : %d\n", entry->idlength);
-        printf("[+]   data length: %" PRIu64 "\n", entry->length);
-        printf("[+]   data offset: %" PRIu64 "\n", entry->offset);
-        printf("[+]   data fileid: %u\n", entry->dataid);
-        printf("[+]   entry flags: 0x%X\n", entry->flags);
-        printf("[+]   entry date : %s\n", entrydate);
-        printf("[+]   entry key  : ");
-        hexdump(entry->id, entry->idlength);
-        printf("\n");
-    }
-
-    printf("[+] ---------------------------\n");
-    printf("[+] all done, entry found: %lu\n", entrycount);
-
-    free(entry);
-
-    return 0;
-}
-
 int namespace_compaction(compaction_t *compaction) {
+    char filename[512];
     settings_t zdbsettings = {
         .datapath = compaction->datapath,
         .indexpath = compaction->indexpath,
@@ -149,70 +66,13 @@ int namespace_compaction(compaction_t *compaction) {
     // load our single namespace
     namespace_t *namespace = namespace_load_light(nsroot, compaction->namespace);
 
-    return 0;
-}
+    uint64_t maxfiles = (1 << (sizeof(((data_root_t *) 0)->dataid) * 8));
 
-int file_check(char *target) {
-    struct stat sb;
+    for(size_t fileid = 0; fileid < maxfiles; fileid++) {
+        snprintf(filename, sizeof(filename), "%s/zdb-data-%05lu", namespace->datapath, fileid);
+        printf("[+] opening file: %s\n", filename);
 
-    if(stat(target, &sb) != 0)
-        diep(target);
 
-    if(!S_ISREG(sb.st_mode))
-        return 1;
-
-    return 0;
-}
-
-int directory_check(char *target) {
-    struct stat sb;
-
-    if(stat(target, &sb) != 0)
-        diep(target);
-
-    if(!S_ISDIR(sb.st_mode))
-        return 1;
-
-    return 0;
-}
-
-int validity_check(compaction_t *compaction) {
-    char filename[256];
-    char buffer[8192];
-    int fd;
-
-    // preliminary check
-    // does index path is a directory
-    if(directory_check(compaction->indexpath)) {
-        fprintf(stderr, "[-] %s: target is not a directory\n", compaction->indexpath);
-        return 1;
-    }
-
-    // does the namespace index directory exists
-    snprintf(filename, sizeof(filename), "%s/%s", compaction->indexpath, compaction->namespace);
-    if(directory_check(filename)) {
-        fprintf(stderr, "[-] %s: target is not a directory\n", filename);
-        return 1;
-    }
-
-    // does the data directory exists
-    if(directory_check(compaction->datapath)) {
-        fprintf(stderr, "[-] %s: target is not a directory\n", compaction->datapath);
-        return 1;
-    }
-
-    // does data namespace directory exists
-    snprintf(filename, sizeof(filename), "%s/%s", compaction->datapath, compaction->namespace);
-    if(directory_check(filename)) {
-        fprintf(stderr, "[-] %s: target is not a directory\n", filename);
-        return 1;
-    }
-
-    // zdb validity check
-    snprintf(filename, sizeof(filename), "%s/%s/zdb-namespace", compaction->indexpath, compaction->namespace);
-    if(file_check(filename)) {
-        fprintf(stderr, "[-] %s: invalid namespace descriptor\n", filename);;
-        return 1;
     }
 
     return 0;
