@@ -305,7 +305,9 @@ static size_t index_load_file(index_root_t *root) {
 // load all the index found
 // if no index files exists, we create the original one
 static void index_load(index_root_t *root) {
-    for(root->indexid = 0; root->indexid < 65535; root->indexid++) {
+    uint64_t maxfiles = (1 << (sizeof(((index_entry_t *) 0)->dataid) * 8));
+
+    for(root->indexid = 0; root->indexid < maxfiles; root->indexid++) {
         index_set_id(root);
 
         if(index_load_file(root) == 0) {
