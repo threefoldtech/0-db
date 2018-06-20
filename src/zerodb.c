@@ -341,8 +341,24 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    //
+    // print information relative to database instance
+    //
     printf("[+] system: running mode: " COLOR_GREEN "%s" COLOR_RESET "\n", modes[settings->mode]);
 
+    // max files is limited by type length of dataid, which is uint16 by default
+    // taking field size in bytes, multiplied by 8 for bits
+    size_t maxfiles = 1 << sizeof(((data_root_t *) 0)->dataid) * 8;
+
+    // max database size is maximum datafile size multiplied by amount of files
+    uint64_t maxsize = maxfiles * DATA_MAXSIZE;
+
+    verbose("[+] system: maximum database size: %.1f TB\n", maxsize / (1024 * 1024 * 1024 * 1024.0));
+
+    //
+    // ensure default directories
+    // for a fresh start if this is a new instance
+    //
     if(!dir_exists(settings->datapath)) {
         verbose("[+] system: creating datapath: %s\n", settings->datapath);
         dir_create(settings->datapath);
@@ -353,5 +369,6 @@ int main(int argc, char *argv[]) {
         dir_create(settings->indexpath);
     }
 
+    // let's go
     return proceed(settings);
 }
