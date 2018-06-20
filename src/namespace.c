@@ -391,19 +391,19 @@ static int namespace_scanload(ns_root_t *root) {
 //
 // this is why it's here we take care about cleaning and emergencies, it's the only
 // place where we __knows__ what we needs to clean
-int namespaces_init(settings_t *settings) {
-    verbose("[+] namespaces: initializing\n");
+ns_root_t *namespaces_allocate(settings_t *settings) {
+    ns_root_t *root;
 
     // we start by the default namespace
-    if(!(nsroot = (ns_root_t *) malloc(sizeof(ns_root_t))))
+    if(!(root = (ns_root_t *) malloc(sizeof(ns_root_t))))
         diep("namespaces malloc");
 
-    nsroot->length = 1;             // we start with the default one, only
-    nsroot->effective = 1;          // no namespace really loaded yet
-    nsroot->settings = settings;    // keep reference to the settings, needed for paths
-    nsroot->branches = NULL;        // maybe we don't need the branches, see below
+    root->length = 1;             // we start with the default one, only
+    root->effective = 1;          // no namespace really loaded yet
+    root->settings = settings;    // keep reference to the settings, needed for paths
+    root->branches = NULL;        // maybe we don't need the branches, see below
 
-    if(!(nsroot->namespaces = (namespace_t **) malloc(sizeof(namespace_t *) * nsroot->length)))
+    if(!(root->namespaces = (namespace_t **) malloc(sizeof(namespace_t *) * root->length)))
         diep("namespace malloc");
 
     // allocating (if needed, only some modes needs it) the big (single) index branches
@@ -411,9 +411,18 @@ int namespaces_init(settings_t *settings) {
         debug("[+] namespaces: pre-allocating index (%d lazy branches)\n", buckets_branches);
 
         // allocating minimal branches array
-        if(!(nsroot->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches)))
+        if(!(root->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches)))
             diep("calloc");
     }
+
+    return root;
+}
+
+int namespaces_init(settings_t *settings) {
+    verbose("[+] namespaces: initializing\n");
+
+    // allocating global namespaces
+    nsroot = namespaces_allocate(settings);
 
     // namespace 0 will always be the default one
     if(!(nsroot->namespaces[0] = namespace_load(nsroot, NAMESPACE_DEFAULT))) {

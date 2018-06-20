@@ -62,6 +62,7 @@
     void namespace_commit(namespace_t *namespace);
 
     int namespaces_init(settings_t *settings);
+    ns_root_t *namespaces_allocate(settings_t *settings);
     int namespaces_destroy();
     int namespaces_emergency();
 
