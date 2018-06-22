@@ -411,8 +411,8 @@ ns_root_t *namespaces_allocate(settings_t *settings) {
         debug("[+] namespaces: pre-allocating index (%d lazy branches)\n", buckets_branches);
 
         // allocating minimal branches array
-        if(!(root->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches)))
-            diep("calloc");
+        if(!(root->branches = index_buckets_init()))
+            diep("buckets allocation");
     }
 
     return root;

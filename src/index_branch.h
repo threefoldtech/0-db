@@ -6,6 +6,7 @@
     extern uint32_t buckets_mask;
 
     int index_set_buckets_bits(uint8_t bits);
+    index_branch_t **index_buckets_init();
 
     // initializers
     index_branch_t *index_branch_init(index_branch_t **branches, uint32_t branchid);

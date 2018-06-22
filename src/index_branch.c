@@ -43,6 +43,10 @@ int index_set_buckets_bits(uint8_t bits) {
 // this allows us to use lot of branch (buckets_branches) in this case)
 // without consuming all the memory if we don't need it
 //
+index_branch_t **index_buckets_init() {
+    return (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches);
+}
+
 index_branch_t *index_branch_init(index_branch_t **branches, uint32_t branchid) {
     // debug("[+] initializing branch id 0x%x\n", branchid);
 
