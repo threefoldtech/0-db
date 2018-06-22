@@ -91,25 +91,45 @@ static int index_read(int fd, void *buffer, size_t length) {
     return 1;
 }
 
+// convert a binary direct-key to a readable
+// direct-key structure
+index_dkey_t *index_dkey_from_key(index_dkey_t *dkey, unsigned char *buffer, uint8_t length) {
+    if(length != sizeof(index_dkey_t))
+        return NULL;
+
+    // binary copy buffer
+    memcpy(dkey, buffer, length);
+
+    return dkey;
+}
 
 // set global filename based on the index id
 void index_set_id(index_root_t *root) {
     sprintf(root->indexfile, "%s/zdb-index-%05u", root->indexdir, root->indexid);
 }
 
-static int index_open_file(index_root_t *root, int fileid) {
+static int index_open_file_mode(index_root_t *root, uint16_t fileid, int mode) {
     char filename[512];
+    char *rdflagstr = (mode & O_RDONLY) ? "yes" : "no";
     int fd;
 
     sprintf(filename, "%s/zdb-index-%05u", root->indexdir, fileid);
-    debug("[+] index: opening file: %s\n", filename);
+    debug("[+] index: opening file: %s (ro: %s)\n", filename, rdflagstr);
 
-    if((fd = open(filename, O_RDONLY)) < 0) {
+    if((fd = open(filename, mode)) < 0) {
         warnp(filename);
         return -1;
     }
 
     return fd;
+}
+
+static int index_open_file(index_root_t *root, int fileid) {
+    return index_open_file_mode(root, fileid, O_RDONLY);
+}
+
+static int index_open_file_rw(index_root_t *root, int fileid) {
+    return index_open_file_mode(root, fileid, O_RDWR);
 }
 
 // open the current filename set on the global struct
@@ -348,21 +368,39 @@ index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlengt
     return entry;
 }
 
+static int index_rewrite_entry(index_root_t *root, index_item_t *entry, size_t length, uint16_t fileid, size_t offset) {
+    int fd;
+
+    if((fd = index_open_file_rw(root, fileid)) < 0)
+        return 0;
+
+    lseek(fd, offset, SEEK_SET);
+
+    if(!index_write(fd, entry, length, root)) {
+        warnp("index: rewrite entry");
+        close(fd);
+        return 0;
+    }
+
+    close(fd);
+
+    return 1;
+}
+
+// IMPORTANT:
+//   this function is the only one to 'break' the always append
+//   behavior, this function will overwrite existing index by
+//   seeking and rewrite header, **only** in direct-mode
+//
+// when deleting some data, we mark (flag) this data as deleted which
+// allows two things
+//   - we can do compaction offline by removing theses blocks
+//   - since direct-key mode use keys which contains file location's
+//     dependant information, we can't do anything else than updating
+//     existing data
+//     we do this in the index file and not in the data file so we keep
+//     the data file really always append in any case
 index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
-    #if 0
-    index_entry_t *entry = index_entry_get(root, id, idlength);
-
-    if(!entry) {
-        verbose("[-] index: key not found\n");
-        return NULL;
-    }
-
-    if(entry->flags & INDEX_ENTRY_DELETED) {
-        verbose("[-] index: key already deleted\n");
-        return NULL;
-    }
-    #endif
-
     // mark entry as deleted
     entry->flags |= INDEX_ENTRY_DELETED;
 
@@ -377,8 +415,31 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
     index_transition->dataid = entry->dataid;
     index_transition->timestamp = (uint32_t) time(NULL);
 
-    if(!index_write(root->indexfd, index_transition, entrylength, root))
-        return NULL;
+    if(rootsettings.mode == DIRECTKEY) {
+        // tricky case
+        // when we are in direct mode, we need to update the existing
+        // header entry with the new flag
+        // we first resolve fileid and location, then open it in update mode
+        // and overwrite the entry
+        index_dkey_t directkey;
+
+        if(!(index_dkey_from_key(&directkey, index_transition->id, index_transition->idlength))) {
+            debug("[-] index: delete: cannot convert key requested\n");
+            return NULL;
+        }
+
+        size_t offset = index_offset_objectid(directkey.objectid);
+        debug("[+] index: delete: directkey: resolved [%d, %lu]\n", directkey.indexid, offset);
+
+        if(!(index_rewrite_entry(root, index_transition, entrylength, directkey.indexid, offset)))
+            return NULL;
+
+    } else {
+        // by default, just append a new entry with
+        // flag set up
+        if(!index_write(root->indexfd, index_transition, entrylength, root))
+            return NULL;
+    }
 
     return entry;
 }
@@ -489,3 +550,4 @@ int index_emergency(index_root_t *root) {
     fsync(root->indexfd);
     return 1;
 }
+

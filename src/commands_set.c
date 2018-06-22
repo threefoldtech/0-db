@@ -37,7 +37,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client) {
 
     // insert the data on the datafile
     // this will returns us the offset where the header is
-    size_t offset = data_insert(data, value, valuelength, id, idlength);
+    size_t offset = data_insert(data, value, valuelength, id, idlength, 0);
 
     // checking for writing error
     // if we couldn't write the data, we won't add entry on the index
@@ -115,7 +115,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client) {
     // insert the data on the datafile
     // this will returns us the offset where the header is
     // size_t offset = data_insert(value, valuelength, id, idlength);
-    size_t offset = data_insert(data, value, valuelength, &id, idlength);
+    size_t offset = data_insert(data, value, valuelength, &id, idlength, 0);
 
     // checking for writing error
     // if we couldn't write the data, we won't add entry on the index
@@ -175,7 +175,7 @@ static size_t redis_set_handler_directkey(redis_client_t *client) {
 
     // insert the data on the datafile
     // this will returns us the offset where the header is
-    size_t offset = data_insert(data, value, valuelength, &id, idlength);
+    size_t offset = data_insert(data, value, valuelength, &id, idlength, 0);
 
     // checking for writing error
     // if we couldn't write the data, we won't add entry on the index

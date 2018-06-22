@@ -31,10 +31,15 @@ static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
     // converting binary key to internal struct
     index_dkey_t directkey;
 
-    memcpy(&directkey, request->argv[1]->buffer, sizeof(index_dkey_t));
-    memcpy(index_reusable_entry->id, request->argv[1]->buffer, sizeof(index_dkey_t));
+    if(!index_dkey_from_key(&directkey, request->argv[1]->buffer, sizeof(index_dkey_t))) {
+        debug("[-] command: get: cannot convert requested key\n");
+        return NULL;
+    }
 
     debug("[+] command: get: direct [%d, %d]\n", directkey.indexid, directkey.objectid);
+
+    // copy key id directly into the reusable object, as it
+    memcpy(index_reusable_entry->id, request->argv[1]->buffer, sizeof(index_dkey_t));
 
     // extract needed data
     size_t offset = index_offset_objectid(directkey.objectid);

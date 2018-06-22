@@ -107,11 +107,16 @@ static int data_open_id(data_root_t *root, uint16_t id) {
     return data_open_id_mode(root, id, O_RDONLY);
 }
 
+// since data are **really** always append
+// there is no more reason to keep a read-write function
+// let keep it here for history reason
+#if 0
 // special case (for deletion) where read-write is needed
 // and not in append mode
-int data_get_dataid_rw(data_root_t *root, uint16_t id) {
+static int data_get_dataid_rw(data_root_t *root, uint16_t id) {
     return data_open_id_mode(root, id, O_RDWR);
 }
+#endif
 
 
 // main function to call when you need to deal with data id
@@ -376,7 +381,7 @@ int data_check(data_root_t *root, size_t offset, uint16_t dataid) {
 
 
 // insert data on the datafile and returns it's offset
-size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength) {
+size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength, uint8_t flags) {
     unsigned char *id = (unsigned char *) vid;
     size_t offset = lseek(root->datafd, 0, SEEK_END);
     size_t headerlength = sizeof(data_entry_header_t) + idlength;
@@ -389,7 +394,7 @@ size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, 
     header->datalength = datalength;
     header->previous = root->previous;
     header->integrity = data_crc32(data, datalength);
-    header->flags = 0;
+    header->flags = flags;
     header->timestamp = time(NULL);
 
     memcpy(header->id, id, idlength);
@@ -509,7 +514,6 @@ size_t data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, 
 
     return length;
 }
-#endif
 
 int data_delete_real(int fd, size_t offset) {
     data_entry_header_t header;
@@ -537,36 +541,21 @@ int data_delete_real(int fd, size_t offset) {
 
     return 1;
 }
+#endif
 
-// IMPORTANT:
-//   this function is the only one to 'break' the always append
-//   behavior, this function will overwrite existing index by
-//   seeking and rewrite headers
-//
-// when deleting some data, we mark (flag) this data as deleted which
-// allows two things
-//   - we can do compaction offline by removing theses blocks
-//   - we still can rebuild an index based on datafile only
-//
-// during runtime, this flag will be checked only using the data_match
-// function
-int data_delete(data_root_t *root, size_t offset, uint16_t dataid) {
-    int fd;
+// add a new empty entry, flagged as deleted
+// with the id, so we know (when reading the datafile) that this key
+// was deleted
+// this is needed in order to rebuild an index from data file and
+// for compaction process
+int data_delete(data_root_t *root, void *id, uint8_t idlength) {
+    unsigned char *empty = (unsigned char *) "";
 
-    debug("[+] data: delete: opening datafile in read-write mode\n");
-
-    // acquire data id fd
-    if((fd = data_get_dataid_rw(root, dataid)) < 0) {
-        debug("[-] data: delete: could not open requested file id (%u)\n", dataid);
+    debug("[+] data: delete: insert empty flagged data\n");
+    if(!(data_insert(root, empty, 0, id, idlength, DATA_ENTRY_DELETED)))
         return 0;
-    }
 
-    int value = data_delete_real(fd, offset);
-
-    // release dataid
-    close(fd);
-
-    return value;
+    return 1;
 }
 
 uint16_t data_dataid(data_root_t *root) {

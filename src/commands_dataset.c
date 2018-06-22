@@ -141,7 +141,7 @@ int command_del(redis_client_t *client) {
     }
 
     // deleting data part
-    if(!data_delete(data, entry->offset, entry->dataid)) {
+    if(!data_delete(data, entry->id, entry->idlength)) {
         debug("[-] command: del: deleting data failed\n");
         redis_hardsend(client, "-Cannot delete key");
         return 0;
