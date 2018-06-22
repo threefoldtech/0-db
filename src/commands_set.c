@@ -160,6 +160,7 @@ static size_t redis_set_handler_directkey(redis_client_t *client) {
     resp_request_t *request = client->request;
     index_root_t *index = client->ns->index;
     data_root_t *data = client->ns->data;
+    index_entry_t *idxentry = NULL;
 
     // create some easier accessor
     uint8_t idlength = sizeof(index_dkey_t);
@@ -195,11 +196,14 @@ static size_t redis_set_handler_directkey(redis_client_t *client) {
     // since there was no index, but now we use the index as statistics
     // manager, we use index, on the branch code, if there is no index in
     // memory, the memory part is skipped but index is still written
-    if(!index_entry_insert(index, &id, idlength, offset, request->argv[2]->length)) {
+    if(!(idxentry = index_entry_insert(index, &id, idlength, offset, request->argv[2]->length))) {
         // cannot insert index (disk issue)
         redis_hardsend(client, "$-1");
         return 0;
     }
+
+    // cleaning this entry, we don't need it in memory
+    free(idxentry);
 
     // building response
     // here, from original redis protocol, we don't reply with a basic
@@ -250,7 +254,10 @@ int command_set(redis_client_t *client) {
     // and the maxsize of the namespace is reached, we need
     // to know if the replacement data is shorter, this is
     // a valid and legitimate insert request
-    if(request->argv[1]->length) {
+    //
+    // this make no sense in direct key mode, since we can't
+    // update an existing key, we can only delete it
+    if(request->argv[1]->length && rootsettings.mode != DIRECTKEY) {
         // userkey id is not null
         if((entry = redis_get_handlers[rootsettings.mode](client))) {
             floating = entry->length;

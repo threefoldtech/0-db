@@ -280,15 +280,22 @@ static size_t index_load_file(index_root_t *root) {
     root->nextid = 0;
 
     while(seeker < filebuf + fullsize) {
+        index_entry_t *fresh = NULL;
+
         entry = (index_item_t *) seeker;
 
         // insert this entry like it was inserted by a user
         // this allows us to keep a generic way of inserting data and keeping a
         // single point of logic when adding data (logic for overwrite, resize bucket, ...)
-        index_entry_insert_memory(root, entry->id, entry->idlength, entry->offset, entry->length, entry->flags);
+        fresh = index_entry_insert_memory(root, entry->id, entry->idlength, entry->offset, entry->length, entry->flags);
 
         // moving seeker to next entry in the buffer
         seeker += sizeof(index_item_t) + entry->idlength;
+
+        // cleaning this entry in direct mode
+        // we don't keep any key in memory, just the statistics
+        if(rootsettings.mode == DIRECTKEY)
+            free(fresh);
     }
 
     // freeing buffer memory
@@ -378,7 +385,7 @@ static void index_allocate_single() {
     // object now and reuse the same all the time
     //
     // this is allocated, when index mode can be different on runtime
-    if(!(index_reusable_entry = (index_entry_t *) malloc(sizeof(index_entry_t))))
+    if(!(index_reusable_entry = (index_entry_t *) malloc(sizeof(index_entry_t) + MAX_KEY_LENGTH)))
         diep("malloc");
 }
 
