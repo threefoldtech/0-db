@@ -1,14 +1,29 @@
 # 0-db [![Build Status](https://travis-ci.org/rivine/0-db.svg?branch=master)](https://travis-ci.org/zero-os/0-db)
 0-db is a super fast and efficient key-value store redis-protocol (mostly) compatible which
-makes data persistant inside an always append index/datafile, with namespaces support.
+makes data persistant inside an always append datafile, with namespaces support.
+
+Indexes are created to speedup restart/reload process, this index is always append too,
+except in direct-mode (see below for more information).
 
 We use it as backend for many of our blockchain work and might replace redis for basic
 SET and GET request.
 
+# Quick links
+1. [Build targets](#build-targets)
+2. [Build instructions](#build-instructions)
+3. [Always append](#always-append)
+4. [Running modes](#running-modes)
+5. [Implementation](#implementation)
+6. [Supported commands](#supported-commands)
+7. [Namespaces](#namespaces)
+8. [Hook system](#hook-system)
+9. [Limitation](#limitation)
+10. [Tests](#tests)
+
 # Build targets
 Currently supported system:
 * Linux (using `epoll`)
-* MacOS / FreeBSD (using `kqueue`)
+* MacOS and FreeBSD (using `kqueue`)
 
 Currently supported hardware:
 * Any processor supporting `SSE 4.2`
@@ -24,8 +39,38 @@ You can build each parts separatly by running `make` in each separated directori
 
 > By default, the code is compiled in debug mode, in order to use it in production, please use `make release`
 
+# Always append
+Data file (files which contains everything, included payload) are **in any cases** always append:
+any change will result in something appened to files. Data files are immuables. If any suppression is
+made, a new entry is added, with a special flag. This have multiple advantages:
+- Very efficient in HDD (no seek when writing batch of data)
+- More efficient for SSD, longer life, since overwrite doesn't occures
+- Easy for backup or transfert: incremental copy work out-of-box
+- Easy for manipulation: data is flat
+
+Of course, when we have advantages, some cons comes with them:
+- Any overwrite won't clean previous data
+- Deleting data won't actually delete anything in realtime
+- You need some maintenance to keep your database not exploding
+
+Hopefuly, theses cons have their solution:
+- Since data are always append, you can at any time start another process reading that database
+and rewrite data somewhere else, with optimization (removed non-needed files). This is what we call
+`compaction`, and some tools are here to do so.
+- As soon as you have your new files compacted, you can hot-reload the database and profit, without
+loosing your clients (small freeze-time will occures, when reloading the index).
+
+Data files are never reach directly, you need to always hit the index first.
+
+Index files are always append in all modes, except in `direct-mode`. The direct mode is explained below,
+but basicly in this mode, the key depends on the position in the index file. This exception
+make the suppression of that key an **obligation** to edit this entry in place.
+
+Otherwise, index works like data files, with more or less the same data (except payload) and
+have the advantage to be small and load fast (can be fully populated in memory for processing).
+
 # Running modes
-On the runtime, you can choose between multiple mode:
+On runtime, you can choose between multiple mode:
 * `user`: user-key mode
 * `seq`: sequential mode
 * `direct`: direct-position key mode
@@ -54,7 +99,7 @@ data back, without using in-memory index.
 
 There is no update possible in this mode (since the key itself contains data to the real location
 and we use always append method, we can't update existing data). Providing a key has no effect and
-is ignored.
+is ignored. Only a suppression will modify the index, to flag the entry as deleted.
 
 The key returned by the `SET` command is a binary key.
 
