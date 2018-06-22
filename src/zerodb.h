@@ -61,6 +61,7 @@
         int background;   // flag to run in background
         char *logfile;    // where to redirect logs in background mode
         char *hook;       // external hook script to execute
+        size_t datasize;  // maximum datafile size before jumping to next one
 
         char *zdbid;      // fake-0db id generated based on listening
 
@@ -105,6 +106,11 @@
     #define warning(fmt, ...) { printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
     #define success(fmt, ...) { printf(COLOR_GREEN  fmt COLOR_RESET "\n", ##__VA_ARGS__); }
     #define notice(fmt, ...)  { printf(COLOR_CYAN   fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+
+    #define KB(x)   (x / (1024.0))
+    #define MB(x)   (x / (1024 * 1024.0))
+    #define GB(x)   (x / (1024 * 1024 * 1024.0))
+    #define TB(x)   (x / (1024 * 1024 * 1024 * 1024.0))
 
     #ifndef RELEASE
         #define debug(...) { printf(__VA_ARGS__); }

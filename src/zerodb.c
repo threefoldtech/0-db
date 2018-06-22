@@ -35,6 +35,7 @@ settings_t rootsettings = {
     .logfile = NULL,
     .hook = NULL,
     .zdbid = NULL,
+    .datasize = ZDB_DEFAULT_DATA_MAXSIZE,
 };
 
 static struct option long_options[] = {
@@ -52,6 +53,7 @@ static struct option long_options[] = {
     {"logfile",    required_argument, 0, 'o'},
     {"admin",      required_argument, 0, 'a'},
     {"hook",       required_argument, 0, 'k'},
+    {"datasize",   required_argument, 0, 'D'},
     {"help",       no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
@@ -216,7 +218,8 @@ void usage() {
     printf("                       > user: default user key-value mode\n");
     printf("                       > seq: sequential keys generated\n");
     printf("                       > direct: direct position by key\n");
-    printf("                       > block: fixed blocks length (smaller direct)\n\n");
+    printf("                       > block: fixed blocks length (smaller direct)\n");
+    printf("  --datasize <size>   maximum datafile size before split (default: %.2f MB)\n\n", MB(ZDB_DEFAULT_DATA_MAXSIZE));
 
     printf(" Network options:\n");
     printf("  --listen <addr>     listen address (default " ZDB_DEFAULT_LISTENADDR ")\n");
@@ -332,6 +335,10 @@ int main(int argc, char *argv[]) {
                 settings->socket = optarg;
                 break;
 
+            case 'D':
+                settings->datasize = atoi(optarg);
+                break;
+
             case 'h':
                 usage();
 
@@ -351,9 +358,9 @@ int main(int argc, char *argv[]) {
     size_t maxfiles = 1 << sizeof(((data_root_t *) 0)->dataid) * 8;
 
     // max database size is maximum datafile size multiplied by amount of files
-    uint64_t maxsize = maxfiles * DATA_MAXSIZE;
+    uint64_t maxsize = maxfiles * settings->datasize;
 
-    verbose("[+] system: maximum database size: %.1f TB\n", maxsize / (1024 * 1024 * 1024 * 1024.0));
+    verbose("[+] system: maximum database size: %.2f GB\n", GB(maxsize));
 
     //
     // ensure default directories

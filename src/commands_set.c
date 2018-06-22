@@ -274,7 +274,7 @@ int command_set(redis_client_t *client) {
     //
     // if we do this after adding data, we could have an empty data file
     // which will fake the 'previous' offset when computing it on reload
-    if(data_next_offset(client->ns->data) + request->argv[2]->length > DATA_MAXSIZE) {
+    if(data_next_offset(client->ns->data) + request->argv[2]->length > rootsettings.datasize) {
         size_t newid = index_jump_next(client->ns->index);
         data_jump_next(client->ns->data, newid);
     }

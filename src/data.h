@@ -2,7 +2,7 @@
     #define __ZDB_DATA_H
 
     // split datafile after 256 MB
-    #define DATA_MAXSIZE  256 * 1024 * 1024
+    #define ZDB_DEFAULT_DATA_MAXSIZE  256 * 1024 * 1024
 
     // root point of the memory handler
     // used by the data manager
