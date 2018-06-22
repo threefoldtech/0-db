@@ -81,14 +81,14 @@ static void index_dump(index_root_t *root, int fulldump) {
     size_t overhead = (buckets_branches * sizeof(index_branch_t **)) +
                       (branches * sizeof(index_branch_t));
 
-    verbose("[+] index: memory overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
+    verbose("[+] index: memory overhead: %.2f KB (%lu bytes)\n", KB(overhead), overhead);
 }
 
 static void index_dump_statistics(index_root_t *root) {
     verbose("[+] index: load: %lu entries\n", root->entries);
 
-    double datamb = root->datasize / (1024.0 * 1024);
-    double indexkb = root->indexsize / 1024.0;
+    double datamb = MB(root->datasize);
+    double indexkb = KB(root->indexsize);
 
     verbose("[+] index: datasize: " COLOR_CYAN "%.2f MB" COLOR_RESET " (%lu bytes)\n", datamb, root->datasize);
     verbose("[+] index: raw usage: %.1f KB (%lu bytes)\n", indexkb, root->indexsize);
@@ -254,7 +254,7 @@ static size_t index_load_file(index_root_t *root) {
     char *filebuf;
     off_t fullsize = lseek(root->indexfd, 0, SEEK_END);
 
-    debug("[+] index: loading in memory file: %.2f MB\n", fullsize / (1024 * 1024.0));
+    debug("[+] index: loading in memory file: %.2f MB\n", MB(fullsize));
 
     if(!(filebuf = malloc(fullsize)))
         diep("index buffer: malloc");

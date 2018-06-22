@@ -241,10 +241,10 @@ int command_nsinfo(redis_client_t *client) {
     sprintf(info + strlen(info), "public: %s\n", namespace->public ? "yes" : "no");
     sprintf(info + strlen(info), "password: %s\n", namespace->password ? "yes" : "no");
     sprintf(info + strlen(info), "data_size_bytes: %lu\n", namespace->index->datasize);
-    sprintf(info + strlen(info), "data_size_mb: %.2f\n", namespace->index->datasize / (1024 * 1024.0));
+    sprintf(info + strlen(info), "data_size_mb: %.2f\n", MB(namespace->index->datasize));
     sprintf(info + strlen(info), "data_limits_bytes: %lu\n", namespace->maxsize);
     sprintf(info + strlen(info), "index_size_bytes: %lu\n", namespace->index->indexsize);
-    sprintf(info + strlen(info), "index_size_kb: %.2f\n", namespace->index->indexsize / 1024.0);
+    sprintf(info + strlen(info), "index_size_kb: %.2f\n", KB(namespace->index->indexsize));
 
     redis_bulk_t response = redis_bulk(info, strlen(info));
     if(!response.buffer) {
