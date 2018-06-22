@@ -453,7 +453,7 @@ int namespaces_destroy() {
     if(nsroot->branches) {
         debug("[+] namespaces: cleaning branches\n");
         for(uint32_t b = 0; b < buckets_branches; b++)
-            index_branch_free(nsroot->namespaces[0]->index, b);
+            index_branch_free(nsroot->namespaces[0]->index->branches, b);
 
         // freeing the big index array
         free(nsroot->branches);

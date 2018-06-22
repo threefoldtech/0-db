@@ -49,7 +49,7 @@ static void index_dump(index_root_t *root, int fulldump) {
 
     // iterating over each buckets
     for(uint32_t b = 0; b < buckets_branches; b++) {
-        index_branch_t *branch = index_branch_get(root, b);
+        index_branch_t *branch = index_branch_get(root->branches, b);
 
         // skipping empty branch
         if(!branch)

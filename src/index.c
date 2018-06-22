@@ -197,7 +197,7 @@ static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
 // main look-up function, used to get an entry from the memory index
 index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t idlength) {
     uint32_t branchkey = index_key_hash(id, idlength);
-    index_branch_t *branch = index_branch_get(root, branchkey);
+    index_branch_t *branch = index_branch_get(root->branches, branchkey);
     index_entry_t *entry;
 
     // branch not exists
@@ -291,7 +291,7 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
     uint32_t branchkey = index_key_hash(id, idlength);
 
     // commit entry into memory
-    index_branch_append(root, branchkey, entry);
+    index_branch_append(root->branches, branchkey, entry);
 
     // update statistics
     root->entries += 1;
