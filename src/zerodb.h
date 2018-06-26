@@ -10,6 +10,8 @@
     #define ZDB_DEFAULT_LISTENADDR  "0.0.0.0"
     #define ZDB_DEFAULT_PORT        9900
 
+    #define ZDB_PATH_MAX    4096
+
     // define here version of datafile and indexfile
     // theses version are written on header of each file created
     //

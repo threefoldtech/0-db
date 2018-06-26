@@ -20,7 +20,7 @@ int dir_exists(char *path) {
 }
 
 int dir_create(char *path) {
-    char tmp[PATH_MAX], *p = NULL;
+    char tmp[ZDB_PATH_MAX], *p = NULL;
     size_t len;
 
     snprintf(tmp, sizeof(tmp), "%s", path);

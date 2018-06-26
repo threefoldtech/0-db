@@ -89,7 +89,7 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
 // this function open the data file in read only and should
 // not be used to edit or open the current effective current file
 static int data_open_id_mode(data_root_t *root, uint16_t id, int mode) {
-    char temp[PATH_MAX];
+    char temp[ZDB_PATH_MAX];
     int fd;
 
     sprintf(temp, "%s/zdb-data-%05u", root->datadir, id);
@@ -1009,7 +1009,7 @@ data_root_t *data_init(settings_t *settings, char *datapath, uint16_t dataid) {
     data_root_t *root = (data_root_t *) malloc(sizeof(data_root_t));
 
     root->datadir = datapath;
-    root->datafile = malloc(sizeof(char) * (PATH_MAX + 1));
+    root->datafile = malloc(sizeof(char) * (ZDB_PATH_MAX + 1));
     root->dataid = dataid;
     root->sync = settings->sync;
     root->synctime = settings->synctime;

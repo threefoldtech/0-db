@@ -397,7 +397,7 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
 
     root->indexdir = indexdir;
     root->indexid = 0;
-    root->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
+    root->indexfile = malloc(sizeof(char) * (ZDB_PATH_MAX + 1));
     root->nextentry = 0;
     root->nextid = 0;
     root->sync = settings->sync;

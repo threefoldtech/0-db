@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -101,10 +102,10 @@ void namespace_descriptor_update(namespace_t *namespace, int fd) {
 }
 
 static int namespace_descriptor_open(namespace_t *namespace) {
-    char pathname[PATH_MAX];
+    char pathname[ZDB_PATH_MAX];
     int fd;
 
-    snprintf(pathname, PATH_MAX, "%s/zdb-namespace", namespace->indexpath);
+    snprintf(pathname, ZDB_PATH_MAX, "%s/zdb-namespace", namespace->indexpath);
 
     if((fd = open(pathname, O_CREAT | O_RDWR, 0600)) < 0) {
         warning("[-] cannot create or open in read-write the namespace file\n");
@@ -169,10 +170,14 @@ void namespace_commit(namespace_t *namespace) {
 }
 
 static char *namespace_path(char *prefix, char *name) {
-    char pathname[PATH_MAX];
-    snprintf(pathname, PATH_MAX, "%s/%s", prefix, name);
+    char *pathname;
 
-    return strdup(pathname);
+    if(asprintf(&pathname, "%s/%s", prefix, name) < 0) {
+        warnp("asprintf");
+        return NULL;
+    }
+
+    return pathname;
 }
 
 namespace_t *namespace_ensure(namespace_t *namespace) {
