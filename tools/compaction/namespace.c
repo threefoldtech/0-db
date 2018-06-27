@@ -19,13 +19,11 @@
 #include "redis.h"
 #include "hook.h"
 
-uint32_t buckets_branches = 1 << 20;
-
 static int namespace_descriptor_open(namespace_t *namespace) {
-    char pathname[PATH_MAX];
+    char pathname[ZDB_PATH_MAX];
     int fd;
 
-    snprintf(pathname, PATH_MAX, "%s/zdb-namespace", namespace->indexpath);
+    snprintf(pathname, ZDB_PATH_MAX, "%s/zdb-namespace", namespace->indexpath);
 
     if((fd = open(pathname, O_CREAT | O_RDWR, 0600)) < 0) {
         warning("[-] cannot create or open in read-write the namespace file\n");
@@ -75,8 +73,8 @@ static void namespace_descriptor_load(namespace_t *namespace) {
 }
 
 static char *namespace_path(char *prefix, char *name) {
-    char pathname[PATH_MAX];
-    snprintf(pathname, PATH_MAX, "%s/%s", prefix, name);
+    char pathname[ZDB_PATH_MAX];
+    snprintf(pathname, ZDB_PATH_MAX, "%s/%s", prefix, name);
 
     return strdup(pathname);
 }
