@@ -32,7 +32,8 @@
     } __attribute__((packed)) data_header_t;
 
     typedef enum data_flags_t {
-        DATA_ENTRY_DELETED = 1,  // flag entry as deleted
+        DATA_ENTRY_DELETED   = 1,       // flag entry as deleted
+        DATA_ENTRY_TRUNCATED = 1 << 1,  // used on compaction, tell entry was truncated
 
     } data_flags_t;
 
