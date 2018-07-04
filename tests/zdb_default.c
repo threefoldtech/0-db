@@ -73,7 +73,11 @@ runtest_prio(110, default_get_deleted) {
     return zdb_command_error(test, argvsz(argv), argv);
 }
 
-
+// not existing command
+runtest_prio(110, default_unknown_command) {
+    const char *argv[] = {"BIPBIPBIP"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
 
 static int overwrite(test_t *test, char *key, char *original, char *newvalue) {
     redisReply *reply;
@@ -142,6 +146,15 @@ runtest_prio(120, default_exists_deleted) {
     return TEST_FAILED_FATAL;
 }
 
+runtest_prio(120, default_exists_large_key) {
+    const char lkey[512] = {0};
+    memset((char *) lkey, 'x', sizeof(lkey) - 1);
+
+    const char *argv[] = {"EXISTS", lkey};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+
 runtest_prio(120, default_exists) {
     const char *argv[] = {"EXISTS", "hello"};
     long long value = zdb_command_integer(test, argvsz(argv), argv);
@@ -151,6 +164,7 @@ runtest_prio(120, default_exists) {
 
     return TEST_FAILED_FATAL;
 }
+
 
 // command: check
 runtest_prio(120, default_check_missing_args) {
@@ -179,3 +193,42 @@ runtest_prio(120, default_check) {
     return TEST_FAILED_FATAL;
 }
 
+
+// run bunch of basic test on some commands
+runtest_prio(121, basic_suit_check) {
+    return zdb_basic_check(test, "CHECK");
+}
+
+runtest_prio(121, basic_suit_get) {
+    return zdb_basic_check(test, "GET");
+}
+
+runtest_prio(121, basic_suit_del) {
+    return zdb_basic_check(test, "DEL");
+}
+
+runtest_prio(121, basic_suit_select) {
+    return zdb_basic_check(test, "SELECT");
+}
+
+runtest_prio(121, basic_suit_auth) {
+    return zdb_basic_check(test, "AUTH");
+}
+
+
+runtest_prio(122, default_auth) {
+    const char *argv[] = {"AUTH", "blabla"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+runtest_prio(122, default_auth_maybe_correct) {
+    const char *argv[] = {"AUTH", "root"};
+    zdb_command(test, argvsz(argv), argv);
+
+    return TEST_SUCCESS;
+}
+
+runtest_prio(990, default_stop) {
+    const char *argv[] = {"STOP"};
+    return zdb_command(test, argvsz(argv), argv);
+}
