@@ -59,16 +59,44 @@ void hexdump(void *input, size_t length) {
     free(output);
 }
 
-index_entry_t *compaction_handle_entry(index_root_t *index, data_entry_header_t *entry, char *id, datamap_t *datamap) {
+int compaction_copy(int fdin, int fdout, size_t size) {
+    char *buffer = NULL;
+
+    if(!(buffer = malloc(size)))
+        diep("malloc");
+
+    ssize_t rsize = 0;
+
+    if((rsize = read(fdin, buffer, size)) < 0)
+        diep("copy read");
+
+    if(rsize != (ssize_t) size)
+        dies("data read failed (not same length)");
+
+    if(write(fdout, buffer, size) < 0)
+        diep("copy write");
+
+    free(buffer);
+
+    return 0;
+}
+
+index_entry_t *compaction_handle_entry(index_root_t *index, data_entry_header_t *entry, char *id, compaction_t *compaction, uint16_t fileid) {
+    datamap_t *datamap = compaction->filesmap[fileid];
     index_entry_t *idxentry = NULL;
 
-    if((idxentry = index_entry_get(index, id, entry->idlength))) {
+    if((idxentry = index_entry_get(index, (unsigned char *) id, entry->idlength))) {
         printf("[+] entry found, already exists, updating\n");
 
-        // FIXME: flag previous offset to be deleted !!
+        printf("[+] discarding previous offset: %u/%lu\n", idxentry->dataid, idxentry->offset);
+        datamap_entry_t *prev = &compaction->filesmap[idxentry->dataid]->entries[idxentry->offset];
+
+        // key is overwritten, we can discard previous one
+        prev->keep = 0;
 
         idxentry->offset = datamap->length;
         idxentry->dataid = datamap->fileid;
+        idxentry->flags = entry->flags;
 
         return idxentry;
     }
@@ -80,7 +108,9 @@ index_entry_t *compaction_handle_entry(index_root_t *index, data_entry_header_t 
     memcpy(idxentry->id, id, entry->idlength);
     idxentry->idlength = entry->idlength;
     idxentry->dataid = datamap->fileid;
+    idxentry->flags = entry->flags;
     idxentry->offset = datamap->length; // offset is object id in datamap
+    idxentry->namespace = NULL;
 
     uint32_t keyhash = index_key_hash(idxentry->id, idxentry->idlength);
     index_branch_append(index->branches, keyhash, idxentry);
@@ -88,7 +118,8 @@ index_entry_t *compaction_handle_entry(index_root_t *index, data_entry_header_t 
     return idxentry;
 }
 
-size_t compaction_data_load(int fd, index_root_t *index, datamap_t *datamap) {
+size_t compaction_data_load(int fd, index_root_t *index, compaction_t *compaction, uint16_t fileid) {
+    datamap_t *datamap = compaction->filesmap[fileid];
     data_header_t header;
 
     // reading static header
@@ -130,17 +161,20 @@ size_t compaction_data_load(int fd, index_root_t *index, datamap_t *datamap) {
         // offset/payload to target
 
         // fillin this entry and keeping it by default
-        datamap->entries[datamap->length].offset = offset;
-        datamap->entries[datamap->length].keep = !(entry.flags & DATA_ENTRY_DELETED);
+        datamap_entry_t *dmentry = &datamap->entries[datamap->length];
+        dmentry->offset = offset;
+        dmentry->length = sizeof(data_entry_header_t) + entry.idlength + entry.datalength;
+        dmentry->keep = !(entry.flags & DATA_ENTRY_DELETED);
 
         // add or update entry into id hash
         index_entry_t *idxentry;
-        idxentry = compaction_handle_entry(index, &entry, idbuffer, datamap);
+        idxentry = compaction_handle_entry(index, &entry, idbuffer, compaction, fileid);
 
         // dump statistics
-        printf("[+] entry: offset: %lu, keep: %d, id: ", offset, datamap->entries[datamap->length].keep);
+        printf("[+] entry: offset: %lu, keep: %d, id: ", offset, dmentry->keep);
         hexdump(idxentry->id, idxentry->idlength);
         printf("\n[+] entry: id: %u bytes, payload size: %u bytes\n", entry.idlength, entry.datalength);
+        printf("\n[+] entry: full size: %lu bytes\n", dmentry->length);
 
         // computing next offset
         offset = lseek(fd, entry.datalength, SEEK_CUR);
@@ -152,14 +186,54 @@ size_t compaction_data_load(int fd, index_root_t *index, datamap_t *datamap) {
     return datamap->length;
 }
 
+size_t compaction_data_convert(int fd, int outfd, compaction_t *compaction, uint16_t fileid) {
+    datamap_t *datamap = compaction->filesmap[fileid];
+
+    // copying header
+    compaction_copy(fd, outfd, sizeof(data_header_t));
+
+    // creating a discarded entry
+    data_entry_header_t entry = {
+        .idlength = 0,     // no id
+        .datalength = 0,   // data truncated
+        .previous = 0,     // will be filled later
+        .integrity = 0,
+        .flags = DATA_ENTRY_TRUNCATED | DATA_ENTRY_DELETED,
+        .timestamp = time(NULL),
+    };
+
+    for(size_t i = 0; i < datamap->length; i++) {
+        datamap_entry_t *dmentry = &datamap->entries[i];
+
+        printf("[+] converting entry: %u/%lu\n", fileid, i);
+
+        if(!dmentry->keep) {
+            printf("[+] discarding this entry\n");
+
+            if(write(outfd, &entry, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t))
+                diep("empty entry: write");
+
+            // skipping this entry on source file
+            lseek(fd, dmentry->length, SEEK_CUR);
+
+        } else {
+            // copy this object, as it
+            compaction_copy(fd, outfd, dmentry->length);
+        }
+    }
+
+    printf("[+] entries read: %lu\n", datamap->length);
+
+    return datamap->length;
+}
+
 int namespace_compaction(compaction_t *compaction) {
-    datamap_t **filesmap = NULL;
     char filename[512];
-    int fd;
+    int fd, ofd;
 
     settings_t zdbsettings = {
         .datapath = compaction->datapath,
-        // .indexpath = compaction->indexpath,
+        .indexpath = NULL,
     };
 
     // allocate namespaces root object
@@ -181,13 +255,13 @@ int namespace_compaction(compaction_t *compaction) {
         printf("[+] opening file: %s\n", filename);
 
         printf("[+] growing up files map\n");
-        if(!(filesmap = realloc(filesmap, sizeof(datamap_t) * (fileid + 1))))
+        if(!(compaction->filesmap = realloc(compaction->filesmap, sizeof(datamap_t) * (fileid + 1))))
             diep("datamap realloc");
 
-        if(!(filesmap[fileid] = calloc(sizeof(datamap_t), 1)))
+        if(!(compaction->filesmap[fileid] = calloc(sizeof(datamap_t), 1)))
             diep("calloc");
 
-        filesmap[fileid]->fileid = fileid;
+        compaction->filesmap[fileid]->fileid = fileid;
 
         if((fd = open(filename, O_RDONLY)) < 0) {
             warnp(filename);
@@ -195,7 +269,7 @@ int namespace_compaction(compaction_t *compaction) {
             break;
         }
 
-        entries += compaction_data_load(fd, namespace->index, filesmap[fileid]);
+        entries += compaction_data_load(fd, namespace->index, compaction, fileid);
         close(fd);
     }
 
@@ -217,13 +291,37 @@ int namespace_compaction(compaction_t *compaction) {
 
         for(; entry; entry = entry->next) {
             // do not count deleted entry
-            if(!(entry->flags & INDEX_ENTRY_DELETED))
+            if(!(entry->flags & INDEX_ENTRY_DELETED)) {
                 effective += 1;
+            }
         }
     }
 
     printf("[+] data: load completed, %lu entries loaded\n", entries);
     printf("[+] index: %lu branches used, for %lu entries\n", branches, effective);
+
+    // rewrite data files and skipping (truncating) discarded entries
+    // we iterate over the whole datamap we built, and we copy (or not)
+    // block from the original files
+    for(size_t fileid = 0; fileid < maxfiles; fileid++) {
+        snprintf(filename, sizeof(filename), "%s/zdb-data-%05lu", namespace->datapath, fileid);
+        printf("[+] opening file for convertion: %s\n", filename);
+
+        if((fd = open(filename, O_RDONLY)) < 0) {
+            warnp(filename);
+            printf("[+] all datafile converted\n");
+            break;
+        }
+
+        snprintf(filename, sizeof(filename), "%s/%s/zdb-data-%05lu", compaction->targetpath, compaction->namespace, fileid);
+        printf("[+] creating file for convertion: %s\n", filename);
+
+        if((ofd = open(filename, O_CREAT | O_WRONLY, 0664)) < 0)
+            diep(filename);
+
+        entries += compaction_data_convert(fd, ofd, compaction, fileid);
+        close(fd);
+    }
 
     return 0;
 }
@@ -289,8 +387,8 @@ int main(int argc, char *argv[]) {
 
     printf("[+] zdb compacting tool\n");
     printf("[+] source root directory: %s\n", settings.datapath);
-    printf("[+] target root directory : %s\n", settings.targetpath);
-    printf("[+] namespace target    : %s\n", settings.namespace);
+    printf("[+] target root directory: %s\n", settings.targetpath);
+    printf("[+] namespace target     : %s\n", settings.namespace);
 
     if(validity_check(&settings))
         exit(EXIT_FAILURE);
