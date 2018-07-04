@@ -60,6 +60,10 @@ void testsuite(test_t *maintest) {
                 printf("[-] >> " CYAN("%s") ": " YELLOW("warning") "\n", test->name);
                 tests.warning += 1;
                 break;
+
+            case TEST_SKIPPED:
+                printf("[-] >> " CYAN("%s") ": " GREY("skipped") "\n", test->name);
+                break;
         }
     }
 
@@ -67,16 +71,34 @@ void testsuite(test_t *maintest) {
 
 static test_t settings;
 
+int initialize_tcp() {
+    settings.host = "localhost";
+    settings.port = 9900;
+
+    settings.zdb = redisConnect(settings.host, settings.port);
+    settings.type = CONNECTION_TYPE_TCP;
+
+    if(!settings.zdb || settings.zdb->err) {
+        const char *error = (settings.zdb->err) ? settings.zdb->errstr : "memory error";
+        log("%s:%d: %s\n", settings.host, settings.port, error);
+        return 1;
+    }
+
+    return 0;
+}
+
 void initialize() {
     char *socket = "/tmp/zdb.sock";
 
     settings.zdb = redisConnectUnix(socket);
+    settings.type = CONNECTION_TYPE_UNIX;
 
     if(!settings.zdb || settings.zdb->err) {
         const char *error = (settings.zdb->err) ? settings.zdb->errstr : "memory error";
-
         log("%s: %s\n", socket, error);
-        exit(EXIT_FAILURE);
+
+        if(initialize_tcp())
+            exit(EXIT_FAILURE);
     }
 
     signal(SIGPIPE, SIG_IGN);
@@ -92,7 +114,7 @@ int main(int argc, char *argv[]) {
 
     for(unsigned int i = 0; i < tests.length; i++) {
         runtest_t *test = &tests.list[i];
-        printf("[+]   % 3d) %-*s [%p]\n", i + 1, tests.longest + 2, test->name, test->test);
+        printf("[+]   % 4d) %-*s [%p]\n", i + 1, tests.longest + 2, test->name, test->test);
     }
 
     printf("[+] \n");

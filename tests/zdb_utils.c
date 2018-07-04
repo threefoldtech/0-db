@@ -181,3 +181,51 @@ long long zdb_command_integer(test_t *test, int argc, const char *argv[]) {
     return value;
 }
 
+// test different scenario (needs to be run after default_del_deleted)
+//  - non-existing key
+//  - deleted key
+//  - with wrong argument count
+//  - with no argument
+//  - with a large key
+//  - with an empty payload
+int zdb_basic_check(test_t *test, const char *command) {
+    log("Testing non-existing key\n");
+    const char *argv1[] = {command, "non-existing"};
+    if(zdb_command_error(test, argvsz(argv1), argv1) != TEST_SUCCESS)
+        return TEST_FAILED_FATAL;
+
+
+    log("Testing with deleted key\n");
+    const char *argv2[] = {command, "deleted"};
+    if(zdb_command_error(test, argvsz(argv2), argv2) != TEST_SUCCESS)
+        return TEST_FAILED_FATAL;
+
+
+    log("Testing wrong argument count\n");
+    const char *argv3[] = {command, "hello", "world"};
+    if(zdb_command_error(test, argvsz(argv3), argv3) != TEST_SUCCESS)
+        return TEST_FAILED_FATAL;
+
+
+    log("Testing without argument\n");
+    const char *argv4[] = {command};
+    if(zdb_command_error(test, argvsz(argv4), argv4) != TEST_SUCCESS)
+        return TEST_FAILED_FATAL;
+
+
+    log("Testing with a large key\n");
+    const char lkey[512] = {0};
+    memset((char *) lkey, 'x', sizeof(lkey) - 1);
+
+    const char *argv5[] = {command, lkey};
+    if(zdb_command_error(test, argvsz(argv5), argv5) != TEST_SUCCESS)
+        return TEST_FAILED_FATAL;
+
+
+    log("Testing with empty payload\n");
+    const char *argv6[] = {command, ""};
+    if(zdb_command_error(test, argvsz(argv6), argv6) != TEST_SUCCESS)
+        return TEST_FAILED_FATAL;
+
+    return TEST_SUCCESS;
+}
