@@ -35,12 +35,12 @@ static size_t redis_set_handler_userkey(redis_client_t *client) {
     // printf("[+] set key: %.*s\n", idlength, id);
     // printf("[+] set value: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
 
-    // insert the data on the datafile
-    // this will returns us the offset where the header is
+    // insert the data into the datafile
+    // this will return the offset where the header is located
     size_t offset = data_insert(data, value, valuelength, id, idlength);
 
-    // checking for writing error
-    // if we couldn't write the data, we won't add entry on the index
+    // check for write error
+    // if we couldn't write the data, we won't add the entry on the index
     // and report to the client an error
     if(offset == 0) {
         redis_hardsend(client, "$-1");
@@ -61,10 +61,10 @@ static size_t redis_set_handler_userkey(redis_client_t *client) {
     }
 
     // building response
-    // here, from original redis protocol, we don't reply with a basic
-    // OK or Error when inserting a key, we reply with the key itself
+    // here, like the original redis protocol, we don't reply with a basic
+    // OK or Error when inserting a key, but we reply with the key itself
     //
-    // this is how the sequential-id can returns the id generated
+    // this is how the sequential-id can return the generated id
     redis_bulk_t response = redis_bulk(id, idlength);
     if(!response.buffer) {
         redis_hardsend(client, "$-1");
@@ -81,7 +81,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client) {
     index_root_t *index = client->ns->index;
     data_root_t *data = client->ns->data;
 
-    // create some easier accessor
+    // create some easier accessors
     // grab the next id, this may be replaced
     // by user input if the key exists
     uint32_t id = index_next_id(index);
@@ -112,8 +112,8 @@ static size_t redis_set_handler_sequential(redis_client_t *client) {
 
     debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
 
-    // insert the data on the datafile
-    // this will returns us the offset where the header is
+    // insert the data into the datafile
+    // this will return the offset where the header is located
     // size_t offset = data_insert(value, valuelength, id, idlength);
     size_t offset = data_insert(data, value, valuelength, &id, idlength);
 

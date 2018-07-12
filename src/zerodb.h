@@ -10,17 +10,17 @@
     #define ZDB_DEFAULT_LISTENADDR  "0.0.0.0"
     #define ZDB_DEFAULT_PORT        9900
 
-    // define here version of datafile and indexfile
-    // theses version are written on header of each file created
+    // define the version of datafile and indexfile
+    // theses versions are written in a header of each created file 
     //
     // the version will only change (increment of 1) if the
-    // format of the binary struct change
+    // format of the binary struct changes
     //
-    // one version of 0-db will only support one version of file
-    // there no backward compatibility planed
+    // one version of 0-db will only support one version of filelayout
+    // there is no backward compatibility planned
     //
-    // if some update are made, upgrade tools could be written
-    // to update existing database
+    // if some updates are made, upgrade tools should be written
+    // to update the existing database(s)
     #define ZDB_DATAFILE_VERSION    2
     #define ZDB_IDXFILE_VERSION     2
 
@@ -31,7 +31,7 @@
         // auto-generated sequential id
         SEQUENTIAL = 1,
 
-        // id is hard-fixed data position
+        // id is a hard-fixed data position
         DIRECTKEY = 2,
 
         // fixed-block length
@@ -43,7 +43,7 @@
     } db_mode_t;
 
     // when adding or removing some modes
-    // don't forget to adapt correctly the handlers
+    // don't forget to update correctly the handler's
     // function pointers (basicly for GET and SET)
 
     typedef struct settings_t {
@@ -54,7 +54,7 @@
         int verbose;      // enable verbose print (function 'verbose')
         int dump;         // ask to dump index on the load-time
         int sync;         // force to sync each write
-        int synctime;     // force to sync writes after this amount of seconds
+        int synctime;     // force to sync writes after this period (in seconds)
         db_mode_t mode;   // default index running mode
         char *adminpwd;   // admin password, if NULL, all users are admin
         char *socket;     // unix socket path
@@ -67,27 +67,27 @@
         // the synctime can be useful to add basic security without killing
         // performance
         //
-        // if low amount of write are performed, the kernel will probably
+        // if low amount of writes are performed, the kernel will probably
         // flush changes to the disk quickly after the write
-        // if a lot of write are subsequents, the kernel can takes a long time
+        // if there are a lot of subsequent writes, the kernel can take a long time
         // (couple of seconds) before writing anything on disk
         //
-        // doing each write sync if, of course, the most secure way to ensure
-        // everything is persistant and well written, but this is a really
-        // performance killer, forcing data to be written each, let's says, 5 seconds
-        // allows you to encore on heavy loads that you could lost at least maximum
-        // 5 seconds of data and not more (if a write has been made after)
+        // doing each write sync is, of course, the most secure way to ensure
+        // everything is persistent and well written to disk, but this is a real
+        // performance killer. forcing data to be written ervery, let's says, 5 seconds
+        // allows you to enfore during heavy load that you could lose at maximum
+        // 5 seconds of data and not more (if a write has been made after the last flush)
         //
-        // if no write were made in the timeout, the kernel probably did the write
-        // in the meantime because the disk was not busy
+        // if no write is made before the timeout, the kernel probably did the write itself
         //
-        // WARNING: all of this really rely on the fact that the disk is not used
-        //          at all by something else on the system, if another process use
-        //          the disk, the disk will not be available to be sync'd automatically
+        // WARNING: all of this really relies on the fact that the disk is not used
+        //          at all by something else on the system; if another process uses
+        //          the disk, the disk will not be available to be synched automatically
         //
         //          this option is really a life-saver on heavy write loaded system
-        //          and try to do some mix between efficienty and security but this
+        //          and try to do some mix between efficiency and security but this
         //          is NOT a way you can entierly trust
+        // (i'll rephrase that)
 
     } settings_t;
 

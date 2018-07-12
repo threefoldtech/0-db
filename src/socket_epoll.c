@@ -25,7 +25,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
         ev = events + i;
 
         // epoll issue
-        // discarding this client
+        // discard this client
         if((ev->events & EPOLLERR) || (ev->events & EPOLLHUP)) {
             warnp("epoll");
             socket_client_free(ev->data.fd);
@@ -33,7 +33,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
         }
 
         // main socket event: we have a new client
-        // creating the new client and accepting it
+        // create the new client and accept it
         if(ev->data.fd == redis->mainfd) {
             int clientfd;
 
@@ -47,7 +47,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 
             verbose("[+] incoming connection (socket %d)\n", clientfd);
 
-            // adding client to the epoll list
+            // add client to the epoll list
             struct epoll_event event;
 
             memset(&event, 0, sizeof(struct epoll_event));
@@ -64,10 +64,10 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
         }
 
         // data available for reading
-        // let's read what'a available and checking
+        // let's read what's available and check
         // the response code
         if(ev->events & EPOLLIN) {
-            // calling the redis chunk event handler
+            // call the redis chunk event handler
             resp_status_t ctrl = redis_chunk_read(ev->data.fd);
 
             // client error, we discard it
@@ -85,7 +85,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
         }
 
         // client is ready for writing, let's check if any
-        // data still needs to be sent or not
+        // data still needs to be sent 
         if(ev->events & EPOLLOUT) {
             redis_delayed_write(ev->data.fd);
         }
@@ -112,10 +112,10 @@ int socket_handler(redis_handler_t *handler) {
 
     events = calloc(MAXEVENTS, sizeof event);
 
-    // waiting for clients
-    // this is how we supports multi-client using a single thread
-    // note that, we will only proceed one request at a time
-    // allows multiple client to be connected
+    // wait for clients
+    // this is how we support multi-client using a single thread
+    // note that, we will only handle one request at a time
+    // allows multiple clients to be connected
 
     while(1) {
         int n = epoll_wait(handler->evfd, events, MAXEVENTS, -1);

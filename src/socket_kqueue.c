@@ -64,7 +64,7 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
         }
 
         if(ev->filter == EVFILT_READ) {
-            // calling the redis chunk event handler
+            // call the redis chunk event handler
             resp_status_t ctrl = redis_chunk_read(ev->ident);
 
             // client error, we discard it
@@ -92,7 +92,7 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
 int socket_handler(redis_handler_t *handler) {
     struct kevent evlist[MAXEVENTS];
 
-    // initialize empty struct
+    // initialize an empty struct
     EV_SET(&evset, handler->mainfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
 
     if((handler->evfd = kqueue()) < 0)
@@ -101,10 +101,10 @@ int socket_handler(redis_handler_t *handler) {
     if(kevent(handler->evfd, &evset, 1, NULL, 0, NULL) == -1)
         diep("kevent");
 
-    // waiting for clients
-    // this is how we supports multi-client using a single thread
-    // note that, we will only proceed one request at a time
-    // allows multiple client to be connected
+    // wait for clients
+    // this is how we support multi-client using a single thread
+    // note that, we will only handle one request at a time
+    // allows multiple clients to be connected
 
     while(1) {
         int n = kevent(handler->evfd, NULL, 0, evlist, MAXEVENTS, NULL);

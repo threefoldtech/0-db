@@ -107,10 +107,10 @@ static int signal_intercept(int signal, void (*function)(int)) {
     return ret;
 }
 
-// signal handler will take care to try to
-// save as much as possible, when problem occures
-// for exemple, on segmentation fault, we will try to flush
-// and closes descriptor anyway to avoid loosing data
+// signal handler will try to
+// save as much as possible when a problem occurs
+// for example, on a segmentation fault, we will try to flush
+// and close descriptors anyway to avoid losing data
 static void sighandler(int signal) {
     void *buffer[1024];
 
@@ -151,7 +151,7 @@ static void sighandler(int signal) {
             break;
     }
 
-    // forwarding original error code
+    // forward original error code
     exit(128 + signal);
 }
 
@@ -178,16 +178,16 @@ static int proceed(struct settings_t *settings) {
 
     zdbid_set(settings->listen, settings->port, settings->socket);
 
-    // namespace is the root of the whole index/data system
+    // the namespace is the root of the whole index/data system
     // anything related to data is always attached to at least
     // one namespace (the default) one, and all the others
-    // are based on a fork of namespace
+    // are based on a fork of that namespace
     //
     // the namespace system will take care about all the loading
     // and the destruction
     namespaces_init(settings);
 
-    // main worker point (if dump not enabled)
+    // main worker entry point (if dump not enabled)
     if(!settings->dump)
         redis_listen(settings->listen, settings->port, settings->socket);
 
@@ -196,7 +196,7 @@ static int proceed(struct settings_t *settings) {
     // a STOP to the server to gracefuly quit
     //
     // this is useful when profiling to ensure there
-    // is no memory leaks, if everything is cleaned as
+    // are no memory leaks, and f everything is cleaned as
     // expected.
     namespaces_destroy();
 
@@ -210,7 +210,7 @@ void usage() {
     printf("Command line arguments:\n\n");
 
     printf(" Database settings:\n");
-    printf("  --data  <dir>       datafile directory (default " ZDB_DEFAULT_DATAPATH ")\n");
+    printf("  --data  <dir>       datafiles directory (default " ZDB_DEFAULT_DATAPATH ")\n");
     printf("  --index <dir>       indexfiles directory (default " ZDB_DEFAULT_INDEXPATH ")\n");
     printf("  --mode  <mode>      select working mode:\n");
     printf("                       > user: default user key-value mode\n");
@@ -230,7 +230,7 @@ void usage() {
     printf(" Useful tools:\n");
     printf("  --verbose           enable verbose (debug) information\n");
     printf("  --dump              only dump index contents, then exit (debug)\n");
-    printf("  --sync              force all write to be sync'd\n");
+    printf("  --sync              force all write to be synched\n");
     printf("  --background        run in background (daemon), when ready\n");
     printf("  --logfile <file>    log file (only in daemon mode)\n");
     printf("  --help              print this message\n");

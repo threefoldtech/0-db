@@ -19,7 +19,7 @@
 #include "commands_namespace.h"
 #include "commands_system.h"
 
-// ensure number of argument and their validity
+// ensure number of arguments and their validity
 static int real_command_args_validate(redis_client_t *client, int expected, int nullallowed) {
     if(client->request->argc != expected) {
         redis_hardsend(client, "-Unexpected arguments");
@@ -80,7 +80,7 @@ static command_t commands_handlers[] = {
 
     // query
     {.command = "INFO", .handler = command_info}, // returns 0-db server name
-    {.command = "STOP", .handler = command_stop}, // custom command for debug purpose
+    {.command = "STOP", .handler = command_stop}, // custom command for debug purposes
 
     // namespace
     {.command = "DBSIZE", .handler = command_dbsize},  // default DBSIZE command
@@ -97,9 +97,9 @@ int redis_dispatcher(redis_client_t *client) {
     resp_request_t *request = client->request;
     resp_object_t *key = request->argv[0];
 
-    // client have no running namespace
-    // this will happens when namespace is removed
-    // and a client was still attached to this namespace
+    // client doesn't have a running namespace
+    // this happens when a namespace is removed
+    // and the client is still attached to this namespace
     //
     // in that special case, we notify this client it's namespace
     // is not available anymore and we disconnect it

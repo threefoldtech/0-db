@@ -17,8 +17,8 @@
 #include "data.h"
 #include "hook.h"
 
-// NOTE: there is no more a global variable for the index
-//       since each namespace have their own index, now
+// NOTE: there is no more global variable for the index
+//       since each namespace has their own index, now
 //       we need to pass the index to each function
 
 // force index to be sync'd with underlaying device
@@ -28,11 +28,11 @@ static inline int index_sync(index_root_t *root, int fd) {
     return 1;
 }
 
-// checking is some sync is forced
-// there is two possibilities:
-// - we set --sync option on runtime, and each write is sync forced
-// - we set --synctime on runtime and after this amount of seconds
-//   we force to sync the last write
+// checking if some sync is forced
+// there are two possibilities:
+// - we set --sync option at runtime, and each write is sync forced
+// - we set --synctime at runtime and after this period (in seconds)
+//   we force to sync the last writes
 static inline int index_sync_check(index_root_t *root, int fd) {
     if(root->sync)
         return index_sync(root, fd);
@@ -49,7 +49,7 @@ static inline int index_sync_check(index_root_t *root, int fd) {
 }
 
 
-// wrap (mostly) all write operation on indexfile
+// wrap (mostly) all write operation on the indexfile
 // it's easier to keep a single logic with error handling
 // related to write check
 int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
@@ -128,9 +128,9 @@ void index_open_final(index_root_t *root) {
     printf("[+] index: active file: %s\n", root->indexfile);
 }
 
-// jumping to the next index id file, this needs to be sync'd with
-// data file, we only do this when datafile changes basicly, this is
-// triggered by a datafile too big event
+// jumping to the next index id file, this needs to be in sync with the
+//  index file, we only do this when datafile changes. basically, this is
+// triggered by a index too big event
 size_t index_jump_next(index_root_t *root) {
     hook_t *hook = NULL;
 
@@ -220,9 +220,9 @@ index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t id
 
 // read an index entry from disk
 // we assume we know enough data to do everything in a single read call
-// which means we need to know offset and id length in advance
+// which means we need to know the offset and id length beforehand
 //
-// this is really important in direct mode to use indirection with index
+// it is really important in direct mode to use indirection with index
 // to have benefit of compaction etc.
 index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t offset, uint8_t idlength) {
     int fd;
@@ -255,8 +255,8 @@ index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t o
 }
 
 // insert a key, only in memory, no disk is touched
-// this function should be called externaly only when populating something
-// if we need to add something new on the index, we should write it on disk
+// this function should be called externally only when populating something
+// if we need to add something new on the index, we should write it to disk
 index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags) {
     index_entry_t *exists = NULL;
 
@@ -290,7 +290,7 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
 
     uint32_t branchkey = index_key_hash(id, idlength);
 
-    // commit entry into memory
+    // commit entry to memory
     index_branch_append(root, branchkey, entry);
 
     // update statistics
@@ -305,18 +305,18 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
     return entry;
 }
 
-// this will be a global item we will allocate only once, to avoid
+// this will be a global item that we will allocate only once, to avoid
 // useless reallocation
 // this item will be used to move from an index_entry_t (disk) to index_item_t (memory)
 index_item_t *index_transition = NULL;
 index_entry_t *index_reusable_entry = NULL;
 
 // main function to insert anything on the index, in memory and on the disk
-// perform at first a memory insertion then disk writing
+// perform at first a memory insertion then a disk write
 //
 // if the key already exists, the in memory version will be updated
 // and the on-disk version is appended anyway, when reloading the index
-// we call the same sets of function which overwrite existing key, we
+// we call the same sets of functions that overwrite the existing key, we
 // will always have the last version in memory
 index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlength, size_t offset, size_t length) {
     unsigned char *id = (unsigned char *) vid;
@@ -383,9 +383,9 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
     return entry;
 }
 
-// return the offset of the next entry which will be added
-// this could be needed, for exemple in direct key mode,
-// when the key depends of the offset itself
+// return the offset of the next entry that will be added
+// this could be needed, for example in direct key mode,
+// when the key depends on the offset itself
 size_t index_next_offset(index_root_t *root) {
     return lseek(root->indexfd, 0, SEEK_END);
 }
@@ -405,7 +405,7 @@ size_t index_offset_objectid(uint32_t objectid) {
     // skip index header
     size_t offset = sizeof(index_t);
 
-    // index is linear like this
+    // the index is linear like this
     // [header][obj-1][obj-2][obj-3][...]
     //
     // object X offset can be found by computing

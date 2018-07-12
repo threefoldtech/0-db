@@ -1,14 +1,14 @@
 #ifndef __ZDB_REDIS_H
     #define __ZDB_REDIS_H
 
-    // redis_hardsend is a macro which allows us to send
-    // easily a hardcoded message to the client, without needing to
-    // specify the size, but keeping the size computed at compile time
+    // redis_hardsend is a macro that allows us to send
+    // easily a hardcoded message to the client, without the need to
+    // specify the size, but keep size computed at compile time
     //
-    // this is useful when you want to write message to client without
+    // this is useful when you want to write a message to the client without
     // writing yourself the size of the string. please only use this with strings
     //
-    // sizeof(message) will contains the null character, to append \r\n the size will
+    // sizeof(message) will end with the null character, appended with \r\n, the size will
     // just be +1
     #define redis_hardsend(fd, message) redis_reply_stack(fd, message "\r\n", sizeof(message) + 1)
 
@@ -37,7 +37,7 @@
 
     } resp_state_t;
 
-    // represent one redis command with arguments
+    // represents one redis command with arguments
     typedef struct resp_request_t {
         resp_state_t state;
         int fillin;
@@ -57,10 +57,10 @@
 
     } resp_status_t;
 
-    // tracking each clients in memory
-    // we need to create object per client to keep
-    // some session-life persistant data, such namespace
-    // attached to the socket, and so on
+    // tracking each client in memory
+    // we need to create an object per client to keep
+    // some session-live persistent data, such as the namespace
+    // attached to a socket, and so on
 
     typedef struct buffer_t {
         char *buffer;
@@ -72,49 +72,49 @@
     } buffer_t;
 
     typedef struct redis_response_t {
-        void *buffer;  // begin of the buffer which will be free's
-        void *reader;  // current pointer on the buffer, for the next chunk to send
-        size_t length; // length of the remain payload to send
+        void *buffer;  // begin of the buffer that will be freed
+        void *reader;  // current pointer to the buffer, for the next chunk to be sent
+        size_t length; // length of the remaining payload to send
 
-        // pointer to a desctuctor function which will be
-        // called when the send if fully complete, to clean
+        // pointer to a desctuctor function that will be
+        // called if the send fully completes, to clean up
         // the buffer
         void (*destructor)(void *target);
 
     } redis_response_t;
 
-    // represent one client in memory
+    // represents one client in memory
     typedef struct redis_client_t {
         int fd;           // socket file descriptor
         namespace_t *ns;  // connection namespace
         time_t connected; // connection time
         size_t commands;  // request (commands) counter
-        int writable;     // does the client can write on the namespace
-        int admin;        // does the client is admin
+        int writable;     // can the client write to the namespace
+        int admin;        // is the client admin
         buffer_t buffer;  // per-client buffer
 
         // each client will be attached to a request
-        // this request will contains one-per-one commands
+        // this request will contain one-per-one commands
         resp_request_t *request;
 
-        // each client will have some (optional) pending
-        // write, we attach a delayed async writer per
+        // each client can have some (optional) pending
+        // writes, we attach a delayed async writer per
         // client
         redis_response_t response;
 
     } redis_client_t;
 
-    // represent all clients in memory
+    // represents all clients in memory
     typedef struct redis_clients_t {
         size_t length;
         redis_client_t **list;
 
     } redis_clients_t;
 
-    // minimum (default) amount of client pre-allocated
+    // minimum (default) amount of clients pre-allocated
     #define REDIS_CLIENTS_INITIAL_LENGTH 32
 
-    // per client buffer
+    // per-client buffer
     #define REDIS_BUFFER_SIZE 8192
 
     // maximum payload size
@@ -143,7 +143,7 @@
     void redis_bulk_append(redis_bulk_t *bulk, void *data, size_t length);
     redis_bulk_t redis_bulk(void *payload, size_t length);
 
-    // abstract handler implemented by a plateform dependent
+    // abstract handler implemented by platform dependent
     // code (see socket_epoll, socket_kqueue, ...)
     int socket_handler(redis_handler_t *handler);
 

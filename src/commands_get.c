@@ -22,7 +22,7 @@ static index_entry_t *redis_get_handler_memkey(redis_client_t *client) {
 static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
     resp_request_t *request = client->request;
 
-    // invalid requested key
+    // invalid key requested 
     if(request->argv[1]->length != sizeof(index_dkey_t)) {
         debug("[-] command: get: invalid key length\n");
         return NULL;
@@ -122,7 +122,7 @@ int command_get(redis_client_t *client) {
         return 1;
     }
 
-    // key found and valid, let's checking the contents
+    // key found and valid, let's check the contents
     debug("[+] command: get: entry found, flags: %x, data length: %" PRIu64 "\n", entry->flags, entry->length);
     debug("[+] command: get: data file: %d, data offset: %" PRIu64 "\n", entry->dataid, entry->offset);
 

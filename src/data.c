@@ -29,17 +29,17 @@ static void data_entry_header_dump(data_entry_header_t *entry) {
 #endif
 }
 
-// force to sync data buffer into the underlaying device
+// force to sync the data buffer into the underlaying device
 static inline int data_sync(data_root_t *root, int fd) {
     fsync(fd);
     root->lastsync = time(NULL);
     return 1;
 }
 
-// checking is some sync is forced
-// there is two possibilities:
-// - we set --sync option on runtime, and each write is sync forced
-// - we set --synctime on runtime and after this amount of seconds
+// checking wether some sync is forced
+// there are two possibilities:
+// - we set --sync option on runtime, then each write is sync forced
+// - we set --synctime on runtime and after this period (in seconds)
 //   we force to sync the last write
 static inline int data_sync_check(data_root_t *root, int fd) {
     if(root->sync)
@@ -49,20 +49,20 @@ static inline int data_sync_check(data_root_t *root, int fd) {
         return 0;
 
     if((time(NULL) - root->lastsync) > root->synctime) {
-        debug("[+] data: last sync expired, force sync\n");
+        debug("[+] data: last sync expired, forcing sync\n");
         return data_sync(root, fd);
     }
 
     return 0;
 }
 
-// wrap (mostly) all write operation on datafile
-// it's easier to keep a single logic with error handling
-// related to write check
-// this function takes an extra argument 'syncer" which explicitly
-// ask to check if we need to do some sync-check or not
-// this is useful when writing data, we write header then payload
-// and we can avoid to do two sync (only one when done)
+// wrap (mostly) all write operations to the datafile.
+// It's easier to keep a single logic with error handling
+// related to write checking
+// This function takes an extra argument "syncer" which explicitly
+// ask to check if we need to do some sync-check or not.
+// This is useful when writing data, we write the header and then the payload
+// so we can avoid to do two sync calls (only one when done)
 static int data_write(int fd, void *buffer, size_t length, int syncer, data_root_t *root) {
     ssize_t response;
 
@@ -86,8 +86,8 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
 // in case of error, the reason will be printed and -1 will be returned
 // otherwise the file descriptor is returned
 //
-// this function open the data file in read only and should
-// not be used to edit or open the current effective current file
+// this function opens the data file in read only mode and should
+// not be used to edit or open the effective current file.
 static int data_open_id_mode(data_root_t *root, uint16_t id, int mode) {
     char temp[PATH_MAX];
     int fd;
@@ -114,11 +114,11 @@ int data_get_dataid_rw(data_root_t *root, uint16_t id) {
 }
 
 
-// main function to call when you need to deal with data id
-// this function takes care to open the right file id:
-//  - if you want the current opened file id, you have thid fd
+// main function to call when you need to deal with data id.
+// This function takes care of opening the right file id:
+//  - if you want the current opened file id, you have the fd
 //  - if the file is not opened yet, you'll receive a new fd
-// you need to call the .... to be consistant about cleaning this
+// you need to call the .... to be consistent about cleaning this
 // file open, if a new one was opened
 //
 // if the data id could not be opened, -1 is returned
@@ -127,7 +127,7 @@ static inline int data_grab_dataid(data_root_t *root, uint16_t dataid) {
 
     if(root->dataid != dataid) {
         // the requested datafile is not the current datafile opened
-        // we will re-open the expected datafile temporary
+        // we will re-open the expected datafile temporarily
         debug("[-] data: switching file: %d, requested: %d\n", root->dataid, dataid);
         if((fd = data_open_id(root, dataid)) < 0)
             return -1;
@@ -138,7 +138,7 @@ static inline int data_grab_dataid(data_root_t *root, uint16_t dataid) {
 
 static inline void data_release_dataid(data_root_t *root, uint16_t dataid, int fd) {
     // if the requested data id (or fd) is not the one
-    // currently used by the main structure, we close it
+    // currently in use by the main structure, we close it
     // since it was temporary
     if(root->dataid != dataid) {
         close(fd);
@@ -156,7 +156,7 @@ void data_initialize(char *filename, data_root_t *root) {
         if(errno == EROFS)
             return;
 
-        diep(filename);
+        diep(filename); // shouldn't we have some BIG message here ?
     }
 
     // writing initial header
@@ -174,7 +174,7 @@ void data_initialize(char *filename, data_root_t *root) {
     close(fd);
 }
 
-// simply set globaly the current filename based on it's id
+// simply set globally the current filename based on it's id
 static void data_set_id(data_root_t *root) {
     sprintf(root->datafile, "%s/zdb-data-%05u", root->datadir, root->dataid);
 }
@@ -232,7 +232,7 @@ size_t data_jump_next(data_root_t *root, uint16_t newid) {
 }
 
 // compute a crc32 of the payload
-// this function uses Intel CRC32 (SSE4.2) intrinsic
+// this function uses Intel CRC32 (SSE4.2) intrinsic (SIMD)
 static uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
     uint64_t *input = (uint64_t *) bytes;
     uint32_t hash = 0;
@@ -250,11 +250,11 @@ static uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
 static size_t data_length_from_offset(int fd, size_t offset) {
     data_entry_header_t header;
 
-    // moving the the header offset
+    // moving to the header offset
     lseek(fd, offset, SEEK_SET);
 
     if(read(fd, &header, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
-        warnp("data header read");
+        warnp("incorrect data header read");
         return 0;
     }
 
@@ -268,8 +268,8 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
         .length = 0
     };
 
-    // if we don't know the length in advance, we will read the
-    // data header to know the payload size from it
+    // if we don't know the length in advance, so we read the
+    // data header to know the payload size 
     if(length == 0) {
         debug("[+] data: fetching length from datafile\n");
 
@@ -289,7 +289,7 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
     payload.length = length;
 
     if(read(fd, payload.buffer, length) != (ssize_t) length) {
-        warnp("data_get: read");
+        warnp("data_get: incorrect read length");
 
         free(payload.buffer);
         payload.buffer = NULL;
@@ -298,8 +298,8 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
     return payload;
 }
 
-// wrapper for data_get_real, which open the right dataid
-// which allows to do only the needed and this wrapper prepare the right data id
+// wrapper for data_get_real, which opens the right dataid
+// allowing to do only what's necessary and this wrapper just prepares the right data id
 data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
     int fd;
     data_payload_t payload = {
@@ -326,7 +326,7 @@ static inline int data_check_real(int fd, size_t offset) {
     unsigned char *buffer;
     data_entry_header_t header;
 
-    // positioning datafile to expected offset
+    // positioning to the expected offset in the datafile
     lseek(fd, offset, SEEK_SET);
 
     if(read(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
@@ -334,7 +334,7 @@ static inline int data_check_real(int fd, size_t offset) {
         return -1;
     }
 
-    // skipping the key, set buffer to payload point
+    // skipping the key, set buffer to payload position
     lseek(fd, header.idlength, SEEK_CUR);
 
     // allocating buffer from header's length
@@ -375,7 +375,7 @@ int data_check(data_root_t *root, size_t offset, uint16_t dataid) {
 
 
 
-// insert data on the datafile and returns it's offset
+// insert data to the datafile and return it's offset
 size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength) {
     unsigned char *id = (unsigned char *) vid;
     size_t offset = lseek(root->datafd, 0, SEEK_END);
@@ -383,7 +383,7 @@ size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, 
     data_entry_header_t *header;
 
     if(!(header = malloc(headerlength)))
-        diep("malloc");
+        diep("Could not allocate memory! (data_insert)");
 
     header->idlength = idlength;
     header->datalength = datalength;
@@ -519,7 +519,7 @@ int data_delete_real(int fd, size_t offset) {
 
     // read current header
     if(read(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
-        warnp("data: delete: header read");
+        warnp("data: delete: unmatched header read length (data_delete_real)");
         return 0;
     }
 
@@ -531,7 +531,7 @@ int data_delete_real(int fd, size_t offset) {
 
     // overwrite the header with the new flag
     if(write(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
-        warnp("data: delete: header overwrite");
+        warnp("data: delete: unmatched header write length (data_delete_real)");
         return 0;
     }
 
@@ -540,13 +540,13 @@ int data_delete_real(int fd, size_t offset) {
 
 // IMPORTANT:
 //   this function is the only one to 'break' the always append
-//   behavior, this function will overwrite existing index by
-//   seeking and rewrite headers
+//   behavior, this function will overwrite an existing index entry by
+//   seeking and rewrite the header
 //
 // when deleting some data, we mark (flag) this data as deleted which
-// allows two things
+// allows two things:
 //   - we can do compaction offline by removing theses blocks
-//   - we still can rebuild an index based on datafile only
+//   - we still can rebuild an index based on the datafile only
 //
 // during runtime, this flag will be checked only using the data_match
 // function
@@ -557,7 +557,7 @@ int data_delete(data_root_t *root, size_t offset, uint16_t dataid) {
 
     // acquire data id fd
     if((fd = data_get_dataid_rw(root, dataid)) < 0) {
-        debug("[-] data: delete: could not open requested file id (%u)\n", dataid);
+        debug("[-] data: delete: could not open requested file id (%u) (data_delete)\n", dataid);
         return 0;
     }
 
@@ -593,7 +593,7 @@ static data_scan_t data_previous_header_real(data_scan_t scan) {
 
     // if scan.target is not set yet, we don't know the expected
     // offset of the previous header, let's read the header
-    // of the current entry and find out which is the next one
+    // of the current entry and find out at what position is the next one
     if(scan.target == 0) {
         off_t current = lseek(scan.fd, scan.original, SEEK_SET);
 
@@ -612,7 +612,7 @@ static data_scan_t data_previous_header_real(data_scan_t scan) {
 
     debug("[+] data: previous-header: offset: %u\n", source.previous);
 
-    // at that point, we know scan.target is set to the expected value
+    // at this point, we know scan.target is set to the expected value
     if(scan.target == 0) {
         debug("[+] data: previous-header: zero reached, nothing to rollback\n");
         return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
@@ -824,10 +824,10 @@ static data_scan_t data_first_header_real(data_scan_t scan) {
     // jumping to next object
     lseek(scan.fd, scan.target, SEEK_SET);
 
-    // reading the fixed-length
+    // reading the fixed-length 
     if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
         warnp("data: first-header: could not read next offset datafile");
-        // this mean the data expected is the first of the next datafile
+        // this means that the expected data is the first of the next datafile
         scan.target = sizeof(data_header_t);
         return data_scan_error(scan, DATA_SCAN_EOF_REACHED);
     }

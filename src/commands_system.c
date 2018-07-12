@@ -25,8 +25,8 @@ int command_time(redis_client_t *client) {
 
     gettimeofday(&now, NULL);
 
-    // default redis protocol returns values as string
-    // not as integer
+    // by default, the redis protocol returns values as a string
+    // not as an integer
     sprintf(sec, "%lu", now.tv_sec);
     sprintf(usec, "%ld", (long) now.tv_usec);
 
@@ -72,9 +72,9 @@ int command_auth(redis_client_t *client) {
 }
 
 // STOP will be only compiled in debug mode
-// this will force to exit listen loop in order to call
-// all destructors, this is useful to ensure every memory allocation
-// are well tracked and well cleaned
+// this will force to exit the listen loop in order to call
+// all destructors, which is useful to ensure every memory allocations
+// are well tracked and well cleaned up
 //
 // in production, a user should not be able to stop the daemon
 int command_stop(redis_client_t *client) {

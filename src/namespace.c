@@ -19,13 +19,13 @@
 #include "redis.h"
 #include "hook.h"
 
-// we keep a list of namespace currently used
-// each namespace used will keep file descriptor opened
+// we keep a list of namespaces currently in use
+// each namespace used will keep a file descriptor opened
 // and only once per namespace
 //
-// each time a client want a specific namespace,
-// if this namespace is already used by someone else, we gives
-// the same object back, like this they will all share the same
+// each time a client wants a specific namespace,
+// if this namespace is already used by someone else, we give
+// the same object back, so they will all share the same
 // state
 static ns_root_t *nsroot = NULL;
 
@@ -60,7 +60,7 @@ namespace_t *namespace_get_default() {
     return nsroot->namespaces[0];
 }
 
-// get a namespace from it's name
+// get a namespace from its name
 namespace_t *namespace_get(char *name) {
     namespace_t *ns;
 
@@ -96,7 +96,7 @@ void namespace_descriptor_update(namespace_t *namespace, int fd) {
             warnp("namespace header pass write");
     }
 
-    // ensure metadata are written
+    // ensure metadata is written
     fsync(fd);
 }
 
@@ -115,8 +115,8 @@ static int namespace_descriptor_open(namespace_t *namespace) {
 }
 
 // read (or create) a namespace descriptor
-// namespace descriptor is a binary file containing namespace
-// specification such password, maxsize, etc. (see header)
+// a namespace descriptor is a binary file containing the namespace
+// specification such as password, maxsize, etc. (see header)
 static void namespace_descriptor_load(namespace_t *namespace) {
     ns_header_t header;
     int fd;
@@ -140,7 +140,7 @@ static void namespace_descriptor_load(namespace_t *namespace) {
             return;
         }
 
-        // skipping the namespace name, jumping to password
+        // skip the namespace name, jump to password
         lseek(fd, header.namelength, SEEK_CUR);
 
         if(read(fd, namespace->password, header.passlength) != (ssize_t) header.passlength)
@@ -154,8 +154,8 @@ static void namespace_descriptor_load(namespace_t *namespace) {
     close(fd);
 }
 
-// update persistance data of a namespace
-// basicly, this rewrite it's metadata on disk
+// update persistence data of a namespace
+// basically, this rewrites it's metadata on disk
 void namespace_commit(namespace_t *namespace) {
     int fd;
 
@@ -192,12 +192,12 @@ namespace_t *namespace_ensure(namespace_t *namespace) {
 }
 
 // lazy load a namespace
-// this just populate data and index from disk
+// this just populates data and index from disk
 // based on an existing namespace object
 // this can be used to load and reload a namespace
 static int namespace_load_lazy(ns_root_t *nsroot, namespace_t *namespace) {
-    // now, we are sure the namespace exists, but it's maybe empty
-    // let's call index and data initializer, they will take care about that
+    // now, we are sure the namespace exists, but it could be empty
+    // let's call index and data initializer, they will take care of that
     namespace->index = index_init(nsroot->settings, namespace->indexpath, namespace, nsroot->branches);
     namespace->data = data_init(nsroot->settings, namespace->datapath, namespace->index->indexid);
 
@@ -220,9 +220,9 @@ namespace_t *namespace_load_light(ns_root_t *nsroot, char *name) {
     namespace->password = NULL;  // no password by default, need to be set later
     namespace->indexpath = namespace_path(nsroot->settings->indexpath, name);
     namespace->datapath = namespace_path(nsroot->settings->datapath, name);
-    namespace->public = 1;  // by default, namespace are public (no password)
-    namespace->maxsize = 0; // by default, there is no limits
-    namespace->idlist = 0;  // by default, no list set
+    namespace->public = 1;  // by default, namespaces are public (no password)
+    namespace->maxsize = 0; // by default, there are no limits
+    namespace->idlist = 0;  // by default, no list is set
 
     if(!namespace_ensure(namespace))
         return NULL;
@@ -240,7 +240,7 @@ namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
     if(!(namespace = namespace_load_light(nsroot, name)))
         return NULL;
 
-    // memory populating
+    // populating memory 
     namespace_load_lazy(nsroot, namespace);
 
     return namespace;
@@ -304,8 +304,8 @@ static void namespace_create_hook(namespace_t *namespace) {
 // create (load) a new namespace
 //
 // note: this function doesn't check if the namespace already exists
-// if it already exists, you could end with duplicate in memory
-// do not call this is you didn't checked the namespace already exists
+// if it already exists, you could end with duplicates in memory
+// do not call this is you didn't check if the namespace already exists
 // by getting it first
 //
 int namespace_create(char *name) {
@@ -347,7 +347,7 @@ static int namespace_scanload(ns_root_t *root) {
 
     // listing the directory
     // if this fails, we mark this as fatal since
-    // it's on init-time, if the directory cannot be read
+    // it's during init-time; if the directory cannot be read
     // we should not be here at all
     if(!(dp = opendir(root->settings->indexpath)))
         diep("opendir");
@@ -358,7 +358,7 @@ static int namespace_scanload(ns_root_t *root) {
 
         debug("[+] namespaces: extra found: %s\n", ep->d_name);
 
-        // loading the namespace
+        // load the namespace
         namespace_t *namespace;
         if(!(namespace = namespace_load(root, ep->d_name)))
             continue;
@@ -383,30 +383,30 @@ static int namespace_scanload(ns_root_t *root) {
 // previously, there was only one index and one data set, now for each
 // namespace, we load each of them separatly, but keep only one big index
 // in memory (because he use a big initial array, we can't keep lot of them)
-// and keep a reference to the namespace for each entries
+// and keep a reference to the namespace for each entry
 //
-// because this is the first entry point, here will be the only place where
-// we knows everything about index and data, we keep every pointer and allocation
+// because this is the first entry point, this will be the only place where
+// we know everything about index and data, so we keep every pointer and allocation
 // here, in a global scope
 //
 // this is why it's here we take care about cleaning and emergencies, it's the only
-// place where we __knows__ what we needs to clean
+// place where we __know__ what we need to clean
 int namespaces_init(settings_t *settings) {
     verbose("[+] namespaces: initializing\n");
 
-    // we start by the default namespace
+    // we start with the default namespace
     if(!(nsroot = (ns_root_t *) malloc(sizeof(ns_root_t))))
         diep("namespaces malloc");
 
     nsroot->length = 1;             // we start with the default one, only
-    nsroot->effective = 1;          // no namespace really loaded yet
-    nsroot->settings = settings;    // keep reference to the settings, needed for paths
+    nsroot->effective = 1;          // no namespace has been loaded yet
+    nsroot->settings = settings;    // keep the reference to the settings, needed for paths
     nsroot->branches = NULL;        // maybe we don't need the branches, see below
 
     if(!(nsroot->namespaces = (namespace_t **) malloc(sizeof(namespace_t *) * nsroot->length)))
         diep("namespace malloc");
 
-    // allocating (if needed, only some modes needs it) the big (single) index branches
+    // allocating (if needed, only some modes need it) the big (single) index branches
     if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL) {
         debug("[+] namespaces: pre-allocating index (%d lazy branches)\n", buckets_branches);
 
@@ -435,10 +435,10 @@ static void namespace_free(namespace_t *namespace) {
 }
 
 // this is called when we receive a graceful exit request
-// let's clean all index, data and namespace stuff
+// let's clean all indices, data and namespace arrays
 int namespaces_destroy() {
     // freeing the big index buffer
-    // since branch want an index as argument, let's use
+    // since branches want an index as argument, let's use
     // the first namespace (default), since they all share
     // the same buffer
     if(nsroot->branches) {
