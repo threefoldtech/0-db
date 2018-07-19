@@ -5,7 +5,7 @@
     // this file is more there for information
     // this is not really relevant but can be used
     // to validate contents and detect type with the magic
-    typedef struct index_t {
+    typedef struct index_header_t {
         char magic[4];     // four bytes magic bytes to recognize the file
         uint32_t version;  // file version, for possible upgrade compatibility
         uint64_t created;  // unix timestamp of creation time
@@ -13,7 +13,7 @@
         uint16_t fileid;   // current index file id (sync with dataid)
         uint8_t mode;      // running mode when index was created
 
-    } __attribute__((packed)) index_t;
+    } __attribute__((packed)) index_header_t;
 
     // main entry structure
     // each key will use one of this entry

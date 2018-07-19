@@ -98,8 +98,8 @@ static void index_dump_statistics(index_root_t *root) {
 // initialize an index file
 // this basicly create the header and write it
 //
-index_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
-    index_t header;
+index_header_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
+    index_header_t header;
 
     memcpy(header.magic, "IDX0", 4);
     header.version = ZDB_IDXFILE_VERSION;
@@ -108,7 +108,7 @@ index_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
     header.opened = time(NULL);
     header.mode = rootsettings.mode;
 
-    if(!index_write(fd, &header, sizeof(index_t), root))
+    if(!index_write(fd, &header, sizeof(index_header_t), root))
         diep("index_initialize: write");
 
     return header;
@@ -159,7 +159,7 @@ static int index_try_rootindex(index_root_t *root) {
 // this should not create any new index (when loading we will never create
 // any new index until we don't have new data to add)
 static size_t index_load_file(index_root_t *root) {
-    index_t header;
+    index_header_t header;
     ssize_t length;
 
     verbose("[+] index: loading file: %s\n", root->indexfile);
@@ -167,7 +167,7 @@ static size_t index_load_file(index_root_t *root) {
     if(!index_try_rootindex(root))
         return 0;
 
-    if((length = read(root->indexfd, &header, sizeof(index_t))) != sizeof(index_t)) {
+    if((length = read(root->indexfd, &header, sizeof(index_header_t))) != sizeof(index_header_t)) {
         if(length < 0) {
             // read failed, probably caused by a system error
             // this is probably an unrecoverable issue, let's skip this
@@ -182,7 +182,7 @@ static size_t index_load_file(index_root_t *root) {
             // not this amount of data, which is a completly undefined behavior
             // let's just stopping here
             fprintf(stderr, "[-] index: header corrupted or incomplete\n");
-            fprintf(stderr, "[-] index: expected %lu bytes, %ld read\n", sizeof(index_t), length);
+            fprintf(stderr, "[-] index: expected %lu bytes, %ld read\n", sizeof(index_header_t), length);
             exit(EXIT_FAILURE);
         }
 
@@ -230,7 +230,7 @@ static size_t index_load_file(index_root_t *root) {
         header.opened = time(NULL);
         lseek(root->indexfd, 0, SEEK_SET);
 
-        if(!index_write(root->indexfd, &header, sizeof(index_t), root))
+        if(!index_write(root->indexfd, &header, sizeof(index_header_t), root))
             diep(root->indexfile);
     }
 
@@ -264,7 +264,7 @@ static size_t index_load_file(index_root_t *root) {
         diep("index buffer: read");
 
     // positioning seeker to beginin of index entries
-    char *seeker = filebuf + sizeof(index_t);
+    char *seeker = filebuf + sizeof(index_header_t);
 
     // reading the index, populating memory
     //

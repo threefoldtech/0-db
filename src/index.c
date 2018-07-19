@@ -463,7 +463,7 @@ int index_entry_is_deleted(index_entry_t *entry) {
 // returns offset in the indexfile from idobject
 size_t index_offset_objectid(uint32_t objectid) {
     // skip index header
-    size_t offset = sizeof(index_t);
+    size_t offset = sizeof(index_header_t);
 
     // index is linear like this
     // [header][obj-1][obj-2][obj-3][...]
