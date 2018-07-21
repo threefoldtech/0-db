@@ -21,6 +21,7 @@
         uint8_t idlength;    // length of the id, here uint8_t limits to 256 bytes
         uint64_t offset;     // offset on the corresponding datafile
         uint64_t length;     // length of the payload on the datafile
+        uint32_t previous;   // previous entry offset
         uint8_t flags;       // flags not used yet, could provide information about deletion
         uint16_t dataid;     // datafile id where is stored the payload
         uint32_t timestamp;  // when did the key was created (unix timestamp)
@@ -49,6 +50,7 @@
 
         uint8_t idlength;    // length of the id, here uint8_t limits to 256 bytes
         uint64_t offset;     // offset on the corresponding datafile
+        uint64_t idxoffset;  // offset on the index file (index file id is the same as data file)
         uint64_t length;     // length of the payload on the datafile
         uint8_t flags;       // keep deleted flags (should be index_flags_t type)
         uint16_t dataid;     // datafile id where is stored the payload
@@ -112,6 +114,8 @@
         size_t indexsize;   // statistics about index in-memory size
         size_t entries;     // statistics about number of keys for this index
 
+        size_t previous;    // keep latest offset inserted to the indexfile
+
     } index_root_t;
 
     // key used by direct mode
@@ -136,7 +140,7 @@
     index_dkey_t *index_dkey_from_key(index_dkey_t *dkey, unsigned char *buffer, uint8_t length);
 
     index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlength, size_t offset, size_t length);
-    index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags);
+    index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags, off_t idxoffset);
 
     index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry);
     int index_entry_is_deleted(index_entry_t *entry);
@@ -157,4 +161,9 @@
     size_t index_next_offset(index_root_t *root);
     size_t index_offset_objectid(uint32_t idobj);
     uint16_t index_indexid(index_root_t *root);
+
+    int index_grab_fileid(index_root_t *root, uint16_t fileid);
+    void index_release_fileid(index_root_t *root, uint16_t fileid, int fd);
+
+    void index_item_header_dump(index_item_t *item);
 #endif

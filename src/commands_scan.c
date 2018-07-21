@@ -8,13 +8,14 @@
 #include <inttypes.h>
 #include "zerodb.h"
 #include "index.h"
+#include "index_scan.h"
 #include "data.h"
 #include "namespace.h"
 #include "redis.h"
 #include "commands.h"
 #include "commands_get.h"
 
-static int command_scan_send_array(data_entry_header_t *header, redis_client_t *client) {
+static int command_scan_send_array(index_item_t *header, redis_client_t *client) {
     char response[(MAX_KEY_LENGTH * 2) + 128];
     size_t offset = 0;
 
@@ -48,10 +49,10 @@ static int command_scan_send_array(data_entry_header_t *header, redis_client_t *
 //
 int command_scan(redis_client_t *client) {
     index_entry_t *entry = NULL;
-    data_scan_t scan;
+    index_scan_t scan;
 
     if(client->request->argc == 1) {
-        scan = data_first_header(client->ns->data);
+        scan = index_first_header(client->ns->index);
         goto gotscan;
     }
 
@@ -68,20 +69,20 @@ int command_scan(redis_client_t *client) {
         return 1;
     }
 
-    scan = data_next_header(client->ns->data, entry->dataid, entry->offset);
+    scan = index_next_header(client->ns->index, entry->dataid, entry->offset);
 
 gotscan:
-    if(scan.status == DATA_SCAN_SUCCESS) {
+    if(scan.status == INDEX_SCAN_SUCCESS) {
         command_scan_send_array(scan.header, client);
         free(scan.header);
     }
 
-    if(scan.status == DATA_SCAN_UNEXPECTED) {
+    if(scan.status == INDEX_SCAN_UNEXPECTED) {
         redis_hardsend(client, "-Internal Error");
         return 1;
     }
 
-    if(scan.status == DATA_SCAN_NO_MORE_DATA) {
+    if(scan.status == INDEX_SCAN_NO_MORE_DATA) {
         redis_hardsend(client, "-No more data");
         return 1;
     }
@@ -94,10 +95,10 @@ gotscan:
 //
 int command_rscan(redis_client_t *client) {
     index_entry_t *entry = NULL;
-    data_scan_t scan;
+    index_scan_t scan;
 
     if(client->request->argc == 1) {
-        scan = data_last_header(client->ns->data);
+        scan = index_last_header(client->ns->index);
         goto gotscan;
     }
 
@@ -114,20 +115,20 @@ int command_rscan(redis_client_t *client) {
         return 1;
     }
 
-    scan = data_previous_header(client->ns->data, entry->dataid, entry->offset);
+    scan = index_previous_header(client->ns->index, entry->dataid, entry->offset);
 
 gotscan:
-    if(scan.status == DATA_SCAN_SUCCESS) {
+    if(scan.status == INDEX_SCAN_SUCCESS) {
         command_scan_send_array(scan.header, client);
         free(scan.header);
     }
 
-    if(scan.status == DATA_SCAN_UNEXPECTED) {
+    if(scan.status == INDEX_SCAN_UNEXPECTED) {
         redis_hardsend(client, "-Internal Error");
         return 1;
     }
 
-    if(scan.status == DATA_SCAN_NO_MORE_DATA) {
+    if(scan.status == INDEX_SCAN_NO_MORE_DATA) {
         redis_hardsend(client, "-No more data");
         return 1;
     }

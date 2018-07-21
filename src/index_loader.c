@@ -283,11 +283,16 @@ static size_t index_load_file(index_root_t *root) {
         index_entry_t *fresh = NULL;
 
         entry = (index_item_t *) seeker;
+        off_t offset = seeker - filebuf;
 
         // insert this entry like it was inserted by a user
         // this allows us to keep a generic way of inserting data and keeping a
         // single point of logic when adding data (logic for overwrite, resize bucket, ...)
-        fresh = index_entry_insert_memory(root, entry->id, entry->idlength, entry->offset, entry->length, entry->flags);
+        fresh = index_entry_insert_memory(root, entry->id, entry->idlength, entry->offset, entry->length, entry->flags, offset);
+
+        // set the previous pointing to this entry
+        // this is the last one we added
+        root->previous = seeker - filebuf;
 
         // moving seeker to next entry in the buffer
         seeker += sizeof(index_item_t) + entry->idlength;
@@ -297,6 +302,8 @@ static size_t index_load_file(index_root_t *root) {
         if(rootsettings.mode == DIRECTKEY)
             free(fresh);
     }
+
+    debug("[+] index: last offset: %lu\n", root->previous);
 
     // freeing buffer memory
     free(filebuf);
@@ -400,6 +407,7 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
     root->indexfile = malloc(sizeof(char) * (ZDB_PATH_MAX + 1));
     root->nextentry = 0;
     root->nextid = 0;
+    root->previous = 0;
     root->sync = settings->sync;
     root->synctime = settings->synctime;
     root->lastsync = 0;

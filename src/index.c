@@ -21,6 +21,21 @@
 //       since each namespace have their own index, now
 //       we need to pass the index to each function
 
+// dump an index entry item
+void index_item_header_dump(index_item_t *item) {
+#ifdef RELEASE
+    (void) entry;
+#else
+    debug("[+] index: entry dump: id length  : %u\n", item->idlength);
+    debug("[+] index: entry dump: data offset: %lu\n", item->offset);
+    debug("[+] index: entry dump: data length: %lu\n", item->length);
+    debug("[+] index: entry dump: previous   : %X\n", item->previous);
+    debug("[+] index: entry dump: flags      : %u\n", item->flags);
+    debug("[+] index: entry dump: timestamp  : %u\n", item->timestamp);
+#endif
+}
+
+
 // force index to be sync'd with underlaying device
 static inline int index_sync(index_root_t *root, int fd) {
     fsync(fd);
@@ -91,18 +106,6 @@ static int index_read(int fd, void *buffer, size_t length) {
     return 1;
 }
 
-// convert a binary direct-key to a readable
-// direct-key structure
-index_dkey_t *index_dkey_from_key(index_dkey_t *dkey, unsigned char *buffer, uint8_t length) {
-    if(length != sizeof(index_dkey_t))
-        return NULL;
-
-    // binary copy buffer
-    memcpy(dkey, buffer, length);
-
-    return dkey;
-}
-
 // set global filename based on the index id
 void index_set_id(index_root_t *root) {
     sprintf(root->indexfile, "%s/zdb-index-%05u", root->indexdir, root->indexid);
@@ -129,6 +132,50 @@ static int index_open_file(index_root_t *root, int fileid) {
 
 static int index_open_file_rw(index_root_t *root, int fileid) {
     return index_open_file_mode(root, fileid, O_RDWR);
+}
+
+// main function to call when you need to deal with multiple index id
+// this function takes care to open the right file id:
+//  - if you want the current opened file id, you have thid fd
+//  - if the file is not opened yet, you'll receive a new fd
+// you need to call the index_release_dataid to be consistant about cleaning this
+// file open, if a new one was opened
+//
+// if the index id could not be opened, -1 is returned
+inline int index_grab_fileid(index_root_t *root, uint16_t fileid) {
+    int fd = root->indexfd;
+
+    if(root->indexid != fileid) {
+        // the requested datafile is not the current datafile opened
+        // we will re-open the expected datafile temporary
+        debug("[-] index: switching file: %d, requested: %d\n", root->indexid, fileid);
+        if((fd = index_open_file(root, fileid)) < 0)
+            return -1;
+    }
+
+    return fd;
+}
+
+inline void index_release_fileid(index_root_t *root, uint16_t fileid, int fd) {
+    // if the requested file id (or fd) is not the one
+    // currently used by the main structure, we close it
+    // since it was temporary
+    if(root->indexid != fileid) {
+        close(fd);
+    }
+}
+
+
+// convert a binary direct-key to a readable
+// direct-key structure
+index_dkey_t *index_dkey_from_key(index_dkey_t *dkey, unsigned char *buffer, uint8_t length) {
+    if(length != sizeof(index_dkey_t))
+        return NULL;
+
+    // binary copy buffer
+    memcpy(dkey, buffer, length);
+
+    return dkey;
 }
 
 // open the current filename set on the global struct
@@ -167,6 +214,8 @@ size_t index_jump_next(index_root_t *root) {
     // moving to the next file
     root->indexid += 1;
     root->nextid = 0;
+    root->previous = 0;
+
     index_set_id(root);
 
     index_open_final(root);
@@ -276,7 +325,7 @@ index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t o
 // insert a key, only in memory, no disk is touched
 // this function should be called externaly only when populating something
 // if we need to add something new on the index, we should write it on disk
-index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags) {
+index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags, off_t idxoffset) {
     index_entry_t *exists = NULL;
 
     // item already exists
@@ -292,6 +341,7 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
         exists->offset = offset;
         exists->flags = flags;
         exists->dataid = root->indexid;
+        exists->idxoffset = idxoffset;
 
         return exists;
     }
@@ -306,6 +356,8 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, 
     entry->offset = offset;
     entry->length = length;
     entry->dataid = root->indexid;
+    entry->idxoffset = idxoffset;
+    entry->flags = flags;
 
     uint32_t branchkey = index_key_hash(id, idlength);
 
@@ -340,8 +392,9 @@ index_entry_t *index_reusable_entry = NULL;
 index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlength, size_t offset, size_t length) {
     unsigned char *id = (unsigned char *) vid;
     index_entry_t *entry = NULL;
+    off_t curoffset = lseek(root->indexfd, 0, SEEK_END);
 
-    if(!(entry = index_entry_insert_memory(root, id, idlength, offset, length, 0)))
+    if(!(entry = index_entry_insert_memory(root, id, idlength, offset, length, 0, curoffset)))
         return NULL;
 
     size_t entrylength = sizeof(index_item_t) + entry->idlength;
@@ -353,6 +406,10 @@ index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlengt
     index_transition->flags = entry->flags;
     index_transition->dataid = entry->dataid;
     index_transition->timestamp = (uint32_t) time(NULL);
+    index_transition->previous = root->previous;
+
+    // updating global previous
+    root->previous = curoffset;
 
     if(!index_write(root->indexfd, index_transition, entrylength, root)) {
         fprintf(stderr, "[-] index: cannot write index entry on disk\n");
@@ -434,10 +491,17 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
             return NULL;
 
     } else {
+        printf(">> %d\n", entry->idxoffset);
+
+        if(!(index_rewrite_entry(root, index_transition, entrylength, entry->dataid, entry->idxoffset)))
+            return NULL;
+
+        /*
         // by default, just append a new entry with
         // flag set up
         if(!index_write(root->indexfd, index_transition, entrylength, root))
             return NULL;
+        */
     }
 
     return entry;
