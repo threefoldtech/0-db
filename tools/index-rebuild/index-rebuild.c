@@ -24,6 +24,7 @@ static struct option long_options[] = {
     {"data",       required_argument, 0, 'd'},
     {"index",      required_argument, 0, 'i'},
     {"namespace",  required_argument, 0, 'n'},
+    {"template",   required_argument, 0, 't'},
     {"help",       no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };

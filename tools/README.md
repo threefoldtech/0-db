@@ -12,5 +12,5 @@ Rebuild a whole index directory based on data directory
 ## Integrity Check
 Check integrity of a datafile (offline integrity check)
 
-## Namespace Edit
+## Namespace Editor
 Create or edit a namespace descriptor file
