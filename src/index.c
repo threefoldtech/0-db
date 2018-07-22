@@ -468,6 +468,7 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
     index_transition->flags = entry->flags;
 
     // rollback to point to the entry again
+    debug("[+] index: delete: overwriting key\n");
     lseek(fd, entry->idxoffset, SEEK_SET);
 
     // overwrite the key
@@ -475,40 +476,6 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
         warnp("index_entry_delete write");
         close(fd);
         return NULL;
-    }
-
-    return entry;
-
-    if(rootsettings.mode == DIRECTKEY) {
-        // tricky case
-        // when we are in direct mode, we need to update the existing
-        // header entry with the new flag
-        // we first resolve fileid and location, then open it in update mode
-        // and overwrite the entry
-        index_dkey_t directkey;
-
-        if(!(index_dkey_from_key(&directkey, index_transition->id, index_transition->idlength))) {
-            debug("[-] index: delete: cannot convert key requested\n");
-            return NULL;
-        }
-
-        size_t offset = index_offset_objectid(directkey.objectid);
-        debug("[+] index: delete: directkey: resolved [%d, %lu]\n", directkey.indexid, offset);
-
-        if(!(index_rewrite_entry(root, index_transition, entrylength, directkey.indexid, offset)))
-            return NULL;
-
-    } else {
-
-        if(!(index_rewrite_entry(root, index_transition, entrylength, entry->dataid, entry->idxoffset)))
-            return NULL;
-
-        /*
-        // by default, just append a new entry with
-        // flag set up
-        if(!index_write(root->indexfd, index_transition, entrylength, root))
-            return NULL;
-        */
     }
 
     return entry;
