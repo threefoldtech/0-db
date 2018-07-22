@@ -14,8 +14,8 @@
 // initialize an index file
 // this basicly create the header and write it
 //
-index_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
-    index_t header;
+index_header_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
+    index_header_t header;
 
     memcpy(header.magic, "IDX0", 4);
     header.version = ZDB_IDXFILE_VERSION;
@@ -24,7 +24,7 @@ index_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
     header.opened = time(NULL);
     header.mode = 0; // FIXME
 
-    if(!index_write(fd, &header, sizeof(index_t), root))
+    if(!index_write(fd, &header, sizeof(index_header_t), root))
         diep("index_initialize: write");
 
     return header;

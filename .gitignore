@@ -63,4 +63,6 @@ bin/zdbtests
 src/zdb
 tools/integrity-check/integrity-check
 tools/index-dump/index-dump
+tools/index-rebuild/index-rebuild
+tools/compaction/compaction
 tests/zdbtests

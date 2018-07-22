@@ -53,11 +53,11 @@ static char *index_date(uint32_t epoch, char *target, size_t length) {
 }
 
 int index_dump(int fd) {
-    index_t header;
+    index_header_t header;
     char entrydate[64];
 
     // first step, let's validate the header
-    if(read(fd, &header, sizeof(index_t)) != (size_t) sizeof(index_t)) {
+    if(read(fd, &header, sizeof(index_header_t)) != (size_t) sizeof(index_header_t)) {
         fprintf(stderr, "[-] cannot read index header\n");
         return 1;
     }
