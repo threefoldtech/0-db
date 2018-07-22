@@ -424,25 +424,6 @@ index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlengt
     return entry;
 }
 
-static int index_rewrite_entry(index_root_t *root, index_item_t *entry, size_t length, uint16_t fileid, size_t offset) {
-    int fd;
-
-    if((fd = index_open_file_rw(root, fileid)) < 0)
-        return 0;
-
-    lseek(fd, offset, SEEK_SET);
-
-    if(!index_write(fd, entry, length, root)) {
-        warnp("index: rewrite entry");
-        close(fd);
-        return 0;
-    }
-
-    close(fd);
-
-    return 1;
-}
-
 // IMPORTANT:
 //   this function is the only one to 'break' the always append
 //   behavior, this function will overwrite existing index by
@@ -457,19 +438,46 @@ static int index_rewrite_entry(index_root_t *root, index_item_t *entry, size_t l
 //     we do this in the index file and not in the data file so we keep
 //     the data file really always append in any case
 index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
-    // mark entry as deleted
-    entry->flags |= INDEX_ENTRY_DELETED;
+    int fd;
 
-    // write flagged deleted entry on index file
+    // compute this object size on disk
     size_t entrylength = sizeof(index_item_t) + entry->idlength;
 
-    memcpy(index_transition->id, entry->id, entry->idlength);
-    index_transition->idlength = entry->idlength;
-    index_transition->offset = entry->offset;
-    index_transition->length = entry->length;
+    // mark entry as deleted
+    // this affect the memory object (runtime)
+    entry->flags |= INDEX_ENTRY_DELETED;
+
+    // (re-)open the expected index file, in read-write mode
+    if((fd = index_open_file_rw(root, entry->dataid)) < 0)
+        return NULL;
+
+    // jump to the right offset for this entry
+    debug("[+] index: delete: reading %lu bytes at offset %lu\n", entrylength, entry->idxoffset);
+    lseek(fd, entry->idxoffset, SEEK_SET);
+
+    // reading the exact entry from disk
+    if(read(fd, index_transition, entrylength) != (ssize_t) entrylength) {
+        warnp("index_entry_delete read");
+        close(fd);
+        return NULL;
+    }
+
+    index_item_header_dump(index_transition);
+
+    // update the flags
     index_transition->flags = entry->flags;
-    index_transition->dataid = entry->dataid;
-    index_transition->timestamp = (uint32_t) time(NULL);
+
+    // rollback to point to the entry again
+    lseek(fd, entry->idxoffset, SEEK_SET);
+
+    // overwrite the key
+    if(write(fd, index_transition, entrylength) != (ssize_t) entrylength) {
+        warnp("index_entry_delete write");
+        close(fd);
+        return NULL;
+    }
+
+    return entry;
 
     if(rootsettings.mode == DIRECTKEY) {
         // tricky case
@@ -491,7 +499,6 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
             return NULL;
 
     } else {
-        printf(">> %d\n", entry->idxoffset);
 
         if(!(index_rewrite_entry(root, index_transition, entrylength, entry->dataid, entry->idxoffset)))
             return NULL;

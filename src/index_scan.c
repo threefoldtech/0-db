@@ -38,23 +38,23 @@ static index_scan_t index_previous_header_real(index_scan_t scan) {
         off_t current = lseek(scan.fd, scan.original, SEEK_SET);
 
         if(read(scan.fd, &source, sizeof(index_item_t)) != sizeof(index_item_t)) {
-            warnp("data: previous-header: could not read original offset datafile");
+            warnp("index scan: previous-header: could not read original offset file");
             return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
         }
 
         scan.target = source.previous;
 
         if(source.previous > current) {
-            debug("[+] data: previous-header: previous offset in previous file\n");
+            debug("[+] index scan: previous-header: previous offset in previous file\n");
             return index_scan_error(scan, INDEX_SCAN_REQUEST_PREVIOUS);
         }
     }
 
-    debug("[+] data: previous-header: offset: %u\n", source.previous);
+    debug("[+] index scan: previous-header: offset: %u\n", source.previous);
 
     // at that point, we know scan.target is set to the expected value
     if(scan.target == 0) {
-        debug("[+] data: previous-header: zero reached, nothing to rollback\n");
+        debug("[+] index scan: previous-header: zero reached, nothing to rollback\n");
         return index_scan_error(scan, INDEX_SCAN_NO_MORE_DATA);
     }
 
@@ -63,13 +63,13 @@ static index_scan_t index_previous_header_real(index_scan_t scan) {
 
     // reading the fixed-length
     if(read(scan.fd, &source, sizeof(index_item_t)) != sizeof(index_item_t)) {
-        warnp("data: previous-header: could not read previous offset datafile");
+        warnp("index scan: previous-header: could not read previous offset datafile");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
 
     // checking if entry is deleted
     if(source.flags & INDEX_ENTRY_DELETED) {
-        debug("[+] data: previous-header: data is deleted, going one further\n");
+        debug("[+] index scan: previous-header: data is deleted, going one more before\n");
 
         // set the 'new' original to this offset
         scan.original = scan.target;

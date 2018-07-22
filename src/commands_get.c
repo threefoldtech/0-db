@@ -57,6 +57,7 @@ static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
     index_reusable_entry->offset = item->offset;
     index_reusable_entry->dataid = item->dataid;
     index_reusable_entry->flags = item->flags;
+    index_reusable_entry->idxoffset = offset;
 
     // force length to zero, this leads to fetch
     // the length from data file

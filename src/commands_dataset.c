@@ -133,14 +133,14 @@ int command_del(redis_client_t *client) {
         return 1;
     }
 
-    // add a new entry containing new flag
+    // mark index entry as deleted
     if(!index_entry_delete(index, entry)) {
         debug("[-] command: del: index delete flag failed\n");
         redis_hardsend(client, "-Cannot delete key");
         return 0;
     }
 
-    // deleting data part
+    // update data file, flag entry deleted
     if(!data_delete(data, entry->id, entry->idlength)) {
         debug("[-] command: del: deleting data failed\n");
         redis_hardsend(client, "-Cannot delete key");

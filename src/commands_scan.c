@@ -69,7 +69,7 @@ int command_scan(redis_client_t *client) {
         return 1;
     }
 
-    scan = index_next_header(client->ns->index, entry->dataid, entry->offset);
+    scan = index_next_header(client->ns->index, entry->dataid, entry->idxoffset);
 
 gotscan:
     if(scan.status == INDEX_SCAN_SUCCESS) {
@@ -115,7 +115,7 @@ int command_rscan(redis_client_t *client) {
         return 1;
     }
 
-    scan = index_previous_header(client->ns->index, entry->dataid, entry->offset);
+    scan = index_previous_header(client->ns->index, entry->dataid, entry->idxoffset);
 
 gotscan:
     if(scan.status == INDEX_SCAN_SUCCESS) {

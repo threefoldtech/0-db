@@ -106,6 +106,7 @@ int index_dump(int fd) {
         printf("[+]   data fileid: %u\n", entry->dataid);
         printf("[+]   entry flags: 0x%X\n", entry->flags);
         printf("[+]   entry date : %s\n", entrydate);
+        printf("[+]   previous   : %d\n", entry->previous);
         printf("[+]   entry key  : ");
         hexdump(entry->id, entry->idlength);
         printf("\n");
