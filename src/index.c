@@ -24,7 +24,7 @@
 // dump an index entry item
 void index_item_header_dump(index_item_t *item) {
 #ifdef RELEASE
-    (void) entry;
+    (void) item;
 #else
     debug("[+] index: entry dump: id length  : %u\n", item->idlength);
     debug("[+] index: entry dump: data offset: %lu\n", item->offset);
