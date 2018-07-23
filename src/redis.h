@@ -93,6 +93,13 @@
         int admin;        // does the client is admin
         buffer_t buffer;  // per-client buffer
 
+        // each client can request to wait for an event
+        // an event is basicly somebody else doing some command
+        // we keep track if a client wants to monitor some event
+        // and a pointer to the last command executed
+        int (*watching)(void *);
+        int (*executed)(void *);
+
         // each client will be attached to a request
         // this request will contains one-per-one commands
         resp_request_t *request;
@@ -155,4 +162,6 @@
     // socket generic reply
     int redis_reply(redis_client_t *client, void *payload, size_t length, void (*destructor)(void *target));
     int redis_reply_stack(redis_client_t *client, void *payload, size_t length);
+
+    int redis_posthandler_client(redis_client_t *client);
 #endif

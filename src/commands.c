@@ -66,6 +66,7 @@ static command_t commands_handlers[] = {
     {.command = "PING", .handler = command_ping}, // default PING command
     {.command = "TIME", .handler = command_time}, // default TIME command
     {.command = "AUTH", .handler = command_auth}, // custom AUTH command to authentifcate admin
+    {.command = "WAIT", .handler = command_wait},    // custom command to wait on events
 
     // dataset
     {.command = "SET",    .handler = command_set},    // default SET command
@@ -120,8 +121,14 @@ int redis_dispatcher(redis_client_t *client) {
     debug("[+] command: '%.*s' [+%d args]\n", key->length, (char *) key->buffer, request->argc - 1);
 
     for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
-        if(strncasecmp(key->buffer, commands_handlers[i].command, key->length) == 0)
-            return commands_handlers[i].handler(client);
+        if(strncasecmp(key->buffer, commands_handlers[i].command, key->length) == 0) {
+            client->executed = (int (*)(void *)) commands_handlers[i].handler;
+            int value = commands_handlers[i].handler(client);
+
+
+
+            return value;
+        }
     }
 
     // unknown command
@@ -130,4 +137,32 @@ int redis_dispatcher(redis_client_t *client) {
 
     return 1;
 }
+
+int command_wait(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    resp_object_t *key = request->argv[1];
+    int (*handler)(redis_client_t *client) = NULL;
+
+    if(!command_args_validate(client, 2))
+        return 1;
+
+    // checking if the requested command is supported
+    for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
+        if(strncasecmp(key->buffer, commands_handlers[i].command, key->length) == 0) {
+            handler = commands_handlers[i].handler;
+            break;
+        }
+    }
+
+    if(handler == NULL) {
+        redis_hardsend(client, "-Unknown command to watch");
+        return 0;
+    }
+
+    // nothing to send to client, he is waiting now
+    client->watching = (int (*)(void *)) handler;
+
+    return 1;
+}
+
 

@@ -417,6 +417,9 @@ static resp_status_t redis_handle_resp_finished(redis_client_t *client) {
     value = redis_dispatcher(client);
     debug("[+] redis: dispatcher done, return code: %d\n", value);
 
+    debug("[+] redis: calling posthandler\n");
+    redis_posthandler_client(client);
+
     // clearing the request
     redis_free_request(request);
 
@@ -549,6 +552,8 @@ redis_client_t *socket_client_new(int fd) {
     client->fd = fd;
     client->connected = time(NULL);
     client->commands = 0;
+    client->executed = NULL;
+    client->watching = NULL;
 
     // allocating a fixed buffer
     client->buffer = buffer_new();
@@ -620,6 +625,30 @@ int redis_detach_clients(namespace_t *namespace) {
         if(clients.list[i]->ns == namespace) {
             debug("[+] redis: client %d: waiting for disconnection\n", clients.list[i]->fd);
             clients.list[i]->ns = NULL;
+        }
+    }
+
+    return 0;
+}
+
+// handler executed after each command executed
+int redis_posthandler_client(redis_client_t *client) {
+    for(size_t i = 0; i < clients.length; i++) {
+        redis_client_t *checking = clients.list[i];
+
+        if(!checking || checking->ns != client->ns)
+            continue;
+
+        if(!checking->watching)
+            continue;
+
+        if(checking->watching == client->executed) {
+            // trigger done, discarding watcher
+            checking->watching = NULL;
+
+            // sending notification
+            printf("[+] redis: posthandler: client %d was waiting, notifing\n", checking->fd);
+            redis_hardsend(checking, "+OK");
         }
     }
 
