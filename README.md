@@ -171,6 +171,7 @@ This mode is not possible if you don't have any data/index already available.
 - `AUTH password`
 - `SCAN [optional key]`
 - `RSCAN [optional key]`
+- `WAIT command`
 
 `SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
 
@@ -235,6 +236,17 @@ any password, the namespace will be accessible in read-only.
 
 ## AUTH
 If an admin account is set, use `AUTH` command to authentificate yourself as `ADMIN`.
+
+## WAIT
+Blocking wait on command execution by someone else. This allows you to wait somebody else
+doing some commands. This can be useful to avoid polling the server if you want to do periodic
+queries (like waiting for a SET).
+
+Wait takes one argument: a command name to wait for. The event will only be triggered for clients
+on the same namespace as you (same SELECT)
+
+This is the only blocking function right now. In server side, your connection is set on pending and
+you won't receive anything until someone executed the expected command.
 
 # Namespaces
 A namespace is a dedicated directory on index and data root directory.
