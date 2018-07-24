@@ -381,23 +381,24 @@ int data_check(data_root_t *root, size_t offset, uint16_t dataid) {
 
 
 // insert data on the datafile and returns it's offset
-size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength, uint8_t flags) {
-    unsigned char *id = (unsigned char *) vid;
+// size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength, uint8_t flags, uint32_t crc) {
+size_t data_insert(data_root_t *root, data_request_t *source) {
+    unsigned char *id = (unsigned char *) source->vid;
     size_t offset = lseek(root->datafd, 0, SEEK_END);
-    size_t headerlength = sizeof(data_entry_header_t) + idlength;
+    size_t headerlength = sizeof(data_entry_header_t) + source->idlength;
     data_entry_header_t *header;
 
     if(!(header = malloc(headerlength)))
         diep("malloc");
 
-    header->idlength = idlength;
-    header->datalength = datalength;
+    header->idlength = source->idlength;
+    header->datalength = source->datalength;
     header->previous = root->previous;
-    header->integrity = data_crc32(data, datalength);
-    header->flags = flags;
+    header->integrity = source->crc; // data_crc32(data, datalength);
+    header->flags = source->flags;
     header->timestamp = time(NULL);
 
-    memcpy(header->id, id, idlength);
+    memcpy(header->id, id, source->idlength);
 
     // data offset will always be >= 1 (see initializer notes)
     // we can use 0 as error detection
@@ -410,7 +411,7 @@ size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, 
 
     free(header);
 
-    if(!data_write(root->datafd, data, datalength, 1, root)) {
+    if(!data_write(root->datafd, source->data, source->datalength, 1, root)) {
         verbose("[-] data payload: write failed\n");
         return 0;
     }
@@ -551,8 +552,17 @@ int data_delete_real(int fd, size_t offset) {
 int data_delete(data_root_t *root, void *id, uint8_t idlength) {
     unsigned char *empty = (unsigned char *) "";
 
+    data_request_t dreq = {
+        .data = empty,
+        .datalength = 0,
+        .vid = id,
+        .idlength = idlength,
+        .flags = DATA_ENTRY_DELETED,
+        .crc = 0,
+    };
+
     debug("[+] data: delete: insert empty flagged data\n");
-    if(!(data_insert(root, empty, 0, id, idlength, DATA_ENTRY_DELETED)))
+    if(!(data_insert(root, &dreq)))
         return 0;
 
     return 1;

@@ -145,8 +145,8 @@
 
     index_dkey_t *index_dkey_from_key(index_dkey_t *dkey, unsigned char *buffer, uint8_t length);
 
-    index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlength, size_t offset, size_t length);
-    index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags, off_t idxoffset);
+    index_entry_t *index_entry_insert(index_root_t *root, void *vid, index_entry_t *new);
+    index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *realid, index_entry_t *new);
 
     index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry);
     int index_entry_is_deleted(index_entry_t *entry);

@@ -241,6 +241,7 @@ void usage() {
     printf("  --data      <dir>      datafile directory (root path), input\n");
     printf("  --index     <dir>      indexfile directory (root path), output\n");
     printf("  --namespace <name>     which namespace to compact\n");
+    printf("  --template  <file>     zdb-namespace source file (namespace settings)\n");
     printf("  --help                 print this message\n");
 
     exit(EXIT_FAILURE);

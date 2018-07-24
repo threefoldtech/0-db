@@ -325,48 +325,58 @@ index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t o
 // insert a key, only in memory, no disk is touched
 // this function should be called externaly only when populating something
 // if we need to add something new on the index, we should write it on disk
-index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags, off_t idxoffset) {
+//
+// the id on the struct is not really allocated, except if explicity done
+// by default, no memory space is allocated (on the stack) for the id, so we need the
+// id in external variable, this variable will be copy on the right place if needed
+//
+// note that we use everything else (including 'idlength') from the new index_entry_t provided
+//
+// index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags, off_t idxoffset) {
+index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *realid, index_entry_t *new) {
     index_entry_t *exists = NULL;
 
     // item already exists
-    if((exists = index_entry_get(root, id, idlength))) {
+    if((exists = index_entry_get(root, realid, new->idlength))) {
         debug("[+] index: key already exists, overwriting\n");
 
         // update statistics
         root->datasize -= exists->length;
-        root->datasize += length;
+        root->datasize += new->length;
 
         // re-use existing entry
-        exists->length = length;
-        exists->offset = offset;
-        exists->flags = flags;
+        exists->length = new->length;
+        exists->offset = new->offset;
+        exists->flags = new->flags;
         exists->dataid = root->indexid;
-        exists->idxoffset = idxoffset;
+        exists->idxoffset = new->idxoffset;
+        exists->crc = new->crc;
 
         return exists;
     }
 
     // calloc will ensure any unset fields (eg: flags) are zero
-    size_t entrysize = sizeof(index_entry_t) + idlength;
+    size_t entrysize = sizeof(index_entry_t) + new->idlength;
     index_entry_t *entry = calloc(entrysize, 1);
 
-    memcpy(entry->id, id, idlength);
+    memcpy(entry->id, realid, new->idlength);
     entry->namespace = root->namespace;
-    entry->idlength = idlength;
-    entry->offset = offset;
-    entry->length = length;
+    entry->idlength = new->idlength;
+    entry->offset = new->offset;
+    entry->length = new->length;
     entry->dataid = root->indexid;
-    entry->idxoffset = idxoffset;
-    entry->flags = flags;
+    entry->idxoffset = new->idxoffset;
+    entry->flags = new->flags;
+    entry->crc = new->crc;
 
-    uint32_t branchkey = index_key_hash(id, idlength);
+    uint32_t branchkey = index_key_hash(realid, new->idlength);
 
     // commit entry into memory
     index_branch_append(root->branches, branchkey, entry);
 
     // update statistics
     root->entries += 1;
-    root->datasize += length;
+    root->datasize += new->length;
     root->indexsize += entrysize;
 
     // update next entry id
@@ -389,12 +399,18 @@ index_entry_t *index_reusable_entry = NULL;
 // and the on-disk version is appended anyway, when reloading the index
 // we call the same sets of function which overwrite existing key, we
 // will always have the last version in memory
-index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlength, size_t offset, size_t length) {
+index_entry_t *index_entry_insert(index_root_t *root, void *vid, index_entry_t *new) { // void *vid, uint8_t idlength, size_t offset, size_t length) {
     unsigned char *id = (unsigned char *) vid;
     index_entry_t *entry = NULL;
     off_t curoffset = lseek(root->indexfd, 0, SEEK_END);
 
-    if(!(entry = index_entry_insert_memory(root, id, idlength, offset, length, 0, curoffset)))
+    // ensure flags are empty
+    new->flags = 0;
+
+    // setting the current index offset
+    new->idxoffset = curoffset;
+
+    if(!(entry = index_entry_insert_memory(root, id, new)))
         return NULL;
 
     size_t entrylength = sizeof(index_item_t) + entry->idlength;

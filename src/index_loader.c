@@ -285,10 +285,22 @@ static size_t index_load_file(index_root_t *root) {
         entry = (index_item_t *) seeker;
         off_t offset = seeker - filebuf;
 
+        // create a gateway struct to fill our index memory
+        // this is not nice (lot of copy) but make things more
+        // generic and clear
+        index_entry_t source = {
+            .idlength = entry->idlength,
+            .length = entry->length,
+            .offset = entry->offset,
+            .flags = entry->flags,
+            .idxoffset = offset,
+            .crc = entry->crc,
+        };
+
         // insert this entry like it was inserted by a user
         // this allows us to keep a generic way of inserting data and keeping a
         // single point of logic when adding data (logic for overwrite, resize bucket, ...)
-        fresh = index_entry_insert_memory(root, entry->id, entry->idlength, entry->offset, entry->length, entry->flags, offset);
+        fresh = index_entry_insert_memory(root, entry->id, &source);
 
         // set the previous pointing to this entry
         // this is the last one we added
