@@ -240,12 +240,12 @@ If an admin account is set, use `AUTH` command to authentificate yourself as `AD
 ## WAIT
 Blocking wait on command execution by someone else. This allows you to wait somebody else
 doing some commands. This can be useful to avoid polling the server if you want to do periodic
-queries (like waiting for a SET).
+queries (like waiting for a `SET`).
 
 Wait takes one argument: a command name to wait for. The event will only be triggered for clients
-on the same namespace as you (same SELECT)
+on the same namespace as you (same `SELECT`)
 
-This is the only blocking function right now. In server side, your connection is set on pending and
+This is the only blocking function right now. In server side, your connection is set `pending` and
 you won't receive anything until someone executed the expected command.
 
 # Namespaces

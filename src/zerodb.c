@@ -245,7 +245,7 @@ void usage() {
 // main entry: processing arguments
 //
 int main(int argc, char *argv[]) {
-    notice("[*] Zero-DB (0-db), revision " REVISION);
+    notice("[*] Zero-DB (0-db), v" ZDB_VERSION " (commit " REVISION ")");
 
     settings_t *settings = &rootsettings;
     int option_index = 0;

@@ -632,6 +632,10 @@ int redis_detach_clients(namespace_t *namespace) {
 }
 
 // handler executed after each command executed
+// basicly for now, walk over all the clients, if they are
+// on the same namespace as the current client, checking if
+// some waiting was set, if waiting was set on the same handler
+// we just called, we trigger (notify) it and unlock it
 int redis_posthandler_client(redis_client_t *client) {
     for(size_t i = 0; i < clients.length; i++) {
         redis_client_t *checking = clients.list[i];

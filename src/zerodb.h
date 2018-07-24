@@ -26,6 +26,21 @@
     #define ZDB_DATAFILE_VERSION    2
     #define ZDB_IDXFILE_VERSION     2
 
+    // define here version of 0-db itself
+    // version is made as following:
+    //
+    //   Major.Minor.Revision
+    //
+    //               ^-- incremented on bug fix and small changes
+    //
+    //         ^-- incremented on important new features
+    //
+    //   ^--- will only change if data format change
+    //        and not assure retro-compatibility
+    //        (eg: files written on version 1.x.x won't works
+    //             out of box on a version 2.x.x)
+    #define ZDB_VERSION     "1.0.0"
+
     typedef enum db_mode_t {
         // default key-value store
         KEYVALUE = 0,

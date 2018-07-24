@@ -138,6 +138,7 @@ int redis_dispatcher(redis_client_t *client) {
     return 1;
 }
 
+// set the client to wait on a special handler to be triggered
 int command_wait(redis_client_t *client) {
     resp_request_t *request = client->request;
     resp_object_t *key = request->argv[1];
@@ -160,6 +161,9 @@ int command_wait(redis_client_t *client) {
     }
 
     // nothing to send to client, he is waiting now
+    // we set the handler pointer to that client waiting flag
+    // and as soon as someone else on the same namespace will
+    // request this command, this client will be notified
     client->watching = (int (*)(void *)) handler;
 
     return 1;
