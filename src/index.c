@@ -32,6 +32,8 @@ void index_item_header_dump(index_item_t *item) {
     debug("[+] index: entry dump: previous   : %" PRIX32 "\n", item->previous);
     debug("[+] index: entry dump: flags      : %" PRIu8  "\n", item->flags);
     debug("[+] index: entry dump: timestamp  : %" PRIu32 "\n", item->timestamp);
+    debug("[+] index: entry dump: parent id  : %" PRIu16 "\n", item->parentid);
+    debug("[+] index: entry dump: parent offs: %" PRIu32 "\n", item->parentoff);
 #endif
 }
 
@@ -291,7 +293,7 @@ index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t id
 // which means we need to know offset and id length in advance
 //
 // this is really important in direct mode to use indirection with index
-// to have benefit of compaction etc.
+// to have benefit of compaction etc. and for history support
 index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t offset, uint8_t idlength) {
     int fd;
     size_t length;
@@ -343,6 +345,12 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *real
         // update statistics
         root->datasize -= exists->length;
         root->datasize += new->length;
+
+        // updating parent id and parent offset
+        // to the previous item itself, which
+        // will be used to keep track of the history
+        exists->parentid = exists->dataid;
+        exists->parentoff = exists->idxoffset;
 
         // re-use existing entry
         exists->length = new->length;
@@ -423,6 +431,9 @@ index_entry_t *index_entry_insert(index_root_t *root, void *vid, index_entry_t *
     index_transition->dataid = entry->dataid;
     index_transition->timestamp = (uint32_t) time(NULL);
     index_transition->previous = root->previous;
+    index_transition->parentid = entry->parentid;
+    index_transition->parentoff = entry->parentoff;
+    index_transition->crc = entry->crc;
 
     // updating global previous
     root->previous = curoffset;

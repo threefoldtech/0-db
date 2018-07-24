@@ -18,6 +18,7 @@
 #include "commands_dataset.h"
 #include "commands_namespace.h"
 #include "commands_system.h"
+#include "commands_history.h"
 
 // ensure number of argument and their validity
 static int real_command_args_validate(redis_client_t *client, int expected, int nullallowed) {
@@ -69,15 +70,16 @@ static command_t commands_handlers[] = {
     {.command = "WAIT", .handler = command_wait},    // custom command to wait on events
 
     // dataset
-    {.command = "SET",    .handler = command_set},    // default SET command
-    {.command = "SETX",   .handler = command_set},    // alias for SET command
-    {.command = "GET",    .handler = command_get},    // default GET command
-    {.command = "DEL",    .handler = command_del},    // default DEL command
-    {.command = "EXISTS", .handler = command_exists}, // default EXISTS command
-    {.command = "CHECK",  .handler = command_check},  // custom command to verify data integrity
-    {.command = "SCAN",   .handler = command_scan},   // modified SCAN which walk forward dataset
-    {.command = "SCANX",  .handler = command_scan},   // alias for SCAN command
-    {.command = "RSCAN",  .handler = command_rscan},  // custom command to walk backward dataset
+    {.command = "SET",     .handler = command_set},     // default SET command
+    {.command = "SETX",    .handler = command_set},     // alias for SET command
+    {.command = "GET",     .handler = command_get},     // default GET command
+    {.command = "DEL",     .handler = command_del},     // default DEL command
+    {.command = "EXISTS",  .handler = command_exists},  // default EXISTS command
+    {.command = "CHECK",   .handler = command_check},   // custom command to verify data integrity
+    {.command = "SCAN",    .handler = command_scan},    // modified SCAN which walk forward dataset
+    {.command = "SCANX",   .handler = command_scan},    // alias for SCAN command
+    {.command = "RSCAN",   .handler = command_rscan},   // custom command to walk backward dataset
+    {.command = "HISTORY", .handler = command_history}, // custom command to get previous version of a key
 
     // query
     {.command = "INFO", .handler = command_info}, // returns 0-db server name

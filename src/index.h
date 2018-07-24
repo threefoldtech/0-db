@@ -125,11 +125,22 @@
     } index_root_t;
 
     // key used by direct mode
+    // contains information about fileid and
+    // objectid, since all object are made of
+    // the same length, we can compute offset like this
     typedef struct index_dkey_t {
         uint16_t indexid;
         uint32_t objectid;
 
     } __attribute__((packed)) index_dkey_t;
+
+    // key used to represent exact position
+    // in index file (aka: dkey resolved)
+    typedef struct index_ekey_t {
+        uint16_t indexid;
+        uint32_t offset;
+
+    } __attribute__((packed)) index_ekey_t;
 
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1
