@@ -156,7 +156,7 @@ size_t index_rebuild(int fd, buffer_t *buffer, uint16_t dataid) {
         buffer->writer = buffer->buffer + buffer->length;
 
         printf("[+] entry: offset: %lu\n", offset);
-        printf("[+] entry: id: %u bytes, payload size: %lu bytes\n", idxitem->idlength, idxitem->length);
+        printf("[+] entry: id: %" PRIu8 " bytes, payload size: %" PRIu32 " bytes\n", idxitem->idlength, idxitem->length);
 
         // computing next offset
         offset = lseek(fd, entry.datalength, SEEK_CUR);

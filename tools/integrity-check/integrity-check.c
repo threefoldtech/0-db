@@ -37,7 +37,7 @@ void hexdump(void *input, size_t length) {
     free(output);
 }
 
-static uint32_t data_crc32(const char *bytes, ssize_t length) {
+uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
     uint64_t *input = (uint64_t *) bytes;
     uint32_t hash = 0;
     ssize_t i = 0;
@@ -111,7 +111,7 @@ int data_integrity(int fd) {
         if(read(fd, buffer, entry->datalength) != entry->datalength)
             diep("payload entry read failed");
 
-        uint32_t crc = data_crc32(buffer, entry->datalength);
+        uint32_t crc = data_crc32((uint8_t *) buffer, entry->datalength);
 
         if(crc != entry->integrity) {
             fprintf(stderr, "[-] integrity check failed: %08x <> %08x\n", crc, entry->integrity);

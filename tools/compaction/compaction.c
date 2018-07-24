@@ -88,7 +88,7 @@ index_entry_t *compaction_handle_entry(index_root_t *index, data_entry_header_t 
     if((idxentry = index_entry_get(index, (unsigned char *) id, entry->idlength))) {
         printf("[+] entry found, already exists, updating\n");
 
-        printf("[+] discarding previous offset: %u/%lu\n", idxentry->dataid, idxentry->offset);
+        printf("[+] discarding previous offset: %" PRIu16 "/%" PRIu32 "\n", idxentry->dataid, idxentry->offset);
         datamap_entry_t *prev = &compaction->filesmap[idxentry->dataid]->entries[idxentry->offset];
 
         // key is overwritten, we can discard previous one
