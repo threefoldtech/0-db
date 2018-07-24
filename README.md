@@ -112,8 +112,9 @@ Each index files contains a 27 bytes headers containing a magic 4 bytes identifi
 a version, creation and last opened date and it's own file-sequential-id. In addition it contains
 the mode used when it was created (to avoid mixing mode on different run).
 
-For each entries on the index, 36 bytes (28 bytes + pointer for linked list) 
-plus the key itself (limited to 256 bytes) will be consumed.
+For each entries on the index, on disk, an entry of 30 bytes + the id will be written.
+In memory, 42 bytes (34 bytes + pointer for linked list) plus the key itself (limited to 256 bytes)
+will be consumed.
 
 The data (value) files contains a 26 bytes headers, mostly the same as the index one
 and each entries consumes 18 bytes (1 byte for key length, 4 bytes for payload length, 4 bytes crc,
@@ -126,11 +127,13 @@ Whenever the key already exists, it's appended to disk and entry in memory is re
 
 Each time the server starts, it loads (basicly replay) the index in memory. The index is kept in memory 
 **all the time** and only this in-memory index is reached to fetch a key, index files are
-never read again except during startup (except for 'direct-key mode', where the index is not in memory)
-or in direct-mode where key is the location on the index.
+never read again except during startup, reload or slow query (slow queries mean, doing some SCAN/RSCAN/HISTORY requests).
+
+In direct-mode, key is the location on the index, no memory usage is needed, but lot of disk access are needed.
 
 When a key-delete is requested, the key is kept in memory and is flagged as deleted. A new entry is added
 to the index file, with the according flags. When the server restart, the latest state of the entry is used.
+In direct mode, the flag is overwritten in place on the index.
 
 ## Index
 The current index in memory is a really simple implementation (to be improved).
@@ -173,6 +176,7 @@ This mode is not possible if you don't have any data/index already available.
 - `SCANX [optional key]` (this is just an alias for `SCAN`)
 - `RSCAN [optional key]`
 - `WAIT command`
+- `HISTORY key [binary-data]`
 
 `SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
 
@@ -252,6 +256,23 @@ on the same namespace as you (same `SELECT`)
 
 This is the only blocking function right now. In server side, your connection is set `pending` and
 you won't receive anything until someone executed the expected command.
+
+## HISTORY
+This command allows you to go back in time, when your overwrite a key.
+
+You always need to set the expected key as first argument: `HISTORY mykey`
+
+Without more argument, you'll get information about the current state of the key.
+The returned value are always the same format, an array made like this:
+
+1. A binary string which can be used to go deeper on the history
+2. The timestamp (unix) when the key was created
+3. The payload of the data at that time
+
+To rollback in time, you can follow the history by calling again the same command, with
+as extra argument the first key received (a binary string). Eg: `HISTORY mykey "\x00\x00\x1b\x00\x00\x00"`
+
+When requesting an extra argument, you'll get the previous entry. And so on...
 
 # Namespaces
 A namespace is a dedicated directory on index and data root directory.
