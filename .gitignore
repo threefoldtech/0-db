@@ -65,5 +65,5 @@ tools/integrity-check/integrity-check
 tools/index-dump/index-dump
 tools/index-rebuild/index-rebuild
 tools/compaction/compaction
-tools/namespace-edit/namespace-edit
+tools/namespace-editor/namespace-editor
 tests/zdbtests
