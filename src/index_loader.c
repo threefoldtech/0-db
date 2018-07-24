@@ -34,7 +34,7 @@ static char *index_date(uint32_t epoch, char *target, size_t length) {
 static inline void index_dump_entry(index_entry_t *entry) {
     printf("[+] key [");
     hexdump(entry->id, entry->idlength);
-    printf("] offset %" PRIu64 ", length: %" PRIu64 "\n", entry->offset, entry->length);
+    printf("] offset %" PRIu32 ", length: %" PRIu32 "\n", entry->offset, entry->length);
 }
 
 // dumps the current index load

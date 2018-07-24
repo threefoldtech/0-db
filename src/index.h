@@ -19,12 +19,15 @@
     // each key will use one of this entry
     typedef struct index_item_t {
         uint8_t idlength;    // length of the id, here uint8_t limits to 256 bytes
-        uint64_t offset;     // offset on the corresponding datafile
-        uint64_t length;     // length of the payload on the datafile
+        uint32_t offset;     // offset on the corresponding datafile
+        uint32_t length;     // length of the payload on the datafile
         uint32_t previous;   // previous entry offset
-        uint8_t flags;       // flags not used yet, could provide information about deletion
+        uint8_t flags;       // key flags (eg: deleted)
         uint16_t dataid;     // datafile id where is stored the payload
-        uint32_t timestamp;  // when did the key was created (unix timestamp)
+        uint32_t timestamp;  // when was the key created (unix timestamp)
+        uint32_t crc;        // the data payload crc32
+        uint16_t parentid;   // history parent dataid ]
+        uint32_t parentoff;  // history parent offset ]- used to keep history tracking
         unsigned char id[];  // the id accessor, dynamically loaded
 
     } __attribute__((packed)) index_item_t;
@@ -49,11 +52,14 @@
         void *namespace;
 
         uint8_t idlength;    // length of the id, here uint8_t limits to 256 bytes
-        uint64_t offset;     // offset on the corresponding datafile
-        uint64_t idxoffset;  // offset on the index file (index file id is the same as data file)
-        uint64_t length;     // length of the payload on the datafile
+        uint32_t offset;     // offset on the corresponding datafile
+        uint32_t idxoffset;  // offset on the index file (index file id is the same as data file)
+        uint32_t length;     // length of the payload on the datafile
         uint8_t flags;       // keep deleted flags (should be index_flags_t type)
         uint16_t dataid;     // datafile id where is stored the payload
+        uint32_t crc;        // the data payload crc32
+        uint16_t parentid;   // parent index file id (history)
+        uint32_t parentoff;  // parent index file offset (history)
         unsigned char id[];  // the id accessor, dynamically loaded
 
     } index_entry_t;

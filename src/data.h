@@ -80,16 +80,31 @@
         size_t target;    // offset of the target key (read from the original)
                           // target will be 0 on the first call
                           // target will be updated if the offset is in another datafile
+
         data_entry_header_t *header;  // target header, set when found
         data_scan_status_t status;    // status code
 
     } data_scan_t;
+
+    // struct to pass to data operation
+    // in order to reduce arguments length
+    typedef struct data_request_t {
+        unsigned char *data;
+        uint32_t datalength;
+        void *vid;
+        uint8_t idlength;
+        uint8_t flags;
+        uint32_t crc;
+
+    } data_request_t;
 
     data_root_t *data_init(settings_t *settings, char *datapath, uint16_t dataid);
     void data_destroy(data_root_t *root);
     size_t data_jump_next(data_root_t *root, uint16_t newid);
     void data_emergency(data_root_t *root);
     uint16_t data_dataid(data_root_t *root);
+
+    uint32_t data_crc32(const uint8_t *bytes, ssize_t length);
 
     data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_t dataid, uint8_t idlength);
     int data_check(data_root_t *root, size_t offset, uint16_t dataid);

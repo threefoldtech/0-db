@@ -26,12 +26,12 @@ void index_item_header_dump(index_item_t *item) {
 #ifdef RELEASE
     (void) item;
 #else
-    debug("[+] index: entry dump: id length  : %u\n", item->idlength);
-    debug("[+] index: entry dump: data offset: %lu\n", item->offset);
-    debug("[+] index: entry dump: data length: %lu\n", item->length);
-    debug("[+] index: entry dump: previous   : %X\n", item->previous);
-    debug("[+] index: entry dump: flags      : %u\n", item->flags);
-    debug("[+] index: entry dump: timestamp  : %u\n", item->timestamp);
+    debug("[+] index: entry dump: id length  : %" PRIu8  "\n", item->idlength);
+    debug("[+] index: entry dump: data offset: %" PRIu32 "\n", item->offset);
+    debug("[+] index: entry dump: data length: %" PRIu32 "\n", item->length);
+    debug("[+] index: entry dump: previous   : %" PRIX32 "\n", item->previous);
+    debug("[+] index: entry dump: flags      : %" PRIu8  "\n", item->flags);
+    debug("[+] index: entry dump: timestamp  : %" PRIu32 "\n", item->timestamp);
 #endif
 }
 
@@ -452,7 +452,7 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
         return NULL;
 
     // jump to the right offset for this entry
-    debug("[+] index: delete: reading %lu bytes at offset %lu\n", entrylength, entry->idxoffset);
+    debug("[+] index: delete: reading %lu bytes at offset %" PRIu32 "\n", entrylength, entry->idxoffset);
     lseek(fd, entry->idxoffset, SEEK_SET);
 
     // reading the exact entry from disk

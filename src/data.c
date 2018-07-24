@@ -238,7 +238,7 @@ size_t data_jump_next(data_root_t *root, uint16_t newid) {
 
 // compute a crc32 of the payload
 // this function uses Intel CRC32 (SSE4.2) intrinsic
-static uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
+uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
     uint64_t *input = (uint64_t *) bytes;
     uint32_t hash = 0;
     ssize_t i = 0;

@@ -133,8 +133,8 @@ int command_get(redis_client_t *client) {
     }
 
     // key found and valid, let's checking the contents
-    debug("[+] command: get: entry found, flags: %x, data length: %" PRIu64 "\n", entry->flags, entry->length);
-    debug("[+] command: get: data file: %d, data offset: %" PRIu64 "\n", entry->dataid, entry->offset);
+    debug("[+] command: get: entry found, flags: %x, data length: %" PRIu32 "\n", entry->flags, entry->length);
+    debug("[+] command: get: data file: %d, data offset: %" PRIu32 "\n", entry->dataid, entry->offset);
 
     data_root_t *data = client->ns->data;
     data_payload_t payload = data_get(data, entry->offset, entry->length, entry->dataid, entry->idlength);
