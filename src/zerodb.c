@@ -336,7 +336,15 @@ int main(int argc, char *argv[]) {
                 break;
 
             case 'D':
-                settings->datasize = atoi(optarg);
+                settings->datasize = atol(optarg);
+                size_t maxsize = 0xffffffff;
+
+                // maximum 4 GB (32 bits) allowed
+                if(settings->datasize >= maxsize) {
+                    danger("[-] datasize cannot be larger than %lu bytes (%.0f MB)", maxsize, MB(maxsize));
+                    exit(EXIT_FAILURE);
+                }
+
                 break;
 
             case 'h':
