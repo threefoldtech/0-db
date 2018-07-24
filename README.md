@@ -170,6 +170,7 @@ This mode is not possible if you don't have any data/index already available.
 - `TIME`
 - `AUTH password`
 - `SCAN [optional key]`
+- `SCANX [optional key]` (this is just an alias for `SCAN`)
 - `RSCAN [optional key]`
 - `WAIT command`
 
@@ -199,6 +200,10 @@ key expected.
 
 By calling `SCAN` with each time the key responded on the previous call, you can walk forward a complete
 dataset.
+
+There is a special alias `SCANX` command which does exacly the same, but with another name.
+Some redis client library (like python) expect integer response and not binary response. Using `SCANX` avoid
+this issue.
 
 ## RSCAN
 Same as scan, but backward (last-to-first key)
