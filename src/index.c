@@ -334,7 +334,6 @@ index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t o
 //
 // note that we use everything else (including 'idlength') from the new index_entry_t provided
 //
-// index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags, off_t idxoffset) {
 index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *realid, index_entry_t *new) {
     index_entry_t *exists = NULL;
 
