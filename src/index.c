@@ -339,8 +339,12 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *real
 
     // item already exists
     if((exists = index_entry_get(root, realid, new->idlength))) {
-        debug("[+] index: key already exists, overwriting\n");
+        debug("[+] index: key already exists\n");
 
+        debug("[+] index: flagging previous key as deleted, on disk\n");
+        index_entry_delete_disk(root, exists);
+
+        debug("[+] index: updating current entry in memory\n");
         // update statistics
         root->datasize -= exists->length;
         root->datasize += new->length;
@@ -495,7 +499,7 @@ int index_entry_delete_memory(index_root_t *root, index_entry_t *entry) {
     return 0;
 }
 
-index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
+int index_entry_delete_disk(index_root_t *root, index_entry_t *entry) {
     int fd;
 
     // compute this object size on disk
@@ -507,7 +511,7 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
 
     // (re-)open the expected index file, in read-write mode
     if((fd = index_open_file_rw(root, entry->dataid)) < 0)
-        return NULL;
+        return 1;
 
     // jump to the right offset for this entry
     debug("[+] index: delete: reading %lu bytes at offset %" PRIu32 "\n", entrylength, entry->idxoffset);
@@ -517,7 +521,7 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
     if(read(fd, index_transition, entrylength) != (ssize_t) entrylength) {
         warnp("index_entry_delete read");
         close(fd);
-        return NULL;
+        return 1;
     }
 
     index_item_header_dump(index_transition);
@@ -533,12 +537,22 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
     if(write(fd, index_transition, entrylength) != (ssize_t) entrylength) {
         warnp("index_entry_delete write");
         close(fd);
-        return NULL;
+        return 1;
     }
 
-    index_entry_delete_memory(root, entry);
+    return 0;
+}
 
-    return entry;
+int index_entry_delete(index_root_t *root, index_entry_t *entry) {
+    // first flag disk entry as deleted
+    if(index_entry_delete_disk(root, entry))
+        return 1;
+
+    // then remove entry from memory
+    if(index_entry_delete_memory(root, entry))
+        return 1;
+
+    return 0;
 }
 
 // return the offset of the next entry which will be added

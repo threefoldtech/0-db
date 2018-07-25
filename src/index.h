@@ -159,7 +159,8 @@
     index_entry_t *index_entry_insert_new(index_root_t *root, void *vid, index_entry_t *new);
     index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *realid, index_entry_t *new);
 
-    index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry);
+    int index_entry_delete(index_root_t *root, index_entry_t *entry);
+    int index_entry_delete_disk(index_root_t *root, index_entry_t *entry);
     int index_entry_delete_memory(index_root_t *root, index_entry_t *entry);
     int index_entry_is_deleted(index_entry_t *entry);
 

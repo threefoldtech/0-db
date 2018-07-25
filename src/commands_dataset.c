@@ -141,7 +141,7 @@ int command_del(redis_client_t *client) {
     }
 
     // mark index entry as deleted
-    if(!index_entry_delete(index, entry)) {
+    if(index_entry_delete(index, entry)) {
         debug("[-] command: del: index delete flag failed\n");
         redis_hardsend(client, "-Cannot delete key");
         return 0;
