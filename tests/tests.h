@@ -91,6 +91,6 @@
     #define CYAN(x)   COLOR_CYAN x COLOR_RESET
     #define GREY(x)   COLOR_GREY x COLOR_RESET
 
-    void initialize();
-    int initialize_tcp();
+    void initialize(test_t *settings);
+    int initialize_tcp(test_t *settings);
 #endif

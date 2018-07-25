@@ -13,6 +13,7 @@
     int zdb_basic_check(test_t *test, const char *command);
     long long zdb_command_integer(test_t *test, int argc, const char *argv[]);
     redisReply *zdb_response_scan(test_t *test, int argc, const char *argv[]);
+    redisReply *zdb_response_history(test_t *test, int argc, const char *argv[]);
 
     #define argvsz(x) (sizeof(x) / sizeof(char *))
 #endif

@@ -104,6 +104,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
     resp_request_t *request = client->request;
     index_root_t *index = client->ns->index;
     data_root_t *data = client->ns->data;
+    index_entry_t *idxentry = NULL;
 
     // create some easier accessor
     // grab the next id, this may be replaced
@@ -182,11 +183,14 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
 
     // inserting this offset with the id on the index
     // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
-    if(!index_entry_insert_new(index, &id, &idxreq)) {
+    if(!(idxentry = index_entry_insert_new(index, &id, &idxreq))) {
         // cannot insert index (disk issue)
         redis_hardsend(client, "-Internal Error (index)");
         return 0;
     }
+
+    // cleaning this entry, we don't need it in memory
+    free(idxentry);
 
     // building response
     // here, from original redis protocol, we don't reply with a basic

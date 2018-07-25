@@ -412,7 +412,7 @@ ns_root_t *namespaces_allocate(settings_t *settings) {
         diep("namespace malloc");
 
     // allocating (if needed, only some modes needs it) the big (single) index branches
-    if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL) {
+    if(settings->mode == KEYVALUE) {
         debug("[+] namespaces: pre-allocating index (%d lazy branches)\n", buckets_branches);
 
         // allocating minimal branches array

@@ -12,6 +12,7 @@
 #include <errno.h>
 #include "zerodb.h"
 #include "index.h"
+#include "index_seq.h"
 #include "index_loader.h"
 #include "index_branch.h"
 #include "data.h"
@@ -264,7 +265,8 @@ static size_t index_load_file(index_root_t *root) {
         diep("index buffer: read");
 
     // positioning seeker to beginin of index entries
-    char *seeker = filebuf + sizeof(index_header_t);
+    char *initseeker = filebuf + sizeof(index_header_t);
+    char *seeker = initseeker;
 
     // reading the index, populating memory
     //
@@ -308,6 +310,17 @@ static size_t index_load_file(index_root_t *root) {
         if(index_entry_is_deleted(fresh))
             index_entry_delete_memory(root, fresh);
 
+        // checking if we are in sequential mode
+        // and this if the first key, we need to populate
+        // our mapping with this key
+        if(root->seqid && seeker == initseeker) {
+            uint32_t thisid;
+            memcpy(&thisid, entry->id, entry->idlength);
+
+            index_seqid_push(root, thisid, root->indexid);
+            // index_seqid_dump(root);
+        }
+
         // set the previous pointing to this entry
         // this is the last one we added
         root->previous = seeker - filebuf;
@@ -317,7 +330,7 @@ static size_t index_load_file(index_root_t *root) {
 
         // cleaning this entry in direct mode
         // we don't keep any key in memory, just the statistics
-        if(rootsettings.mode == DIRECTKEY)
+        if(rootsettings.mode == DIRECTKEY || rootsettings.mode == SEQUENTIAL)
             free(fresh);
     }
 
@@ -355,6 +368,12 @@ static void index_load(index_root_t *root) {
             index_set_id(root);
             break;
         }
+    }
+
+    if(root->seqid && root->seqid->length == 0) {
+        debug("[+] index: fresh database created in sequential mode\n");
+        debug("[+] index: initializing default seqmap\n");
+        index_seqid_push(root, 0, 0);
     }
 
     if(root->status & INDEX_READ_ONLY) {
@@ -414,6 +433,22 @@ static void index_allocate_single() {
         diep("malloc");
 }
 
+index_seqid_t *index_allocate_seqid() {
+    index_seqid_t *seqid;
+
+    debug("[+] index loader: allocating sequential buffer map\n");
+    if(!(seqid = malloc(sizeof(index_seqid_t))))
+        diep("index loader: seqid: malloc");
+
+    seqid->allocated = 1024;
+    seqid->length = 0;
+
+    if(!(seqid->seqmap = malloc(seqid->allocated * sizeof(index_seqmap_t))))
+        diep("index loader: seqid: buffer malloc");
+
+    return seqid;
+}
+
 // create an index and load files
 index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches) {
     index_root_t *root = calloc(sizeof(index_root_t), 1);
@@ -434,6 +469,9 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
     root->namespace = namespace;
     root->mode = settings->mode;
 
+    if(settings->mode == SEQUENTIAL)
+        root->seqid = index_allocate_seqid();
+
     // since this function will be called for each namespace
     // we will not allocate all the time the reusable variables
     // but this is the 'main entry' of index loading, so doing this
@@ -441,7 +479,7 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
     index_allocate_single();
     index_load(root);
 
-    if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL)
+    if(settings->mode == KEYVALUE)
         index_dump(root, settings->dump);
 
     index_dump_statistics(root);
@@ -454,6 +492,12 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
 void index_destroy(index_root_t *root) {
     // delete root object
     free(root->indexfile);
+
+    if(root->seqid) {
+        free(root->seqid->seqmap);
+        free(root->seqid);
+    }
+
     free(root);
 }
 

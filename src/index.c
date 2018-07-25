@@ -13,6 +13,7 @@
 #include "zerodb.h"
 #include "index.h"
 #include "index_loader.h"
+#include "index_seq.h"
 #include "index_branch.h"
 #include "data.h"
 #include "hook.h"
@@ -228,6 +229,9 @@ size_t index_jump_next(index_root_t *root) {
         hook_execute(hook);
         hook_free(hook);
     }
+
+    if(root->seqid)
+        index_seqid_push(root, index_next_id(root), root->indexid);
 
     return root->indexid;
 }

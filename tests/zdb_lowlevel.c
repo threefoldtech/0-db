@@ -22,7 +22,7 @@ int lowlevel_send_invalid(test_t *test, char *buffer, size_t buflen) {
     if(buffer[0] == '-') {
         // connection was closed, reopen it
         // redisReconnect(test->zdb);
-        initialize_tcp();
+        initialize_tcp(test);
         return TEST_SUCCESS;
     }
 
