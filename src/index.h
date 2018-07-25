@@ -96,6 +96,20 @@
 
     } index_status_t;
 
+    // index sequential id mapping
+    typedef struct index_seqmap_t {
+        uint32_t seqid;
+        uint16_t fileid;
+
+    } index_seqmap_t;
+
+    typedef struct index_seqid_t {
+        uint16_t allocated;
+        uint16_t length;
+        index_seqmap_t *seqmap;
+
+    } index_seqid_t;
+
     //
     // global root memory structure of the index
     //
@@ -113,6 +127,7 @@
 
         void *namespace;    // see index_entry_t, same reason
 
+        index_seqid_t *seqid;      // sequential fileid mapping
         index_branch_t **branches; // list of branches explained later
         index_status_t status;     // index health
 

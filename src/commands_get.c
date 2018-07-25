@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include "zerodb.h"
 #include "index.h"
+#include "index_seq.h"
 #include "data.h"
 #include "namespace.h"
 #include "redis.h"
@@ -18,6 +19,49 @@ static index_entry_t *redis_get_handler_memkey(redis_client_t *client) {
     index_root_t *index = client->ns->index;
     return index_entry_get(index, request->argv[1]->buffer, request->argv[1]->length);
 }
+
+static index_entry_t *redis_get_handler_sequential(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    index_root_t *index = client->ns->index;
+
+    if(request->argv[1]->length != sizeof(uint32_t)) {
+        debug("[-] command: get seq: invalid key length\n");
+        return NULL;
+    }
+
+    // converting key into binary format
+    uint32_t key;
+    memcpy(&key, request->argv[1]->buffer, sizeof(uint32_t));
+
+    // resolving key into file id
+    index_seqmap_t *seqmap = index_fileid_from_seq(index, key);
+
+    // resolving relative offset
+    uint32_t relative = key - seqmap->seqid;
+    uint32_t offset = index_seq_offset(relative);
+
+    index_item_t *item = index_item_get_disk(index, seqmap->fileid, offset, sizeof(uint32_t));
+
+    // something went wrong
+    if(item == NULL)
+        return NULL;
+
+    index_reusable_entry->idlength = item->idlength;
+    index_reusable_entry->offset = item->offset;
+    index_reusable_entry->dataid = item->dataid;
+    index_reusable_entry->flags = item->flags;
+    index_reusable_entry->idxoffset = offset;
+    index_reusable_entry->crc = item->crc;
+
+    // force length to zero, this leads to fetch
+    // the length from data file
+    index_reusable_entry->length = 0;
+
+    free(item);
+
+    return index_reusable_entry;
+}
+
 
 static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
     resp_request_t *request = client->request;
@@ -58,6 +102,7 @@ static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
     index_reusable_entry->dataid = item->dataid;
     index_reusable_entry->flags = item->flags;
     index_reusable_entry->idxoffset = offset;
+    index_reusable_entry->crc = item->crc;
 
     // force length to zero, this leads to fetch
     // the length from data file
@@ -94,10 +139,10 @@ static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
 }
 
 index_entry_t * (*redis_get_handlers[])(redis_client_t *client) = {
-    redis_get_handler_memkey, // key-value mode
-    redis_get_handler_memkey, // incremental mode
-    redis_get_handler_direct, // direct-key mode
-    redis_get_handler_direct, // fixed block mode
+    redis_get_handler_memkey,     // key-value mode
+    redis_get_handler_sequential, // incremental mode
+    redis_get_handler_direct,     // direct-key mode
+    redis_get_handler_direct,     // fixed block mode
 };
 
 int command_get(redis_client_t *client) {
@@ -107,7 +152,7 @@ int command_get(redis_client_t *client) {
         return 1;
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
-        printf("[-] invalid key size\n");
+        debug("[-] command: get: invalid key size (too big)\n");
         redis_hardsend(client, "-Invalid key");
         return 1;
     }
