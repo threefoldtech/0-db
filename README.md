@@ -62,9 +62,10 @@ loosing your clients (small freeze-time will occures, when reloading the index).
 
 Data files are never reach directly, you need to always hit the index first.
 
-Index files are always append in all modes, except in `direct-mode`. The direct mode is explained below,
-but basicly in this mode, the key depends on the position in the index file. This exception
-make the suppression of that key an **obligation** to edit this entry in place.
+Index files are always append, except when deleting or overwriting a key. Impact are really small
+only a flag is edited, and new entries are always append anyway, but the database supports to walk
+over the keys, any update needs to invalidate the previous entry, in order to keep the chain in a
+good health. The index is there mostly to have flexibility.
 
 Otherwise, index works like data files, with more or less the same data (except payload) and
 have the advantage to be small and load fast (can be fully populated in memory for processing).
