@@ -78,7 +78,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
     };
 
     // inserting this offset with the id on the index
-    if(!index_entry_insert(index, id, &idxreq)) {
+    if(!index_entry_insert_new(index, id, &idxreq)) {
         // cannot insert index (disk issue)
         redis_hardsend(client, "$-1");
         return 0;
@@ -182,7 +182,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
 
     // inserting this offset with the id on the index
     // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
-    if(!index_entry_insert(index, &id, &idxreq)) {
+    if(!index_entry_insert_new(index, &id, &idxreq)) {
         // cannot insert index (disk issue)
         redis_hardsend(client, "-Internal Error (index)");
         return 0;
@@ -266,7 +266,7 @@ static size_t redis_set_handler_directkey(redis_client_t *client, index_entry_t 
     // since there was no index, but now we use the index as statistics
     // manager, we use index, on the branch code, if there is no index in
     // memory, the memory part is skipped but index is still written
-    if(!(idxentry = index_entry_insert(index, &id, &idxreq))) {
+    if(!(idxentry = index_entry_insert_new(index, &id, &idxreq))) {
         // cannot insert index (disk issue)
         redis_hardsend(client, "-Internal Error (index)");
         return 0;
@@ -329,9 +329,8 @@ int command_set(redis_client_t *client) {
     // update an existing key, we can only delete it
     if(request->argv[1]->length && rootsettings.mode != DIRECTKEY) {
         // userkey id is not null
-        if((entry = redis_get_handlers[rootsettings.mode](client))) {
+        if((entry = redis_get_handlers[rootsettings.mode](client)))
             floating = entry->length;
-        }
     }
 
     // check if namespace limitation is set

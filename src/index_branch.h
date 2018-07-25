@@ -17,4 +17,5 @@
     index_branch_t *index_branch_get_allocate(index_branch_t **branches, uint32_t branchid);
     index_entry_t *index_branch_append(index_branch_t **branches, uint32_t branchid, index_entry_t *entry);
     index_entry_t *index_branch_remove(index_branch_t *branch, index_entry_t *entry, index_entry_t *previous);
+    index_entry_t *index_branch_get_previous(index_branch_t *branch, index_entry_t *entry);
 #endif

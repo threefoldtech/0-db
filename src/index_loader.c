@@ -302,6 +302,12 @@ static size_t index_load_file(index_root_t *root) {
         // single point of logic when adding data (logic for overwrite, resize bucket, ...)
         fresh = index_entry_insert_memory(root, entry->id, &source);
 
+        // now we added the entry (whatever it was)
+        // if this entry was flagged as deleted, let simulate a deletion
+        // like it was (we do replay here), this ensure coherence of data
+        if(index_entry_is_deleted(fresh))
+            index_entry_delete_memory(root, fresh);
+
         // set the previous pointing to this entry
         // this is the last one we added
         root->previous = seeker - filebuf;

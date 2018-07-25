@@ -367,8 +367,8 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *real
     index_entry_t *entry = calloc(entrysize, 1);
 
     memcpy(entry->id, realid, new->idlength);
-    entry->namespace = root->namespace;
     entry->idlength = new->idlength;
+    entry->namespace = root->namespace;
     entry->offset = new->offset;
     entry->length = new->length;
     entry->dataid = root->indexid;
@@ -376,12 +376,13 @@ index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *real
     entry->flags = new->flags;
     entry->crc = new->crc;
 
-    uint32_t branchkey = index_key_hash(realid, new->idlength);
+    uint32_t branchkey = index_key_hash(entry->id, entry->idlength);
 
     // commit entry into memory
     index_branch_append(root->branches, branchkey, entry);
 
-    // update statistics
+    // update statistics (if the key exists)
+    // maybe it doesn't exists if it comes from a replay
     root->entries += 1;
     root->datasize += new->length;
     root->indexsize += entrysize;
@@ -406,7 +407,7 @@ index_entry_t *index_reusable_entry = NULL;
 // and the on-disk version is appended anyway, when reloading the index
 // we call the same sets of function which overwrite existing key, we
 // will always have the last version in memory
-index_entry_t *index_entry_insert(index_root_t *root, void *vid, index_entry_t *new) { // void *vid, uint8_t idlength, size_t offset, size_t length) {
+index_entry_t *index_entry_insert_new(index_root_t *root, void *vid, index_entry_t *new) { // void *vid, uint8_t idlength, size_t offset, size_t length) {
     unsigned char *id = (unsigned char *) vid;
     index_entry_t *entry = NULL;
     off_t curoffset = lseek(root->indexfd, 0, SEEK_END);
@@ -463,6 +464,37 @@ index_entry_t *index_entry_insert(index_root_t *root, void *vid, index_entry_t *
 //     existing data
 //     we do this in the index file and not in the data file so we keep
 //     the data file really always append in any case
+int index_entry_delete_memory(index_root_t *root, index_entry_t *entry) {
+    // running in a mode without index, let's just skip this
+    if(root->branches == NULL)
+        return 0;
+
+    uint32_t branchkey = index_key_hash(entry->id, entry->idlength);
+    index_branch_t *branch = index_branch_get(root->branches, branchkey);
+    index_entry_t *previous = index_branch_get_previous(branch, entry);
+
+    debug("[+] index: delete memory: removing entry from memory\n");
+
+    if(previous == entry) {
+        danger("[-] index: entry delete memory: something wrong happens");
+        danger("[-] index: entry delete memory: branches seems buggy");
+        return 1;
+    }
+
+    // removing entry from global branch
+    index_branch_remove(branch, entry, previous);
+
+    // updating statistics
+    root->entries -= 1;
+    root->datasize -= entry->length;
+    root->indexsize -= sizeof(index_entry_t) + entry->idlength;
+
+    // cleaning memory object
+    free(entry);
+
+    return 0;
+}
+
 index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
     int fd;
 
@@ -503,6 +535,8 @@ index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
         close(fd);
         return NULL;
     }
+
+    index_entry_delete_memory(root, entry);
 
     return entry;
 }

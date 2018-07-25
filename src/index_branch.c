@@ -152,3 +152,24 @@ index_entry_t *index_branch_remove(index_branch_t *branch, index_entry_t *entry,
 
     return entry;
 }
+
+// iterate over a branch and try to find the previous entry of the given entry
+// if by mystake, the entry was not found on the branch, we returns the entry itself
+// if entry was the first entry, previous will also be NULL
+index_entry_t *index_branch_get_previous(index_branch_t *branch, index_entry_t *entry) {
+    index_entry_t *previous = NULL;
+    index_entry_t *iterator = branch->list;
+
+    while(iterator && iterator != entry) {
+        previous = iterator;
+        iterator = iterator->next;
+    }
+
+    // we reached the end of the list, without finding
+    // a matching entry, this is mostly a mistake from caller
+    // let's notify it by replying with it's own object
+    if(!iterator)
+        return entry;
+
+    return previous;
+}
