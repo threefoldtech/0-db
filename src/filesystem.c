@@ -1,4 +1,8 @@
+#ifndef __APPLE__
 #define _XOPEN_SOURCE 500
+#endif
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
