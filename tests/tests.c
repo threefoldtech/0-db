@@ -69,35 +69,34 @@ void testsuite(test_t *maintest) {
 
 }
 
-static test_t settings;
 
-int initialize_tcp() {
-    settings.host = "localhost";
-    settings.port = 9900;
+int initialize_tcp(test_t *settings) {
+    settings->host = "localhost";
+    settings->port = 9900;
 
-    settings.zdb = redisConnect(settings.host, settings.port);
-    settings.type = CONNECTION_TYPE_TCP;
+    settings->zdb = redisConnect(settings->host, settings->port);
+    settings->type = CONNECTION_TYPE_TCP;
 
-    if(!settings.zdb || settings.zdb->err) {
-        const char *error = (settings.zdb->err) ? settings.zdb->errstr : "memory error";
-        log("%s:%d: %s\n", settings.host, settings.port, error);
+    if(!settings->zdb || settings->zdb->err) {
+        const char *error = (settings->zdb->err) ? settings->zdb->errstr : "memory error";
+        log("%s:%d: %s\n", settings->host, settings->port, error);
         return 1;
     }
 
     return 0;
 }
 
-void initialize() {
+void initialize(test_t *settings) {
     char *socket = "/tmp/zdb.sock";
 
-    settings.zdb = redisConnectUnix(socket);
-    settings.type = CONNECTION_TYPE_UNIX;
+    settings->zdb = redisConnectUnix(socket);
+    settings->type = CONNECTION_TYPE_UNIX;
 
-    if(!settings.zdb || settings.zdb->err) {
-        const char *error = (settings.zdb->err) ? settings.zdb->errstr : "memory error";
+    if(!settings->zdb || settings->zdb->err) {
+        const char *error = (settings->zdb->err) ? settings->zdb->errstr : "memory error";
         log("%s: %s\n", socket, error);
 
-        if(initialize_tcp())
+        if(initialize_tcp(settings))
             exit(EXIT_FAILURE);
     }
 
@@ -107,6 +106,7 @@ void initialize() {
 int main(int argc, char *argv[]) {
     (void) argc;
     (void) argv;
+    static test_t settings;
 
     printf("[+] initializing " CYAN("%s") " tests suite\n", project);
     printf("[+] tests registered: %u\n", tests.length);
@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
 
     printf("[+] \n");
     printf("[+] preparing tests\n");
-    initialize();
+    initialize(&settings);
 
     printf("[+] running tests\n");
     printf("[+]\n");

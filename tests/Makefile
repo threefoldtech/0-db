@@ -3,7 +3,7 @@ SRC=$(wildcard *.c)
 OBJ=$(SRC:.c=.o)
 
 CFLAGS=-g -std=gnu99 -O0 -W -Wall -Wextra -msse4.2 -Wno-implicit-fallthrough
-LDFLAGS=-lhiredis
+LDFLAGS=-lhiredis -lpthread
 
 CFLAGS+=$(shell pkg-config --cflags hiredis)
 

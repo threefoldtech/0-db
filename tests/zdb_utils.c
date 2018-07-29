@@ -162,6 +162,28 @@ redisReply *zdb_response_scan(test_t *test, int argc, const char *argv[]) {
     return reply;
 }
 
+redisReply *zdb_response_history(test_t *test, int argc, const char *argv[]) {
+    redisReply *reply;
+
+    if(!(reply = redisCommandArgv(test->zdb, argc, argv, NULL)))
+        return NULL;
+
+    if(reply->type != REDIS_REPLY_ARRAY) {
+        log("%s\n", reply->str);
+        freeReplyObject(reply);
+        return NULL;
+    }
+
+    if(reply->elements != 3) {
+        log("Unexpected array length: %lu\n", reply->elements);
+        freeReplyObject(reply);
+        return NULL;
+    }
+
+    return reply;
+}
+
+
 long long zdb_command_integer(test_t *test, int argc, const char *argv[]) {
     redisReply *reply;
 

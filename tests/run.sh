@@ -11,13 +11,14 @@ rm -rf /tmp/zdbtest
 # test arguments
 ./src/zdb --help || true
 ./src/zdb --blabla || true
+./src/zdb --datasize $((8 * 1024 * 1024 * 1024)) || true
 
 # test load with slashes
 ./src/zdb -v --dump --data /tmp/zdbtest --index /tmp/zdbtest
 ./src/zdb -v --dump --data /tmp/zdbtest/ --index /tmp/zdbtest/
 
 # first real test suite
-./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/
+./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/false --datasize $((128 * 1024 * 1024))
 ./tests/zdbtests
 sleep 1
 
@@ -25,18 +26,27 @@ sleep 1
 ./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --dump
 
 # simulate a segmentation fault
-./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/
+./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/false
 pkill -SEGV zdb
 sleep 1
 
 # simulate a SIGINT (ctrl+c)
-./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/
+./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/false
 pkill -INT zdb
 sleep 1
 
-# starting with authentification
+# cleaning stuff
 rm -rf /tmp/zdbtest
 
+# starting test suite with small datasize, generating lot of file jump
+./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/false --datasize 32
+./tests/zdbtests
+sleep 1
+
+# cleaning stuff again
+rm -rf /tmp/zdbtest
+
+# starting with authentification
 ./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ \
     --admin protect \
     --synctime 10 \
@@ -71,6 +81,11 @@ rm -rf /tmp/zdbtest-index
 ./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --mode direct
 rm -rf /tmp/zdbtest
 
+# create empty dataset in sequential mode
+./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --mode seq
+rm -rf /tmp/zdbtest
+
+# trying non existing mode
 ./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --mode nonexist || true
 rm -rf /tmp/zdbtest
 

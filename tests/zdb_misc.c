@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
+#include <unistd.h>
 #include "tests_user.h"
 #include "zdb_utils.h"
 #include "tests.h"
@@ -40,3 +42,43 @@ runtest_prio(sp, misc_info) {
     const char *argv[] = {"INFO"};
     return zdb_command(test, argvsz(argv), argv);
 }
+
+runtest_prio(sp, misc_wait_missing_args) {
+    const char *argv[] = {"WAIT"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, misc_wait_cmd_not_exists) {
+    const char *argv[] = {"WAIT", "nonexisting"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+static void *misc_wait_send_ping(void *args) {
+    usleep(500000);
+
+    const char *argv[] = {"PING"};
+    zdb_command(args, argvsz(argv), argv);
+
+    return NULL;
+}
+
+runtest_prio(sp, misc_wait_real) {
+    // cloning settings and duplicating connection
+    test_t newconn = *test;
+    initialize(&newconn);
+
+    // creating waiting thread
+    pthread_t thread;
+    pthread_create(&thread, NULL, misc_wait_send_ping, &newconn);
+
+    // executing wait command
+    const char *argv[] = {"WAIT", "PING"};
+    int value = zdb_command_error(test, argvsz(argv), argv);
+
+    // get back from normal
+    pthread_join(thread, NULL);
+
+    return value;
+}
+
+

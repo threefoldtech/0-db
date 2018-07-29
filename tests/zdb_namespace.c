@@ -9,8 +9,11 @@
 
 static char *namespace_default = "default";
 static char *namespace_created = "test_ns_create";
+static char *namespace_delete = "test_ns_deleteme";
+static char *namespace_reload = "test_ns_reload";
 static char *namespace_protected = "test_ns_protected";
 static char *namespace_password = "helloworld";
+static char *namespace_new_password = "mynewpassword";
 static char *namespace_password_try1 = "blabla";
 static char *namespace_password_try2 = "hellowo";
 static char *namespace_password_try3 = "helloworldhello";
@@ -203,6 +206,24 @@ runtest_prio(sp, namespace_select_protected_cleared) {
     return zdb_command(test, argvsz(argv), argv);
 }
 
+// move back to default again
+runtest_prio(sp, namespace_select_default_before_reset) {
+    const char *argv[] = {"SELECT", namespace_default};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+// set again a password, different
+runtest_prio(sp, namespace_protected_set_again_password) {
+    const char *argv[] = {"NSSET", namespace_protected, "password", namespace_new_password};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+// try to select it with the new password
+runtest_prio(sp, namespace_select_new_protected_correct_pass) {
+    const char *argv[] = {"SELECT", namespace_protected, namespace_new_password};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
 // change settings on non-existing namespace
 runtest_prio(sp, namespace_nsset_notfound) {
     const char *argv[] = {"NSSET", "nsnotfound", "public", "0"};
@@ -322,8 +343,14 @@ runtest_prio(sp, namespace_nsset_few_argument) {
     return zdb_command_error(test, argvsz(argv), argv);
 }
 
+runtest_prio(sp, namespace_nsset_not_existing) {
+    const char *argv[] = {"NSSET", "notexisting", "public", "0"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+
 runtest_prio(sp, namespace_nsset_long_value) {
-    const char lvalue[128] = {0};
+    const char lvalue[386] = {0};
     memset((char *) lvalue, 'x', sizeof(lvalue) - 1);
 
     const char *argv[] = {"NSSET", namespace_protected, "public", lvalue};
@@ -372,3 +399,110 @@ runtest_prio(sp, namespace_nslist) {
 
     return zdb_result(reply, TEST_SUCCESS);
 }
+
+
+
+// checking deleting a namespace
+runtest_prio(sp, namespace_create_delete) {
+    const char *argv[] = {"NSNEW", namespace_delete};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+// deleting a namespace too long
+runtest_prio(sp, namespace_nsdel_long_name) {
+    const char lkey[512] = {0};
+    memset((char *) lkey, 'x', sizeof(lkey) - 1);
+
+    const char *argv[] = {"NSDEL", lkey};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// selecting the namespace we want to delete
+runtest_prio(sp, namespace_switch_delete) {
+    const char *argv[] = {"SELECT", namespace_delete};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+// we should not be able to delete it
+runtest_prio(sp, namespace_try_delete_inuse) {
+    const char *argv[] = {"NSDEL", namespace_delete};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// should not be able to remove default namespace
+runtest_prio(sp, namespace_try_delete_default) {
+    const char *argv[] = {"NSDEL", namespace_default};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+
+runtest_prio(sp, namespace_switch_delete_to_default) {
+    const char *argv[] = {"SELECT", namespace_default};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, namespace_real_delete_empty) {
+    const char *argv[] = {"NSDEL", namespace_delete};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+// should not be able to delete again this namespace
+// (should not exists anymore)
+runtest_prio(sp, namespace_real_delete_empty_again) {
+    const char *argv[] = {"NSDEL", namespace_delete};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+
+runtest_prio(sp, namespace_create_delete_again) {
+    const char *argv[] = {"NSNEW", namespace_delete};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, namespace_switch_delete_again) {
+    const char *argv[] = {"SELECT", namespace_delete};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, namespace_fill_delete) {
+    return zdb_set(test, "mykey", "helloworld");
+}
+
+runtest_prio(sp, namespace_switch_delete_again_default) {
+    const char *argv[] = {"SELECT", namespace_default};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, namespace_real_delete_not_empty) {
+    const char *argv[] = {"NSDEL", namespace_delete};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+
+
+
+// namespace hot reload
+runtest_prio(sp, namespace_create_reload) {
+    const char *argv[] = {"NSNEW", namespace_reload};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, namespace_switch_reload) {
+    const char *argv[] = {"SELECT", namespace_reload};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, namespace_fill_reload) {
+    return zdb_set(test, "keypresent", "helloworld");
+}
+
+runtest_prio(sp, namespace_reload_execute) {
+    const char *argv[] = {"RELOAD", namespace_reload};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, namespace_simple_get_after_reload) {
+    return zdb_check(test, "keypresent", "helloworld");
+}
+
+
