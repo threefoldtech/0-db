@@ -282,6 +282,13 @@ and size limited.
 
 You are always attached to a namespace, by default, it's namespace `default`.
 
+## Protected mode
+If you start the server using `--protect` flag, your `default` namespace will be set in read-only
+by default, and protected by the **Admin Password**.
+
+If you're running protected mode, in order to do changes on default namespace, you need to explicitly
+`SELECT default [password]` to switch into read-write mode.
+
 # Hook System
 You can request 0-db to call an external program/script, as hook-system. This allows the host
 machine running 0-db to adapt itself when something happen.

@@ -36,6 +36,7 @@ settings_t rootsettings = {
     .hook = NULL,
     .zdbid = NULL,
     .datasize = ZDB_DEFAULT_DATA_MAXSIZE,
+    .protect = 0,
 };
 
 static struct option long_options[] = {
@@ -54,6 +55,7 @@ static struct option long_options[] = {
     {"admin",      required_argument, 0, 'a'},
     {"hook",       required_argument, 0, 'k'},
     {"datasize",   required_argument, 0, 'D'},
+    {"protect",    no_argument,       0, 'P'},
     {"help",       no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
@@ -189,6 +191,11 @@ static int proceed(struct settings_t *settings) {
     // and the destruction
     namespaces_init(settings);
 
+    if(settings->protect) {
+        namespace_t *defns = namespace_get_default();
+        defns->password = settings->adminpwd;
+    }
+
     // main worker point (if dump not enabled)
     if(!settings->dump)
         redis_listen(settings->listen, settings->port, settings->socket);
@@ -227,8 +234,9 @@ void usage() {
     printf("  --socket <path>     unix socket path (override listen and port)\n\n");
 
     printf(" Administrative:\n");
-    printf("  --hook  <file>      execute external hook script\n");
-    printf("  --admin <pass>      set admin password\n\n");
+    printf("  --hook   <file>     execute external hook script\n");
+    printf("  --admin  <pass>     set admin password\n");
+    printf("  --protect           set default namespace protected by admin password\n\n");
 
     printf(" Useful tools:\n");
     printf("  --verbose           enable verbose (debug) information\n");
@@ -310,6 +318,11 @@ int main(int argc, char *argv[]) {
                 verbose("[+] system: admin password set\n");
                 break;
 
+            case 'P':
+                settings->protect = 1;
+                verbose("[+] system: protected database enabled\n");
+                break;
+
             case 'm':
                 if(strcmp(optarg, "user") == 0) {
                     settings->mode = KEYVALUE;
@@ -354,6 +367,11 @@ int main(int argc, char *argv[]) {
             default:
                exit(EXIT_FAILURE);
         }
+    }
+
+    if(settings->protect && !settings->adminpwd) {
+        danger("[-] protected mode only works with admin password");
+        exit(EXIT_FAILURE);
     }
 
     //

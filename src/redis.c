@@ -576,7 +576,8 @@ redis_client_t *socket_client_new(int fd) {
     client->ns = namespace_get_default();
 
     // by default, the default namespace is writable
-    client->writable = 1;
+    // except if protect mode is enabled
+    client->writable = (rootsettings.protect) ? 0 : 1;
 
     // set all users admin if no password are set
     client->admin = (rootsettings.adminpwd) ? 0 : 1;
