@@ -73,7 +73,7 @@ runtest_prio(sp, misc_wait_real) {
 
     // executing wait command
     const char *argv[] = {"WAIT", "PING"};
-    int value = zdb_command_error(test, argvsz(argv), argv);
+    int value = zdb_command(test, argvsz(argv), argv);
 
     // get back from normal
     pthread_join(thread, NULL);
