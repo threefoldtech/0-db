@@ -50,11 +50,31 @@ static redis_clients_t clients = {
 //
 // custom buffer
 //
+
+// reset buffer to point like empty
 static void buffer_reset(buffer_t *buffer) {
     buffer->length = 0;
     buffer->remain = REDIS_BUFFER_SIZE;
     buffer->reader = buffer->buffer;
     buffer->writer = buffer->buffer;
+}
+
+// move the remaining data on the buffer
+// into the beginning of the buffer
+static void buffer_shift(buffer_t *buffer) {
+    if(buffer->reader == buffer->buffer) {
+        // nothing to shift
+        return;
+    }
+
+    pdebug("[+] redis: buffer shifting\n");
+
+    buffer->length = buffer->writer - buffer->reader;
+    buffer->remain = REDIS_BUFFER_SIZE - buffer->length;
+    memmove(buffer->buffer, buffer->reader, buffer->length);
+
+    buffer->reader = buffer->buffer;
+    buffer->writer = buffer->reader + buffer->length;
 }
 
 static buffer_t buffer_new() {
@@ -286,21 +306,34 @@ static void redis_free_request(resp_request_t *request) {
 static resp_status_t redis_handle_resp_empty(redis_client_t *client) {
     resp_request_t *request = client->request;
     buffer_t *buffer = &client->buffer;
+    char *match;
 
-    // waiting for a complete line
-    if(!(buffer->reader = strchr(buffer->buffer, '\n')))
+    // checking if we have a new line character on the
+    // request, if yes, we can parse this segment
+    if(!(match = memchr(buffer->reader, '\n', buffer->writer - buffer->reader))) {
+        // the buffer seems full and we don't have
+        // anything usable, let's try to shift the buffer
+        // and hope next call will be usable
+        if(buffer->remain == 0) {
+            buffer_shift(buffer);
+            return RESP_STATUS_RESET;
+        }
+
         return RESP_STATUS_CONTINUE;
+    }
+
+    // should we check for \r\n ?
 
     // checking for array request, we only support array
     // since any command are send using array
-    if(*buffer->buffer != '*') {
+    if(*buffer->reader != '*') {
         debug("[-] resp: request is not an array, rejecting\n");
         resp_discard(client, "Malformed request, array expected");
         return RESP_STATUS_DISCARD;
     }
 
     // reading the amount of argument
-    request->argc = atoi(buffer->buffer + 1);
+    request->argc = atoi(buffer->reader + 1);
     debug("[+] redis: resp: %d arguments\n", request->argc);
 
     if(request->argc == 0) {
@@ -308,20 +341,27 @@ static resp_status_t redis_handle_resp_empty(redis_client_t *client) {
         return RESP_STATUS_ABNORMAL;
     }
 
+    // we don't have any command
+    // with more than like 4 or 5 arguments
+    // but let put a higher limit, just in case
     if(request->argc > 8) {
         resp_discard(client, "Too many arguments");
         return RESP_STATUS_ABNORMAL;
     }
 
+    // allocating needed requests per arguments announced
+    // (this is basicly why we limit the number or items)
     if(!(request->argv = (resp_object_t **) calloc(sizeof(resp_type_t *), request->argc))) {
         warnp("request argv malloc");
         resp_discard(client, "Internal memory error");
         return RESP_STATUS_DISCARD;
     }
 
+    // next step if reading the first
+    // header of the first argument
     request->state = RESP_FILLIN_HEADER;
-    request->fillin = 0; // start fillin argument 0
-    buffer->reader += 1; // moving after the '\n'
+    request->fillin = 0;
+    buffer->reader = match + 1; // moving after the '\n'
 
     return RESP_STATUS_SUCCESS;
 }
@@ -339,8 +379,17 @@ static resp_status_t redis_handle_resp_header(redis_client_t *client) {
     }
 
     // waiting for a new line
-    if(!(match = strchr(buffer->reader, '\n')))
+    if(!(match = memchr(buffer->reader, '\n', buffer->writer - buffer->reader))) {
+        // the buffer seems full and we don't have
+        // anything usable, let's try to shift the buffer
+        // and hope next call will be usable
+        if(buffer->remain == 0) {
+            buffer_shift(buffer);
+            return RESP_STATUS_RESET;
+        }
+
         return RESP_STATUS_ABNORMAL;
+    }
 
     // checking if it's a string request
     if(*buffer->reader != '$') {
@@ -358,14 +407,16 @@ static resp_status_t redis_handle_resp_header(redis_client_t *client) {
     resp_object_t *argument = request->argv[request->fillin];
 
     // reading the length of the array
-    request->argv[request->fillin]->length = atoi(buffer->reader + 1);
+    argument->length = atoi(buffer->reader + 1);
+    // real size is the length + 2 (\r\n)
+    argument->size = argument->length + 2;
 
     if(argument->length > REDIS_MAX_PAYLOAD) {
         resp_discard(client, "Payload too big");
         return RESP_STATUS_DISCARD;
     }
 
-    if(!(argument->buffer = (unsigned char *) malloc(argument->length))) {
+    if(!(argument->buffer = (unsigned char *) malloc(argument->size))) {
         warnp("argument buffer malloc");
         resp_discard(client, "Internal memory error");
         return RESP_STATUS_DISCARD;
@@ -379,50 +430,70 @@ static resp_status_t redis_handle_resp_header(redis_client_t *client) {
     return RESP_STATUS_CONTINUE;
 }
 
-static resp_status_t redis_handle_resp_payload(redis_client_t *client, int fd) {
+static resp_status_t redis_handle_resp_payload(redis_client_t *client) {
     resp_request_t *request = client->request;
     buffer_t *buffer = &client->buffer;
     resp_object_t *argument = request->argv[request->fillin];
 
-    ssize_t available = buffer->length - (buffer->reader - buffer->buffer);
+    size_t available = buffer->writer - buffer->reader;
 
     // do we have available data on the buffer
     if(available == 0) {
+        // the buffer seems full and we don't have
+        // anything usable, let's try to shift the buffer
+        // and hope next call will be usable
+        if(buffer->remain == 0) {
+            buffer_shift(buffer);
+            return RESP_STATUS_RESET;
+        }
+
         debug("[-] resp: reading payload: no data available on the buffer\n");
-        return RESP_STATUS_SUCCESS;
+        return RESP_STATUS_CONTINUE;
     }
 
-    if(available < argument->length - argument->filled && buffer->remain > 1) {
-        // no enough data but the buffer is not full, let's wait for
-        // more data to come
-        return RESP_STATUS_ABNORMAL;
+    // we maybe have too much data on the buffer
+    // and we don't need all of them on this payload
+    //
+    // let's take only what we need and let the
+    // caller do the next things
+    size_t needed = argument->size - argument->filled;
+
+    pdebug("[+] redis: payload: needed: %lu, available: %lu\n", needed, available);
+
+    if(available >= needed) {
+        pdebug("[+] redis: more (or equals) available/needed, extracting needed\n");
+        void *argbuf = argument->buffer + argument->filled;
+        memcpy(argbuf, buffer->reader, needed);
+
+        // let update counters
+        argument->filled += needed;
+        request->fillin += 1;
+        request->state = RESP_FILLIN_HEADER;
+        buffer->reader += needed;
+
+        // special case, if buffer contains exactly what's needed
+        // let's reset it after
+        // this is not *obligatory* (since reader/writer are updated)
+        // but this makes more space for next call
+        if(available == needed) {
+            pdebug("[+] redis: available was exactly what's needed, reset buffer\n");
+            buffer_reset(buffer);
+        }
+
+        return RESP_STATUS_CONTINUE;
     }
+
+    pdebug("[+] redis: saving %lu bytes into user request\n", available);
 
     // we don't have enough data on the buffer
-    // to fill the complete payload
-    //
-    // let's save what we have and call again the whole process
-    // this process will succeed until valid request received or
-    // until a EAGAIN which means we need to await more data
-    if(available < argument->length - argument->filled) {
-        memcpy(argument->buffer + argument->filled, buffer->reader, available);
-        argument->filled += available;
+    // to fill the complete payload, let's take everything available
+    // and place it on the request buffer, reseting source buffer
+    // and waiting for more data to come (by the caller)
+    memcpy(argument->buffer + argument->filled, buffer->reader, available);
+    argument->filled += available;
 
-        buffer_reset(&client->buffer);
-        return redis_chunk_read(fd);
-    }
-
-    // computing the amount of data we need to extract
-    // from the buffer
-    size_t needed = argument->length - argument->filled;
-
-    memcpy(argument->buffer + argument->filled, buffer->reader, needed);
-    argument->filled += needed;
-
-    // jumping to the next argument, this one is set
-    request->fillin += 1;
-    request->state = RESP_FILLIN_HEADER;
-    buffer->reader += argument->length + 2; // skipping the last \r\n
+    pdebug("[+] redis: resetting buffer\n");
+    buffer_reset(&client->buffer);
 
     return RESP_STATUS_CONTINUE;
 }
@@ -442,79 +513,142 @@ static resp_status_t redis_handle_resp_finished(redis_client_t *client) {
     redis_free_request(request);
 
     // reset states
-    buffer_reset(&client->buffer);
+    // buffer_reset(&client->buffer);
     request->state = RESP_EMPTY;
 
     return value;
 }
 
-// int redis_read_client(int fd) {
+// function called as soon as something is available on
+// one client socket
 resp_status_t redis_chunk_read(int fd) {
     redis_client_t *client = clients.list[fd];
     resp_request_t *request = client->request;
     buffer_t *buffer = &client->buffer;
     ssize_t length;
 
+    // default return value
+    int value = RESP_STATUS_SUCCESS;
+
+go_again:
+    // buffer is full, this is probably a bug
     if(buffer->remain == 0) {
         debug("[-] resp: new chunk requested and buffer full\n");
         return RESP_STATUS_DISCARD;
     }
 
-    if((length = recv(fd, buffer->writer, buffer->remain - 1, 0)) < 0) {
+    pdebug("[+] redis: perform read on the socket\n");
+    if((length = recv(fd, buffer->writer, buffer->remain, 0)) < 0) {
         if(errno != EAGAIN && errno != EWOULDBLOCK) {
             warnp("client recv");
             return RESP_STATUS_ABNORMAL;
         }
 
-        // we hit a EGAIN or EWOULDBLOCK, nothing wrong here
-        return RESP_STATUS_SUCCESS;
+        // we hit a EGAIN or EWOULDBLOCK, nothing wrong here,
+        // this is probably because the request was done
+        // and nothing more is available on the socket, let's
+        // return the caller the value we received from the
+        // process (or success if nothing was done)
+        return value;
+    }
+
+    if(length == 0) {
+        // socket was empty
+        // this is probably a connection reset by peer
+        // let's disconnect this client
+        debug("[+] resp: empty socket read, client disconnected\n");
+        return RESP_STATUS_DISCONNECTED;
     }
 
     buffer->writer += length;
     buffer->length += length;
     buffer->remain -= length;
 
+    #ifdef PROTOCOL_DEBUG
+    fulldump((uint8_t *) buffer->buffer, buffer->length);
+    #endif
+
     // ensure string (needed for testing later)
-    buffer->buffer[buffer->length] = '\0';
+    // buffer->buffer[buffer->length] = '\0';
 
-    if(length == 0) {
-        debug("[+] resp: empty socket read, client disconnected\n");
-        return RESP_STATUS_DISCONNECTED;
-    }
+    // while we didn't parsed everything available
+    // on the buffer
+    while(buffer->reader < buffer->writer) {
+        pdebug("[+] redis: buffer parsing (r: %p, w: %p)\n", buffer->reader, buffer->writer);
 
-    int value;
-
-    // the current request is empty
-    // let's let's check if we have enough to build
-    // the original header
-    if(request->state == RESP_EMPTY)
-        if((value = redis_handle_resp_empty(client)) != RESP_STATUS_SUCCESS)
-            return value;
-
-    while(1) {
-        // if this was the last argument, executing the request
-        if(request->fillin == request->argc) {
-            // we have everything we need to proceed but
-            // we still wait to receive the last \r\n from the client
-            if(strncmp(buffer->buffer + buffer->length - 2, "\r\n", 2) != 0)
-                return RESP_STATUS_CONTINUE;
-
-            // executing the request
-            return redis_handle_resp_finished(client);
+        // checking if the current request is empty
+        // if it is, let's doing a parsing to see if enough
+        // data are available to build the request and if
+        // the data is well formated
+        if(request->state == RESP_EMPTY) {
+            if((value = redis_handle_resp_empty(client)) != RESP_STATUS_SUCCESS) {
+                // it looks like we didn't had enough data
+                // or data was not correctly formated (unexpected data)
+                // we don't have anything more to do right now
+                break;
+            }
         }
 
+        // here, since redis_handle_resp_empty was executed at least one time
+        // and returned with success, we know the state is at least something
+        // usable, we can now check what we need to do
+
+        // if state is RESP_FILLIN_HEADER, we are waiting for data
+        // to be used to fill in the (next) argument header (the type and length)
         if(request->state == RESP_FILLIN_HEADER) {
-            if((value = redis_handle_resp_header(client)) != RESP_STATUS_CONTINUE)
-                return value;
+            pdebug("[+] redis: header parser\n");
+
+            if((value = redis_handle_resp_header(client)) != RESP_STATUS_CONTINUE) {
+                // we didn't had enough information or data was invalid (malformed request)
+                // nothing more to do right now
+                break;
+            }
         }
 
+        // if state is RESP_FILLIN_PAYLOAD, we are waiting for data
+        // to fill the payload of the argument (we know the type and the length now)
         if(request->state == RESP_FILLIN_PAYLOAD) {
-            if((value = redis_handle_resp_payload(client, fd)) != RESP_STATUS_CONTINUE)
-                return value;
+            pdebug("[+] redis: payload parser\n");
+
+            if((value = redis_handle_resp_payload(client)) != RESP_STATUS_CONTINUE) {
+                // we didn't had enough information or data was invalid (malformed request)
+                // nothing more to do right now
+                break;
+            }
+
+        }
+
+        // the last argument proceed by the payload
+        // completed, and now the argument counter match
+        // with argc, we know all arguments was parsed correctly
+        // we can do real work with this request
+        if(request->fillin == request->argc) {
+            pdebug("[+] redis: request completed, executing\n");
+            value = redis_handle_resp_finished(client);
         }
     }
 
-    return 0;
+    // do not keep going on this request/client
+    if(value == RESP_STATUS_DISCARD || value == RESP_STATUS_DISCONNECTED) {
+        pdebug("[+] redis: discard or disconnected received\n");
+        return value;
+    }
+
+    // specific end of work
+    if(value == RESP_STATUS_DONE || value == RESP_STATUS_SHUTDOWN) {
+        pdebug("[+] redis: done or shutdown received\n");
+        return value;
+    }
+
+    // not suceed, let's try again
+    if(value != RESP_STATUS_SUCCESS) {
+        pdebug("[+] redis: parsing didn't suceed, trying again\n");
+        goto go_again;
+    }
+
+    // success
+    pdebug("[+] redis: socket parsing succeed\n");
+    return RESP_STATUS_SUCCESS;
 }
 
 resp_status_t redis_delayed_write(int fd) {
@@ -670,7 +804,7 @@ int redis_posthandler_client(redis_client_t *client) {
             checking->watching = NULL;
 
             // sending notification
-            printf("[+] redis: posthandler: client %d was waiting, notifing\n", checking->fd);
+            debug("[+] redis: posthandler: client %d was waiting, notifing\n", checking->fd);
             redis_hardsend(checking, "+OK");
         }
     }

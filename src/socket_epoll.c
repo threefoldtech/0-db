@@ -55,6 +55,10 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             event.data.fd = clientfd;
             event.events = EPOLLIN | EPOLLOUT | EPOLLET;
 
+            // we use edge-level because of how the
+            // upload works (need to be notified when client
+            // is ready to receive data, only one time)
+
             if(epoll_ctl(redis->evfd, EPOLL_CTL_ADD, clientfd, &event) < 0) {
                 warnp("epoll_ctl");
                 continue;

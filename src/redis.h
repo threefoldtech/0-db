@@ -27,6 +27,7 @@
         void *buffer;
         int length;
         int filled;
+        int size;
 
     } resp_object_t;
 
@@ -54,6 +55,7 @@
         RESP_STATUS_CONTINUE,
         RESP_STATUS_DONE,
         RESP_STATUS_SHUTDOWN,
+        RESP_STATUS_RESET,
 
     } resp_status_t;
 
