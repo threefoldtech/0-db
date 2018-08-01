@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <execinfo.h>
 #include <getopt.h>
+#include <ctype.h>
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
@@ -70,6 +71,38 @@ static char *modes[] = {
 // debug tools
 static char __hex[] = "0123456789abcdef";
 
+void fulldump(void *_data, size_t len) {
+    uint8_t *data = _data;
+    unsigned int i, j;
+
+    printf("[*] data fulldump [%p -> %p] (%lu bytes)\n", data, data + len, len);
+    printf("[*] 0x0000: ");
+
+    for(i = 0; i < len; ) {
+        printf("%02x ", data[i++]);
+
+        if(i % 16 == 0) {
+            printf("|");
+
+            for(j = i - 16; j < i; j++)
+                printf("%c", ((isprint(data[j]) ? data[j] : '.')));
+
+            printf("|\n[*] 0x%04x: ", i);
+        }
+    }
+
+    if(i % 16) {
+        printf("%-*s |", 5 * (16 - (i % 16)), " ");
+
+        for(j = i - (i % 16); j < len; j++)
+            printf("%c", ((isprint(data[j]) ? data[j] : '.')));
+
+        printf("%-*s|\n", 16 - ((int) len % 16), " ");
+    }
+
+    printf("\n");
+}
+
 void hexdump(void *input, size_t length) {
     unsigned char *buffer = (unsigned char *) input;
     char *output = calloc((length * 2) + 1, 1);
@@ -124,7 +157,7 @@ static void sighandler(int signal) {
             fprintf(stderr, "[-] ----------------------------------\n");
 
             int calls = backtrace(buffer, sizeof(buffer) / sizeof(void *));
-			backtrace_symbols_fd(buffer, calls, 1);
+            backtrace_symbols_fd(buffer, calls, 1);
 
             fprintf(stderr, "[-] ----------------------------------");
 

@@ -111,6 +111,7 @@
     } settings_t;
 
     void hexdump(void *buffer, size_t length);
+    void fulldump(void *data, size_t len);
 
     #define verbose(...) { if(rootsettings.verbose) { printf(__VA_ARGS__); } }
 
