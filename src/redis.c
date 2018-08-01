@@ -21,6 +21,24 @@
 #include "commands.h"
 #include "hook.h"
 
+// full protocol debug
+// this produce full dump of socket payload
+// and lot of debug message about protocol parsing
+
+// #define PROTOCOL_DEBUG
+
+// -- internal static protocol debugger --
+#ifdef RELEASE
+    #undef PROTOCOL_DEBUG
+#endif
+
+#ifdef PROTOCOL_DEBUG
+    #define pdebug(...) { printf(__VA_ARGS__); }
+#else
+    #define pdebug(...) ((void)0)
+#endif
+// -- internal static protocol debugger --
+
 static int yes = 1;
 
 // list of active clients
