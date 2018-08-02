@@ -1,4 +1,4 @@
-# 0-db [![Build Status](https://travis-ci.org/rivine/0-db.svg?branch=master)](https://travis-ci.org/rivine/0-db) [![codecov](https://codecov.io/gh/rivine/0-db/branch/master/graph/badge.svg)](https://codecov.io/gh/rivine/0-db)  
+[![Build Status](https://travis-ci.com/threefoldtech/0-db.svg?branch=master)](https://travis-ci.com/threefoldtech/0-db) [![codecov](https://codecov.io/gh/threefoldtech/0-db/branch/master/graph/badge.svg)](https://codecov.io/gh/rivine/0-db)  
 0-db is a super fast and efficient key-value store redis-protocol (mostly) compatible which
 makes data persistant inside an always append index/datafile, with namespaces support.
 
