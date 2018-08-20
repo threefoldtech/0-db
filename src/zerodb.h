@@ -80,6 +80,7 @@
         char *hook;       // external hook script to execute
         size_t datasize;  // maximum datafile size before jumping to next one
         int protect;      // flag default namespace to use admin password (for writing)
+        size_t maxsize;   // default namespace maximum datasize
 
         char *zdbid;      // fake-0db id generated based on listening
 

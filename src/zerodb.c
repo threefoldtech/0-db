@@ -38,6 +38,7 @@ settings_t rootsettings = {
     .zdbid = NULL,
     .datasize = ZDB_DEFAULT_DATA_MAXSIZE,
     .protect = 0,
+    .maxsize = 0,
 };
 
 static struct option long_options[] = {
@@ -56,6 +57,7 @@ static struct option long_options[] = {
     {"admin",      required_argument, 0, 'a'},
     {"hook",       required_argument, 0, 'k'},
     {"datasize",   required_argument, 0, 'D'},
+    {"maxsize",    required_argument, 0, 'M'},
     {"protect",    no_argument,       0, 'P'},
     {"help",       no_argument,       0, 'h'},
     {0, 0, 0, 0}
@@ -224,9 +226,16 @@ static int proceed(struct settings_t *settings) {
     // and the destruction
     namespaces_init(settings);
 
+    // apply global protected flag to the default namespace
     if(settings->protect) {
         namespace_t *defns = namespace_get_default();
         defns->password = settings->adminpwd;
+    }
+
+    // apply global maximum size for the global namespace
+    if(settings->maxsize) {
+        namespace_t *defns = namespace_get_default();
+        defns->maxsize = settings->maxsize;
     }
 
     // main worker point (if dump not enabled)
@@ -267,8 +276,9 @@ void usage() {
     printf("  --socket <path>     unix socket path (override listen and port)\n\n");
 
     printf(" Administrative:\n");
-    printf("  --hook   <file>     execute external hook script\n");
-    printf("  --admin  <pass>     set admin password\n");
+    printf("  --hook     <file>   execute external hook script\n");
+    printf("  --admin    <pass>   set admin password\n");
+    printf("  --maxsize  <size>   set default namespace maximum datasize (in bytes)\n");
     printf("  --protect           set default namespace protected by admin password\n\n");
 
     printf(" Useful tools:\n");
@@ -292,7 +302,6 @@ int main(int argc, char *argv[]) {
     int option_index = 0;
 
     while(1) {
-        // int i = getopt_long_only(argc, argv, "d:i:l:p:vxh", long_options, &option_index);
         int i = getopt_long_only(argc, argv, "", long_options, &option_index);
 
         if(i == -1)
@@ -354,6 +363,11 @@ int main(int argc, char *argv[]) {
             case 'P':
                 settings->protect = 1;
                 verbose("[+] system: protected database enabled\n");
+                break;
+
+            case 'M':
+                settings->maxsize = atol(optarg);
+                verbose("[+] system: default namespace maxsize: %.2f MB\n", MB(settings->maxsize));
                 break;
 
             case 'm':
