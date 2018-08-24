@@ -67,3 +67,4 @@ tools/index-rebuild/index-rebuild
 tools/compaction/compaction
 tools/namespace-editor/namespace-editor
 tests/zdbtests
+utilities/db-sync/db-sync
