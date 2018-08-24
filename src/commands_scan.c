@@ -22,8 +22,8 @@ static int command_scan_send_array(index_item_t *header, redis_client_t *client)
     // array response, with 2 arguments:
     //  - first one is the next SCAN key value
     //    (in our case, this is always the same value as the returned id)
-    //  - the second one is another array, containins list of keys scanned
-    //    (in our case, always only one single response)
+    //  - the second one is another array, containins information about this key
+    //    like timestamp and size
     offset = sprintf(response, "*2\r\n$%d\r\n", header->idlength);
 
     // copy the key
@@ -32,12 +32,13 @@ static int command_scan_send_array(index_item_t *header, redis_client_t *client)
 
     // end of the key
     // adding the array of response with the single response
-    offset += sprintf(response + offset, "\r\n*1\r\n$%d\r\n", header->idlength);
+    offset += sprintf(response + offset, "\r\n*2\r\n");
 
-    // writing (again) the key, but this time as id response
-    memcpy(response + offset, header->id, header->idlength);
-    offset += header->idlength;
-    offset += sprintf(response + offset, "\r\n");
+    // adding the length of the payload
+    offset += sprintf(response + offset, ":%d\r\n", header->length);
+
+    // adding the timestamp to the payload
+    offset += sprintf(response + offset, ":%d\r\n", header->timestamp);
 
     redis_reply_stack(client, response, offset);
 

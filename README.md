@@ -200,8 +200,17 @@ If the dataset is empty, or you reach the end of the chain, `-No more data` is r
 
 If you provide a non-existing (or deleted) key as argument, `-Invalid index` is returned.
 
-Otherwise, an array (like redis `SCAN`) is returned. Only the first item is relevant, and it's the next
-key expected.
+Otherwise, an array (like redis `SCAN`) is returned. The first item of the array is the next key you expected.
+The next field is another array, which contains two entries: the size of the payload and the timestamp when
+the key was created.
+
+Example:
+```
+> SCAN
+1) "\xa4\x87\xd4}\xbe\x84\x1a\xba"    # next key id
+2) 1) (integer) 226948                # size of payload in byte
+   2) (integer) 1535063077            # unix timestamp of creation time
+```
 
 By calling `SCAN` with each time the key responded on the previous call, you can walk forward a complete
 dataset.
