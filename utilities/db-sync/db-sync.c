@@ -65,7 +65,7 @@ status_t warmup(sync_t *sync, char *namespace) {
         return status;
     }
 
-    status.size = atoi(match + 17);
+    status.size = atol(match + 17);
 
     if(!(match = strstr(reply->str, "entries:"))) {
         // should not happen
@@ -201,6 +201,7 @@ int main(int argc, char **argv) {
 
             case 'h':
                 usage(argv[0]);
+                exit(EXIT_FAILURE);
 
             case '?':
             default:
