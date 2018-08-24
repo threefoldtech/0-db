@@ -197,8 +197,8 @@ int command_get(redis_client_t *client) {
         return 0;
     }
 
-    redis_reply(client, response.buffer, response.length, free);
-
+    redis_reply(client, response.buffer, response.length);
+    free(response.buffer);
     free(payload.buffer);
 
     return 0;

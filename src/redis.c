@@ -117,9 +117,10 @@ static void buffer_free(buffer_t *buffer) {
 static void redis_send_reset(redis_client_t *client) {
     redis_response_t *response = &client->response;
 
-    if(response->destructor)
-        response->destructor(response->buffer);
+    // free memory
+    free(response->buffer);
 
+    // reset structure
     response->buffer = NULL;
     response->reader = NULL;
     response->length = 0;
@@ -162,16 +163,37 @@ int redis_send_reply(redis_client_t *client) {
     return 0;
 }
 
-int redis_reply(redis_client_t *client, void *payload, size_t length, void (*destructor)(void *payload)) {
+int redis_reply(redis_client_t *client, void *payload, size_t length) {
     redis_response_t *response = &client->response;
 
-    // preparing this request, using argument provided
-    // even if buffer are literal or stack allocated, we will try to send it
-    // a first time before choosing what to do
-    response->destructor = destructor;
-    response->buffer = payload;
-    response->reader = payload;
-    response->length = length;
+    // we need to send data, we maybe still have something on the buffer
+    // if the client was doing some pipeline (maybe we still have something to
+    // send, in pending, and we received another command in the mean time, because
+    // we received them in batch)
+    //
+    // we need to append this response to the existing response, the current only easy
+    // solution is just growing up the buffer and appending the data
+
+    // saving the current buffer, to free it after
+    void *backup = response->buffer;
+
+    // reallocating the buffer, with the new expected size
+    // this size if the remaining size of the data in the buffer
+    // plus the size we want to add
+    response->buffer = malloc(response->length + length);
+
+    // let's copy what's still need to be sent on the existing buffer
+    memcpy(response->buffer, response->reader, response->length);
+
+    // now copy the new payload we just want to send
+    memcpy(response->buffer + response->length, payload, length);
+
+    // updating structure pointer to point to the new buffer
+    response->reader = response->buffer;
+    response->length += length;
+
+    // cleaning the old buffer not used anymore
+    free(backup);
 
     debug("[+] redis: force sending first chunk (client %d)\n", client->fd);
     if(redis_send_reply(client) != EAGAIN) {
@@ -196,41 +218,17 @@ int redis_reply(redis_client_t *client, void *payload, size_t length, void (*des
     // since we are full non-blocking socket, we don't want to block
     // the others clients waiting this client is ready
     //
-    // this function allows buffer allocated on the heap with a specific
-    // destructor in argument, for theses call there is nothing special to
-    // do, but this function can also accepts buffer which was stack allocated
-    // or even a literal string, in this case, when we will returns, theses
-    // pointers are not safe anymore and we can't reach them.
-    //
-    // if no destructor was provided, we will duplicate the buffer in order to
-    // keep it safe and send it later
+    // we already duplicated the data received, whatever it comes from
+    // so we don't have anything more to do, just waiting for the socket
+    // to be ready to send the next chunks
     debug("[+] redis: reply: client %d not ready for sending data\n", client->fd);
-
-    // destructor was set, nothing more to do, everything is already set
-    if(destructor)
-        return 0;
-
-    debug("[+] redis: duplicating data since it was a stack response\n");
-
-    // a destructor was set, we duplicate the buffer to the heap
-    if(!(response->buffer = malloc(response->length))) {
-        warnp("redis_reply: malloc");
-        return 0;
-    }
-
-    // we copy from the response and not the argument of these function
-    // because some data could be already be sent, and redis_send_reply has
-    // updated the response already
-    memcpy(response->buffer, response->reader, response->length);
-
-    response->destructor = free;
-    response->reader = response->buffer;
 
     return 0;
 }
 
+// legacy function when destructor was existing
 inline int redis_reply_stack(redis_client_t *client, void *payload, size_t length) {
-    return redis_reply(client, payload, length, NULL);
+    return redis_reply(client, payload, length);
 }
 
 //
