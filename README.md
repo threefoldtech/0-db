@@ -193,23 +193,32 @@ Returns 1 if integrity is validated, 0 otherwise.
 ## SCAN
 Walk forward over a dataset (namespace).
 
-- If `SCAN` is called without argument, it returns the first key (first in time) available in the dataset.
-- If `SCAN` is called with an argument, it returns the next key after the argument.
+- If `SCAN` is called without argument, it starts from first key (first in time) available in the dataset.
+- If `SCAN` is called with an argument, it starts from provided key.
 
 If the dataset is empty, or you reach the end of the chain, `-No more data` is returned.
 
 If you provide a non-existing (or deleted) key as argument, `-Invalid index` is returned.
 
-Otherwise, an array (like redis `SCAN`) is returned. The first item of the array is the next key you expected.
-The next field is another array, which contains two entries: the size of the payload and the timestamp when
-the key was created.
+Otherwise, an array (a little bit like original redis `SCAN`) is returned.
+The first item of the array is the next key you need to set to SCAN in order to continue the walk.
+
+The second element of the array is another array which contains one or more entries (keys). Each entries
+contains 3 fields: the key, the size of the payload and the creation timestamp.
+
+**Note:** the amount of keys returned is not predictable, it returns as much as possible keys
+in a certain limited amount of time, to not block others clients.
 
 Example:
 ```
 > SCAN
-1) "\xa4\x87\xd4}\xbe\x84\x1a\xba"    # next key id
-2) 1) (integer) 226948                # size of payload in byte
-   2) (integer) 1535063077            # unix timestamp of creation time
+1) "\xa4\x87\xd4}\xbe\x84\x1a\xba"    # next key id to send to SCAN to continue
+2) 1) 1) "\x01\x02\x03"
+      2) (integer) 16                 # size of payload in byte
+      3) (integer) 1535361488         # unix timestamp of creation time
+   2) 1) "\xa4\x87\xd4}\xbe\x84\x1a\xba"
+      2) (integer) 6                  # size of payload in byte
+      3) (integer) 1535361485         # unix timestamp of creation time
 ```
 
 By calling `SCAN` with each time the key responded on the previous call, you can walk forward a complete
