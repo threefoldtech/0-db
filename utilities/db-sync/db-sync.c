@@ -18,7 +18,8 @@ static struct option long_options[] = {
 };
 
 typedef struct sync_t {
-    redisContext *source;
+    redisContext *sourceq;  // source query
+    redisContext *sourcep;  // source payload
     redisContext *target;
 
 } sync_t;
@@ -33,8 +34,17 @@ typedef struct status_t {
 
     size_t keys;        // amount of keys to transfert
     size_t copied;      // amount of keys transfered
+    size_t requested;   // amount of keys requested
 
 } status_t;
+
+typedef struct keylist_t {
+    size_t length;
+    size_t allocated;
+    size_t size;
+    redisReply **keys;
+
+} keylist_t;
 
 static char __hex[] = "0123456789abcdef";
 
@@ -57,7 +67,7 @@ status_t warmup(sync_t *sync, char *namespace) {
     redisReply *reply;
     char *match;
 
-    if(!(reply = redisCommand(sync->source, "NSINFO %s", namespace)))
+    if(!(reply = redisCommand(sync->sourceq, "NSINFO %s", namespace)))
         return status;
 
     if(!(match = strstr(reply->str, "data_size_bytes:"))) {
@@ -77,11 +87,32 @@ status_t warmup(sync_t *sync, char *namespace) {
     return status;
 }
 
+size_t keylist_append(keylist_t *keylist, redisReply *reply, size_t size) {
+    if(keylist->allocated < keylist->length + 1) {
+        size_t newsize = sizeof(redisReply *) * (keylist->allocated + 128);
+
+        if(!(keylist->keys = (redisReply **) realloc(keylist->keys, newsize))) {
+            perror("malloc");
+            exit(EXIT_FAILURE);
+        }
+
+        keylist->allocated += 128;
+    }
+
+    keylist->length += 1;
+    keylist->size += size;
+    keylist->keys[keylist->length - 1] = reply;
+
+    return keylist->length;
+}
 
 
 //
 // workflow
 //
+
+// slow sequential mode to fetch key by key
+#if 0
 size_t transfert(sync_t *sync, uint8_t *key, size_t keylen) {
     redisReply *input, *output;
     size_t transfered = 0;
@@ -136,6 +167,88 @@ int synchronize(sync_t *sync) {
 
     printf("\n[+] database synchronized\n");
 
+    return 0;
+}
+#endif
+int fetchsync(sync_t *sync, keylist_t *keylist, status_t *status) {
+    redisReply *input, *output;
+
+    for(size_t i = 0; i < keylist->length; i++) {
+        if(redisGetReply(sync->sourcep, (void **) &input) == REDIS_ERR) {
+            fprintf(stderr, "\n[-] %s\n", sync->sourcep->errstr);
+            exit(EXIT_FAILURE);
+        }
+
+        char *key = keylist->keys[i]->element[0]->str;
+        size_t keylen = keylist->keys[i]->element[0]->len;
+
+        if(!(output = redisCommand(sync->target, "SET %b %b", key, keylen, input->str, input->len)))
+            return 0;
+
+        status->transfered += input->len;
+        status->copied += 1;
+
+        float percent = (status->transfered / (double) status->size) * 100.0;
+        printf("\r[+] syncing: % 3.1f %% [%lu/%lu keys, %.2f MB]", percent, status->requested, status->copied, MB(status->transfered));
+        fflush(stdout);
+
+        freeReplyObject(input);
+        freeReplyObject(output);
+        freeReplyObject(keylist->keys[i]);
+    }
+
+    return 0;
+
+}
+
+int synchronize(sync_t *sync) {
+    redisReply *reply;
+    keylist_t keylist = {
+        .length = 0,
+        .keys = NULL,
+        .size = 0,
+        .allocated = 0,
+    };
+
+    printf("[+] preparing buffers\n");
+
+    // loading stats
+    printf("[+] preparing namespace\n");
+    status_t status = warmup(sync, "default");
+
+    printf("[+] namespace ready, %lu keys to transfert (%.2f MB)\n", status.keys, MB(status.size));
+
+    if(!(reply = redisCommand(sync->sourceq, "SCAN")))
+        return 1;
+
+    while(reply && reply->type == REDIS_REPLY_ARRAY) {
+        float percent = (status.transfered / (double) status.size) * 100.0;
+
+        // append the get in the buffer
+        redisAppendCommand(sync->sourcep, "GET %b", reply->element[0]->str, reply->element[0]->len);
+        keylist_append(&keylist, reply, reply->element[1]->element[0]->integer);
+
+        printf("\r[+] syncing: % 3.1f %% [%lu/%lu keys, %.2f MB]", percent, status.requested, status.copied, MB(status.transfered));
+        fflush(stdout);
+
+        // one more key requested
+        status.requested += 1;
+
+        // query next key
+        if(!(reply = redisCommand(sync->sourceq, "SCAN %b", reply->element[0]->str, reply->element[0]->len)))
+            return 1;
+
+        // if batch is filled, let's fetch this batch now
+        if(keylist.size >= 8 * 1024 * 1024) {
+            fetchsync(sync, &keylist, &status);
+            keylist.length = 0;
+            keylist.size = 0;
+        }
+    }
+
+    // last fetch.
+
+    printf("\n[+] database synchronized\n");
     return 0;
 }
 
@@ -221,7 +334,10 @@ int main(int argc, char **argv) {
 
     printf("[+] initializing hosts\n");
 
-    if(!(sync.source = initialize(inhost, inport)))
+    if(!(sync.sourcep = initialize(inhost, inport)))
+        exit(EXIT_FAILURE);
+
+    if(!(sync.sourceq = initialize(inhost, inport)))
         exit(EXIT_FAILURE);
 
     if(!(sync.target = initialize(outhost, outport)))
@@ -230,7 +346,8 @@ int main(int argc, char **argv) {
     // synchronize databases
     int value = synchronize(&sync);
 
-    redisFree(sync.source);
+    redisFree(sync.sourcep);
+    redisFree(sync.sourceq);
     redisFree(sync.target);
 
     return value;
