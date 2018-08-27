@@ -14,80 +14,212 @@
 #include "redis.h"
 #include "commands.h"
 #include "commands_get.h"
+#include "commands_scan.h"
 
-static int command_scan_send_array(index_item_t *header, redis_client_t *client) {
-    char response[(MAX_KEY_LENGTH * 2) + 128];
+uint64_t ustime() {
+    struct timeval tv;
+    uint64_t ust;
+
+    gettimeofday(&tv, NULL);
+
+    ust = ((uint64_t) tv.tv_sec) * 1000000;
+    ust += tv.tv_usec;
+
+    return ust;
+}
+
+//
+// scan list management
+//
+
+// append one entry into the scanlist result
+// if the list is not large enough to contains the entry
+// growing it up a little bit
+static scan_list_t *scanlist_append(scan_list_t *scanlist, index_scan_t *scan) {
+    if(scanlist->length + 1 > scanlist->allocated) {
+        scanlist->allocated += 32;
+
+        if(!(scanlist->items = realloc(scanlist->items, scanlist->allocated * sizeof(index_item_t *))))
+            return NULL;
+    }
+
+    scanlist->items[scanlist->length] = scan->header;
+    scanlist->length += 1;
+
+    return scanlist;
+}
+
+static void scanlist_init(scan_list_t *scanlist) {
+    memset(scanlist, 0x00, sizeof(scan_list_t));
+}
+
+static void scanlist_free(scan_list_t *scanlist) {
+    for(size_t i = 0; i < scanlist->length; i++)
+        free(scanlist->items[i]);
+
+    free(scanlist->items);
+}
+
+static void scaninfo_from_scan(scan_info_t *info, index_scan_t *scan) {
+    info->dataid = scan->header->dataid;
+    info->idxoffset = scan->target;
+}
+
+static void scaninfo_from_entry(scan_info_t *info, index_entry_t *entry) {
+    info->dataid = entry->dataid;
+    info->idxoffset = entry->idxoffset;
+}
+
+//
+// redis serialization of the scan list
+//
+static int command_scan_send_scanlist(scan_list_t *scanlist, redis_client_t *client) {
+    char *response;
     size_t offset = 0;
+    index_item_t *entry;
+
+    // if the list is empty, we have nothing
+    // to send, obviously
+    if(scanlist->length == 0) {
+        redis_hardsend(client, "-No more data");
+        return 0;
+    }
 
     // array response, with 2 arguments:
     //  - first one is the next SCAN key value
     //    (in our case, this is always the same value as the returned id)
-    //  - the second one is another array, containins information about this key
-    //    like timestamp and size
-    offset = sprintf(response, "*2\r\n$%d\r\n", header->idlength);
+    //  - the second one is another array, of each keys found, each entry containins
+    //    information about this key like timestamp and size
+    if(!(response = malloc(((MAX_KEY_LENGTH * 2) + 128) * scanlist->length)))
+        return 1;
+
+    // get last entry for the next key value
+    entry = scanlist->items[scanlist->length - 1];
+    offset = sprintf(response, "*2\r\n$%d\r\n", entry->idlength);
 
     // copy the key
-    memcpy(response + offset, header->id, header->idlength);
-    offset += header->idlength;
+    memcpy(response + offset, entry->id, entry->idlength);
+    offset += entry->idlength;
 
-    // end of the key
-    // adding the array of response with the single response
-    offset += sprintf(response + offset, "\r\n*2\r\n");
+    // iterating over the full list and building the list response
+    offset += sprintf(response + offset, "\r\n*%lu\r\n", scanlist->length);
 
-    // adding the length of the payload
-    offset += sprintf(response + offset, ":%d\r\n", header->length);
+    for(size_t i = 0; i < scanlist->length; i++) {
+        entry = scanlist->items[i];
 
-    // adding the timestamp to the payload
-    offset += sprintf(response + offset, ":%d\r\n", header->timestamp);
+        // end of the key
+        // adding the array of response with the single response
+        offset += sprintf(response + offset, "*3\r\n");
 
-    redis_reply_stack(client, response, offset);
+        // adding the key
+        offset += sprintf(response + offset, "$%u\r\n", entry->idlength);
+        memcpy(response + offset, entry->id, entry->idlength);
+        offset += entry->idlength;
+
+        // adding the length of the payload
+        offset += sprintf(response + offset, "\r\n:%d\r\n", entry->length);
+
+        // adding the timestamp to the payload
+        offset += sprintf(response + offset, ":%d\r\n", entry->timestamp);
+    }
+
+    redis_reply(client, response, offset);
+    free(response);
 
     return 0;
+}
+
+static scan_info_t *scan_initial_info(scan_info_t *info, scan_list_t *scanlist, index_scan_t *scan) {
+    // could not get initial scan entry
+    if(scan->status != INDEX_SCAN_SUCCESS)
+        return NULL;
+
+    scanlist_append(scanlist, scan);
+    scaninfo_from_scan(info, scan);
+
+    return info;
+}
+
+static scan_info_t *scan_initial_get(scan_info_t *info, redis_client_t *client) {
+    index_entry_t *entry = NULL;
+
+    // grabbing original entry
+    if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
+        debug("[-] command: scan: key not found\n");
+        redis_hardsend(client, "-Invalid index");
+        return NULL;
+    }
+
+    if(index_entry_is_deleted(entry)) {
+        verbose("[-] command: scan: key deleted\n");
+        redis_hardsend(client, "-Invalid index");
+        return NULL;
+    }
+
+    scaninfo_from_entry(info, entry);
+    return info;
+}
+
+static int scan_failure(index_scan_t *scan, redis_client_t *client) {
+    if(scan->status == INDEX_SCAN_NO_MORE_DATA)
+        redis_hardsend(client, "-No more data");
+
+    if(scan->status == INDEX_SCAN_UNEXPECTED)
+        redis_hardsend(client, "-Internal Error");
+
+    return 1;
 }
 
 //
 // SCAN
 //
 int command_scan(redis_client_t *client) {
-    index_entry_t *entry = NULL;
     index_scan_t scan;
+    scan_list_t scanlist;
+    scan_info_t info;
 
+    // initialize empty scanlist
+    scanlist_init(&scanlist);
+
+    // scan requested without initial key
     if(client->request->argc == 1) {
         scan = index_first_header(client->ns->index);
-        goto gotscan;
+
+        if(!scan_initial_info(&info, &scanlist, &scan))
+            return scan_failure(&scan, client);
+
+    } else {
+        // scan requested with an initial key
+        if(!scan_initial_get(&info, client))
+            return 1;
     }
 
-    // grabbing original entry
-    if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
-        debug("[-] command: scan: key not found\n");
-        redis_hardsend(client, "-Invalid index");
-        return 1;
+    // we have everything needed to start walking over
+    // the keys and building our scan response
+    uint64_t basetime = ustime();
+
+    while(ustime() - basetime < 1000) {
+        printf("[+] scan: elapsed time: %lu us\n", ustime() - basetime);
+
+        // reading entry and appending it
+        scan = index_next_header(client->ns->index, info.dataid, info.idxoffset);
+
+        // this scan failed, let's guess it's the end
+        if(scan.status != INDEX_SCAN_SUCCESS)
+            break;
+
+        scanlist_append(&scanlist, &scan);
+
+        // preparing next call
+        scaninfo_from_scan(&info, &scan);
     }
 
-    if(index_entry_is_deleted(entry)) {
-        verbose("[-] command: scan: key deleted\n");
-        redis_hardsend(client, "-Invalid index");
-        return 1;
-    }
+    debug("[+] scan: retreived %lu entries in %lu us\n", scanlist.length, ustime() - basetime);
 
-    scan = index_next_header(client->ns->index, entry->dataid, entry->idxoffset);
-
-gotscan:
-    if(scan.status == INDEX_SCAN_SUCCESS) {
-        command_scan_send_array(scan.header, client);
-        free(scan.header);
-    }
-
-    if(scan.status == INDEX_SCAN_UNEXPECTED) {
+    if(command_scan_send_scanlist(&scanlist, client))
         redis_hardsend(client, "-Internal Error");
-        return 1;
-    }
 
-    if(scan.status == INDEX_SCAN_NO_MORE_DATA) {
-        redis_hardsend(client, "-No more data");
-        return 1;
-    }
-
+    scanlist_free(&scanlist);
     return 0;
 }
 
@@ -95,46 +227,52 @@ gotscan:
 // RSCAN
 //
 int command_rscan(redis_client_t *client) {
-    index_entry_t *entry = NULL;
     index_scan_t scan;
+    scan_list_t scanlist;
+    scan_info_t info;
 
+    // initialize empty scanlist
+    scanlist_init(&scanlist);
+
+    // scan requested without initial key
     if(client->request->argc == 1) {
         scan = index_last_header(client->ns->index);
-        goto gotscan;
+
+        if(!scan_initial_info(&info, &scanlist, &scan))
+            return scan_failure(&scan, client);
+
+    } else {
+        // scan requested with an initial key
+        if(!scan_initial_get(&info, client))
+            return 1;
     }
 
-    // grabbing original entry
-    if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
-        debug("[-] command: scan: key not found\n");
-        redis_hardsend(client, "-Invalid index");
-        return 1;
+    // we have everything needed to start walking over
+    // the keys and building our scan response
+    uint64_t basetime = ustime();
+
+    while(ustime() - basetime < 1000) {
+        printf("[+] scan: elapsed time: %lu us\n", ustime() - basetime);
+
+        // reading entry and appending it
+        scan = index_previous_header(client->ns->index, info.dataid, info.idxoffset);
+
+        // this scan failed, let's guess it's the end
+        if(scan.status != INDEX_SCAN_SUCCESS)
+            break;
+
+        scanlist_append(&scanlist, &scan);
+
+        // preparing next call
+        scaninfo_from_scan(&info, &scan);
     }
 
-    if(index_entry_is_deleted(entry)) {
-        verbose("[-] command: scan: key deleted\n");
-        redis_hardsend(client, "-Invalid index");
-        return 1;
-    }
+    debug("[+] scan: retreived %lu entries in %lu us\n", scanlist.length, ustime() - basetime);
 
-    scan = index_previous_header(client->ns->index, entry->dataid, entry->idxoffset);
-
-gotscan:
-    if(scan.status == INDEX_SCAN_SUCCESS) {
-        command_scan_send_array(scan.header, client);
-        free(scan.header);
-    }
-
-    if(scan.status == INDEX_SCAN_UNEXPECTED) {
+    if(command_scan_send_scanlist(&scanlist, client))
         redis_hardsend(client, "-Internal Error");
-        return 1;
-    }
 
-    if(scan.status == INDEX_SCAN_NO_MORE_DATA) {
-        redis_hardsend(client, "-No more data");
-        return 1;
-    }
-
+    scanlist_free(&scanlist);
     return 0;
 }
-
 
