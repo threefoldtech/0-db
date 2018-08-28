@@ -224,29 +224,30 @@ int synchronize(sync_t *sync) {
     while(reply && reply->type == REDIS_REPLY_ARRAY) {
         float percent = (status.transfered / (double) status.size) * 100.0;
 
-        // append the get in the buffer
-        redisAppendCommand(sync->sourcep, "GET %b", reply->element[0]->str, reply->element[0]->len);
-        keylist_append(&keylist, reply, reply->element[1]->element[0]->integer);
+        for(size_t i = 0; i < reply->element[1]->elements; i++) {
+            redisReply *item = reply->element[1]->element[i];
 
-        printf("\r[+] syncing: % 3.1f %% [%lu/%lu keys, %.2f MB]", percent, status.requested, status.copied, MB(status.transfered));
-        fflush(stdout);
+            // append the get in the buffer
+            redisAppendCommand(sync->sourcep, "GET %b", item->element[0]->str, item->element[0]->len);
+            keylist_append(&keylist, item, item->element[1]->integer);
 
-        // one more key requested
-        status.requested += 1;
+            printf("\r[+] syncing: % 3.1f %% [%lu/%lu keys, %.2f MB]", percent, status.requested, status.copied, MB(status.transfered));
+            fflush(stdout);
+
+            // one more key requested
+            status.requested += 1;
+        }
 
         // query next key
         if(!(reply = redisCommand(sync->sourceq, "SCAN %b", reply->element[0]->str, reply->element[0]->len)))
             return 1;
 
-        // if batch is filled, let's fetch this batch now
-        if(keylist.size >= 8 * 1024 * 1024) {
-            fetchsync(sync, &keylist, &status);
-            keylist.length = 0;
-            keylist.size = 0;
-        }
+        // original reply will be free'd here
+        // that's why new reply is already prepared ^
+        fetchsync(sync, &keylist, &status);
+        keylist.length = 0;
+        keylist.size = 0;
     }
-
-    // last fetch.
 
     printf("\n[+] database synchronized\n");
     return 0;

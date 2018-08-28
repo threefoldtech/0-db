@@ -8,6 +8,7 @@
         size_t length;
         size_t allocated;
         index_item_t **items;
+        uint32_t *offsets;
 
     } scan_list_t;
 

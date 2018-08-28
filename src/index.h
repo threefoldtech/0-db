@@ -65,7 +65,7 @@
     } index_entry_t;
 
     // WARNING: this should be on index_branch.h
-    //          but we can't due to cirtucal dependencies
+    //          but we can't due to circular dependencies
     //          in order to fix this, we should put all struct in a dedicated file
     //
     // the current implementation of the index use rudimental index memory system
@@ -149,6 +149,28 @@
 
     } __attribute__((packed)) index_dkey_t;
 
+    // binary key
+    // this is a representation of an index key
+    // using binary fields pointing directly to
+    // it's file, but with additional information
+    // not directly needed to find the value back
+    // but useful to ensure the user won't send fake
+    // malformed or crafted illegal key
+    //
+    // eg: requesting fileid 10 and offset 57 is easy...
+    //     but requesting fileid 10 and offset 57 with
+    //     keylength and crc matching the index entry,
+    //     the probability of fake crafted user key is
+    //     quite impossible
+    typedef struct index_bkey_t {
+        uint8_t idlength;
+        uint16_t fileid;
+        uint32_t length;
+        uint32_t idxoffset;
+        uint32_t crc;
+
+    } __attribute__((packed)) index_bkey_t;
+
     // key used to represent exact position
     // in index file (aka: dkey resolved)
     typedef struct index_ekey_t {
@@ -195,6 +217,9 @@
     size_t index_next_offset(index_root_t *root);
     size_t index_offset_objectid(uint32_t idobj);
     uint16_t index_indexid(index_root_t *root);
+
+    index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset);
+    index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key);
 
     int index_grab_fileid(index_root_t *root, uint16_t fileid);
     void index_release_fileid(index_root_t *root, uint16_t fileid, int fd);

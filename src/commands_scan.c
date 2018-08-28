@@ -41,9 +41,13 @@ static scan_list_t *scanlist_append(scan_list_t *scanlist, index_scan_t *scan) {
 
         if(!(scanlist->items = realloc(scanlist->items, scanlist->allocated * sizeof(index_item_t *))))
             return NULL;
+
+        if(!(scanlist->offsets = realloc(scanlist->offsets, scanlist->allocated * sizeof(uint32_t))))
+            return NULL;
     }
 
     scanlist->items[scanlist->length] = scan->header;
+    scanlist->offsets[scanlist->length] = scan->target;
     scanlist->length += 1;
 
     return scanlist;
@@ -58,6 +62,7 @@ static void scanlist_free(scan_list_t *scanlist) {
         free(scanlist->items[i]);
 
     free(scanlist->items);
+    free(scanlist->offsets);
 }
 
 static void scaninfo_from_scan(scan_info_t *info, index_scan_t *scan) {
@@ -77,6 +82,8 @@ static int command_scan_send_scanlist(scan_list_t *scanlist, redis_client_t *cli
     char *response;
     size_t offset = 0;
     index_item_t *entry;
+    index_bkey_t bkey;
+    uint32_t idxoffset;
 
     // if the list is empty, we have nothing
     // to send, obviously
@@ -93,13 +100,17 @@ static int command_scan_send_scanlist(scan_list_t *scanlist, redis_client_t *cli
     if(!(response = malloc(((MAX_KEY_LENGTH * 2) + 128) * scanlist->length)))
         return 1;
 
-    // get last entry for the next key value
+    // converting the last object key into a binary serialized key
     entry = scanlist->items[scanlist->length - 1];
-    offset = sprintf(response, "*2\r\n$%d\r\n", entry->idlength);
+    idxoffset = scanlist->offsets[scanlist->length - 1];
+    bkey = index_item_serialize(entry, idxoffset);
+
+    // get last entry for the next key value
+    offset = sprintf(response, "*2\r\n$%ld\r\n", sizeof(index_bkey_t));
 
     // copy the key
-    memcpy(response + offset, entry->id, entry->idlength);
-    offset += entry->idlength;
+    memcpy(response + offset, &bkey, sizeof(index_bkey_t));
+    offset += sizeof(index_bkey_t);
 
     // iterating over the full list and building the list response
     offset += sprintf(response + offset, "\r\n*%lu\r\n", scanlist->length);
@@ -142,7 +153,23 @@ static scan_info_t *scan_initial_info(scan_info_t *info, scan_list_t *scanlist, 
 
 static scan_info_t *scan_initial_get(scan_info_t *info, redis_client_t *client) {
     index_entry_t *entry = NULL;
+    index_bkey_t bkey;
 
+    if(client->request->argv[1]->length != sizeof(index_bkey_t)) {
+        debug("[-] command: scan: requested key invalid (size mismatch)\n");
+        redis_hardsend(client, "-Invalid key format");
+        return NULL;
+    }
+
+    memcpy(&bkey, client->request->argv[1]->buffer, sizeof(index_bkey_t));
+
+    if(!(entry = index_entry_deserialize(client->ns->index, &bkey))) {
+        debug("[-] command: scan: could not fetch/validate key requested\n");
+        redis_hardsend(client, "-Invalid key format");
+        return NULL;
+    }
+
+    #if 0
     // grabbing original entry
     if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
         debug("[-] command: scan: key not found\n");
@@ -155,8 +182,11 @@ static scan_info_t *scan_initial_get(scan_info_t *info, redis_client_t *client) 
         redis_hardsend(client, "-Invalid index");
         return NULL;
     }
+    #endif
 
     scaninfo_from_entry(info, entry);
+    free(entry);
+
     return info;
 }
 
@@ -199,7 +229,7 @@ int command_scan(redis_client_t *client) {
     uint64_t basetime = ustime();
 
     while(ustime() - basetime < 1000) {
-        printf("[+] scan: elapsed time: %lu us\n", ustime() - basetime);
+        debug("[+] scan: elapsed time: %lu us\n", ustime() - basetime);
 
         // reading entry and appending it
         scan = index_next_header(client->ns->index, info.dataid, info.idxoffset);
@@ -252,7 +282,7 @@ int command_rscan(redis_client_t *client) {
     uint64_t basetime = ustime();
 
     while(ustime() - basetime < 1000) {
-        printf("[+] scan: elapsed time: %lu us\n", ustime() - basetime);
+        debug("[+] scan: elapsed time: %lu us\n", ustime() - basetime);
 
         // reading entry and appending it
         scan = index_previous_header(client->ns->index, info.dataid, info.idxoffset);

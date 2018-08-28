@@ -559,6 +559,58 @@ int index_entry_delete(index_root_t *root, index_entry_t *entry) {
     return 0;
 }
 
+// serialize into binary object a deserializable
+// object identifier
+index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset) {
+    index_bkey_t key = {
+        .idlength = item->idlength,
+        .fileid = item->dataid,
+        .length = item->length,
+        .idxoffset = idxoffset,
+        .crc = item->crc
+    };
+
+    return key;
+}
+
+// read an object from disk, based on binarykey provided
+// and ensure the key object seems legit with the requested key
+index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key) {
+    index_item_t *item;
+
+    if(!(item = index_item_get_disk(root, key->fileid, key->idxoffset, key->idlength)))
+        return NULL;
+
+    if(item->length != key->length || item->crc != key->crc) {
+        debug("[-] index: deserialize: invalid key requested (fields mismatch)\n");
+        free(item);
+        return NULL;
+    }
+
+    // FIXME: avoid double malloc for a single object
+    index_entry_t *entry;
+
+    if(!(entry = malloc(sizeof(index_entry_t) + item->idlength))) {
+        debug("[-] index: deserialize: cannot allocate memory\n");
+        free(item);
+        return NULL;
+    }
+
+    entry->idlength = item->idlength;
+    entry->offset = item->offset;
+    entry->dataid = item->dataid;
+    entry->flags = item->flags;
+    entry->idxoffset = key->idxoffset;
+    entry->crc = item->crc;
+    entry->length = item->length;
+    memcpy(entry->id, item->id, item->idlength);
+
+    // clean intermediate item
+    free(item);
+
+    return entry;
+}
+
 // return the offset of the next entry which will be added
 // this could be needed, for exemple in direct key mode,
 // when the key depends of the offset itself
