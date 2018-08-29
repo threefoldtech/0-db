@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <inttypes.h>
+#include <time.h>
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
@@ -42,6 +43,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
         .idlength = idlength,
         .flags = 0,
         .crc = data_crc32(value, valuelength),
+        .timestamp = time(NULL),
     };
 
     // checking if we need to update this entry of if data are unchanged
@@ -78,7 +80,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
     };
 
     // inserting this offset with the id on the index
-    if(!index_entry_insert_new(index, id, &idxreq)) {
+    if(!index_entry_insert_new(index, id, &idxreq, time(NULL))) {
         // cannot insert index (disk issue)
         redis_hardsend(client, "$-1");
         return 0;
@@ -145,6 +147,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
         .idlength = idlength,
         .flags = 0,
         .crc = data_crc32(value, valuelength),
+        .timestamp = time(NULL),
     };
 
     // checking if we need to update this entry of if data are unchanged
@@ -184,7 +187,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
 
     // inserting this offset with the id on the index
     // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
-    if(!(idxentry = index_entry_insert_new(index, &id, &idxreq))) {
+    if(!(idxentry = index_entry_insert_new(index, &id, &idxreq, time(NULL)))) {
         // cannot insert index (disk issue)
         redis_hardsend(client, "-Internal Error (index)");
         return 0;
@@ -240,6 +243,7 @@ static size_t redis_set_handler_directkey(redis_client_t *client, index_entry_t 
         .idlength = idlength,
         .flags = 0,
         .crc = data_crc32(value, valuelength),
+        .timestamp = time(NULL),
     };
 
     // insert the data on the datafile
@@ -272,7 +276,7 @@ static size_t redis_set_handler_directkey(redis_client_t *client, index_entry_t 
     // since there was no index, but now we use the index as statistics
     // manager, we use index, on the branch code, if there is no index in
     // memory, the memory part is skipped but index is still written
-    if(!(idxentry = index_entry_insert_new(index, &id, &idxreq))) {
+    if(!(idxentry = index_entry_insert_new(index, &id, &idxreq, time(NULL)))) {
         // cannot insert index (disk issue)
         redis_hardsend(client, "-Internal Error (index)");
         return 0;

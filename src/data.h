@@ -95,6 +95,7 @@
         uint8_t idlength;
         uint8_t flags;
         uint32_t crc;
+        time_t timestamp;
 
     } data_request_t;
 

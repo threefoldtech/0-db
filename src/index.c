@@ -415,7 +415,7 @@ index_entry_t *index_reusable_entry = NULL;
 // and the on-disk version is appended anyway, when reloading the index
 // we call the same sets of function which overwrite existing key, we
 // will always have the last version in memory
-index_entry_t *index_entry_insert_new(index_root_t *root, void *vid, index_entry_t *new) { // void *vid, uint8_t idlength, size_t offset, size_t length) {
+index_entry_t *index_entry_insert_new(index_root_t *root, void *vid, index_entry_t *new, time_t timestamp) {
     unsigned char *id = (unsigned char *) vid;
     index_entry_t *entry = NULL;
     off_t curoffset = lseek(root->indexfd, 0, SEEK_END);
@@ -437,7 +437,7 @@ index_entry_t *index_entry_insert_new(index_root_t *root, void *vid, index_entry
     index_transition->length = entry->length;
     index_transition->flags = entry->flags;
     index_transition->dataid = entry->dataid;
-    index_transition->timestamp = (uint32_t) time(NULL);
+    index_transition->timestamp = timestamp;
     index_transition->previous = root->previous;
     index_transition->parentid = entry->parentid;
     index_transition->parentoff = entry->parentoff;
