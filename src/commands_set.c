@@ -232,6 +232,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
     return offset;
 }
 
+#if 0
 static size_t redis_set_handler_directkey(redis_client_t *client, index_entry_t *existing) {
     resp_request_t *request = client->request;
     index_root_t *index = client->ns->index;
@@ -322,12 +323,13 @@ static size_t redis_set_handler_directkey(redis_client_t *client, index_entry_t 
 
     return offset;
 }
+#endif
 
 static size_t (*redis_set_handlers[])(redis_client_t *client, index_entry_t *existing) = {
     redis_set_handler_userkey,    // key-value mode
     redis_set_handler_sequential, // incremental mode
-    redis_set_handler_directkey,  // direct-key mode
-    redis_set_handler_directkey,  // fixed blocks mode
+    redis_set_handler_sequential, // direct-key mode (not used anymore)
+    redis_set_handler_sequential, // fixed blocks mode (not implemented yet)
 };
 
 int command_set(redis_client_t *client) {

@@ -62,7 +62,7 @@ static index_entry_t *redis_get_handler_sequential(redis_client_t *client) {
     return index_reusable_entry;
 }
 
-
+#if 0
 static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
     resp_request_t *request = client->request;
 
@@ -137,12 +137,13 @@ static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
 
     return index_reusable_entry;
 }
+#endif
 
 index_entry_t * (*redis_get_handlers[])(redis_client_t *client) = {
     redis_get_handler_memkey,     // key-value mode
     redis_get_handler_sequential, // incremental mode
-    redis_get_handler_direct,     // direct-key mode
-    redis_get_handler_direct,     // fixed block mode
+    redis_get_handler_sequential, // direct-key mode (not used anymore)
+    redis_get_handler_sequential  // fixed block mode (not implemented yet)
 };
 
 int command_get(redis_client_t *client) {

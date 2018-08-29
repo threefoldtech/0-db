@@ -390,7 +390,16 @@ int main(int argc, char *argv[]) {
                     settings->mode = SEQUENTIAL;
 
                 } else if(strcmp(optarg, "direct") == 0) {
-                    settings->mode = DIRECTKEY;
+                    // settings->mode = DIRECTKEY;
+                    settings->mode = SEQUENTIAL;
+
+                    warning("[!] WARNING: direct mode doesn't exists anymore !");
+                    warning("[!] WARNING: this mode is replaced by 'sequential' mode");
+                    warning("[!] WARNING: which works the same way, but offers more");
+                    warning("[!] WARNING: flexibility and performance");
+                    warning("[!] WARNING: ");
+                    warning("[!] WARNING: direct mode will not be supported at all anymore");
+                    warning("[!] WARNING: in futur release");
 
                 } else if(strcmp(optarg, "block") == 0) {
                     settings->mode = DIRECTBLOCK;
