@@ -228,7 +228,7 @@ int command_scan(redis_client_t *client) {
     // the keys and building our scan response
     uint64_t basetime = ustime();
 
-    while(ustime() - basetime < 1000) {
+    while(ustime() - basetime < SCAN_TIMESLICE_US) {
         debug("[+] scan: elapsed time: %lu us\n", ustime() - basetime);
 
         // reading entry and appending it
@@ -281,7 +281,7 @@ int command_rscan(redis_client_t *client) {
     // the keys and building our scan response
     uint64_t basetime = ustime();
 
-    while(ustime() - basetime < 1000) {
+    while(ustime() - basetime < SCAN_TIMESLICE_US) {
         debug("[+] scan: elapsed time: %lu us\n", ustime() - basetime);
 
         // reading entry and appending it

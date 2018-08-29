@@ -18,4 +18,8 @@
 
     } scan_info_t;
 
+    // one call to SCAN/RSCAN can take up to
+    // 2000 microseconds (2 milliseconds)
+    #define SCAN_TIMESLICE_US  2000
+
 #endif
