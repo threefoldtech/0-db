@@ -338,38 +338,35 @@ index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t o
 //
 // note that we use everything else (including 'idlength') from the new index_entry_t provided
 //
+index_entry_t *index_entry_update_memory(index_root_t *root, index_entry_t *new, index_entry_t *exists) {
+    debug("[+] index: key already exists\n");
+
+    debug("[+] index: flagging previous key as deleted, on disk\n");
+    index_entry_delete_disk(root, exists);
+
+    debug("[+] index: updating current entry in memory\n");
+    // update statistics
+    root->datasize -= exists->length;
+    root->datasize += new->length;
+
+    // updating parent id and parent offset
+    // to the previous item itself, which
+    // will be used to keep track of the history
+    exists->parentid = exists->dataid;
+    exists->parentoff = exists->idxoffset;
+
+    // re-use existing entry
+    exists->length = new->length;
+    exists->offset = new->offset;
+    exists->flags = new->flags;
+    exists->dataid = root->indexid;
+    exists->idxoffset = new->idxoffset;
+    exists->crc = new->crc;
+
+    return exists;
+}
+
 index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *realid, index_entry_t *new) {
-    index_entry_t *exists = NULL;
-
-    // item already exists
-    if((exists = index_entry_get(root, realid, new->idlength))) {
-        debug("[+] index: key already exists\n");
-
-        debug("[+] index: flagging previous key as deleted, on disk\n");
-        index_entry_delete_disk(root, exists);
-
-        debug("[+] index: updating current entry in memory\n");
-        // update statistics
-        root->datasize -= exists->length;
-        root->datasize += new->length;
-
-        // updating parent id and parent offset
-        // to the previous item itself, which
-        // will be used to keep track of the history
-        exists->parentid = exists->dataid;
-        exists->parentoff = exists->idxoffset;
-
-        // re-use existing entry
-        exists->length = new->length;
-        exists->offset = new->offset;
-        exists->flags = new->flags;
-        exists->dataid = root->indexid;
-        exists->idxoffset = new->idxoffset;
-        exists->crc = new->crc;
-
-        return exists;
-    }
-
     // calloc will ensure any unset fields (eg: flags) are zero
     size_t entrysize = sizeof(index_entry_t) + new->idlength;
     index_entry_t *entry = calloc(entrysize, 1);
@@ -415,7 +412,7 @@ index_entry_t *index_reusable_entry = NULL;
 // and the on-disk version is appended anyway, when reloading the index
 // we call the same sets of function which overwrite existing key, we
 // will always have the last version in memory
-index_entry_t *index_entry_insert_new(index_root_t *root, void *vid, index_entry_t *new, time_t timestamp) {
+index_entry_t *index_entry_insert_new(index_root_t *root, void *vid, index_entry_t *new, time_t timestamp, index_entry_t *existing) {
     unsigned char *id = (unsigned char *) vid;
     index_entry_t *entry = NULL;
     off_t curoffset = lseek(root->indexfd, 0, SEEK_END);
@@ -426,8 +423,14 @@ index_entry_t *index_entry_insert_new(index_root_t *root, void *vid, index_entry
     // setting the current index offset
     new->idxoffset = curoffset;
 
-    if(!(entry = index_entry_insert_memory(root, id, new)))
-        return NULL;
+    if(existing) {
+        if(!(entry = index_entry_update_memory(root, new, existing)))
+            return NULL;
+
+    } else {
+        if(!(entry = index_entry_insert_memory(root, id, new)))
+            return NULL;
+    }
 
     size_t entrylength = sizeof(index_item_t) + entry->idlength;
 
