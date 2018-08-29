@@ -157,7 +157,7 @@ This mode is not possible if you don't have any data/index already available.
 
 # Supported commands
 - `PING`
-- `SET key value`
+- `SET key value [timestamp]`
 - `GET key`
 - `DEL key`
 - `STOP` (used only for debugging, to check memory leaks)
@@ -182,6 +182,15 @@ This mode is not possible if you don't have any data/index already available.
 `SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
 
 > Compared to real redis protocol, during a `SET`, the key is returned as response.
+
+## SET
+This is the basic `SET key value` command, key can be binary.
+
+This command returns the key if SET was done properly or `(nil)` if you
+try to update a key without modification (avoid inserting already existing data).
+
+**Note:** admin user can specify an extra argument, timestamp, which will set the timestamp of the key
+to the specified timestamp and not the current timestamp. This is needed when doing replication.
 
 ## EXISTS
 Returns 1 or 0 if the key exists
