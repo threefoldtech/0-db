@@ -15,6 +15,18 @@
 #include "commands.h"
 #include "commands_get.h"
 
+static time_t timestamp_from_set(resp_request_t *request) {
+    if(request->argc == 3)
+        return time(NULL);
+
+    // convert argument to string
+    char *temp = strndup(request->argv[3]->buffer, request->argv[3]->length);
+    time_t timestamp = atoll(temp);
+    free(temp);
+
+    return timestamp;
+}
+
 static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *existing) {
     resp_request_t *request = client->request;
     index_root_t *index = client->ns->index;
@@ -32,6 +44,9 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
 
+    // setting the timestamp
+    time_t timestamp = timestamp_from_set(request);
+
     debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
     // printf("[+] set key: %.*s\n", idlength, id);
     // printf("[+] set value: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
@@ -43,7 +58,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
         .idlength = idlength,
         .flags = 0,
         .crc = data_crc32(value, valuelength),
-        .timestamp = time(NULL),
+        .timestamp = timestamp,
     };
 
     // checking if we need to update this entry of if data are unchanged
@@ -80,7 +95,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
     };
 
     // inserting this offset with the id on the index
-    if(!index_entry_insert_new(index, id, &idxreq, time(NULL))) {
+    if(!index_entry_insert_new(index, id, &idxreq, timestamp)) {
         // cannot insert index (disk issue)
         redis_hardsend(client, "$-1");
         return 0;
@@ -138,6 +153,9 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
 
+    // setting the timestamp
+    time_t timestamp = timestamp_from_set(request);
+
     debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
 
     data_request_t dreq = {
@@ -147,7 +165,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
         .idlength = idlength,
         .flags = 0,
         .crc = data_crc32(value, valuelength),
-        .timestamp = time(NULL),
+        .timestamp = timestamp,
     };
 
     // checking if we need to update this entry of if data are unchanged
@@ -187,7 +205,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
 
     // inserting this offset with the id on the index
     // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
-    if(!(idxentry = index_entry_insert_new(index, &id, &idxreq, time(NULL)))) {
+    if(!(idxentry = index_entry_insert_new(index, &id, &idxreq, timestamp))) {
         // cannot insert index (disk issue)
         redis_hardsend(client, "-Internal Error (index)");
         return 0;
@@ -234,6 +252,9 @@ static size_t redis_set_handler_directkey(redis_client_t *client, index_entry_t 
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
 
+    // setting the timestamp
+    time_t timestamp = timestamp_from_set(request);
+
     debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
 
     data_request_t dreq = {
@@ -243,7 +264,7 @@ static size_t redis_set_handler_directkey(redis_client_t *client, index_entry_t 
         .idlength = idlength,
         .flags = 0,
         .crc = data_crc32(value, valuelength),
-        .timestamp = time(NULL),
+        .timestamp = timestamp,
     };
 
     // insert the data on the datafile
@@ -276,7 +297,7 @@ static size_t redis_set_handler_directkey(redis_client_t *client, index_entry_t 
     // since there was no index, but now we use the index as statistics
     // manager, we use index, on the branch code, if there is no index in
     // memory, the memory part is skipped but index is still written
-    if(!(idxentry = index_entry_insert_new(index, &id, &idxreq, time(NULL)))) {
+    if(!(idxentry = index_entry_insert_new(index, &id, &idxreq, timestamp))) {
         // cannot insert index (disk issue)
         redis_hardsend(client, "-Internal Error (index)");
         return 0;
@@ -312,8 +333,18 @@ static size_t (*redis_set_handlers[])(redis_client_t *client, index_entry_t *exi
 int command_set(redis_client_t *client) {
     resp_request_t *request = client->request;
 
-    if(!command_args_validate_null(client, 3))
-        return 1;
+    if(request->argc == 4) {
+        // we have a timestamp request
+        // this is only authorized to admin users
+        if(!command_admin_authorized(client))
+            return 1;
+
+    } else {
+        // we don't have 4 argument, let's check
+        // using default behavior we have 3 arguments
+        if(!command_args_validate_null(client, 3))
+            return 1;
+    }
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         redis_hardsend(client, "-Key too large");
