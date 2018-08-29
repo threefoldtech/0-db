@@ -122,7 +122,7 @@ static int index_open_file_mode(index_root_t *root, uint16_t fileid, int mode) {
     debug("[+] index: opening file: %s (ro: %s)\n", filename, (mode & O_RDONLY) ? "yes" : "no");
 
     if((fd = open(filename, mode)) < 0) {
-        warnp(filename);
+        verbosep("index_open_file_mode", filename);
         return -1;
     }
 

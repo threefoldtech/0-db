@@ -114,7 +114,6 @@
     void hexdump(void *buffer, size_t length);
     void fulldump(void *data, size_t len);
 
-    #define verbose(...) { if(rootsettings.verbose) { printf(__VA_ARGS__); } }
 
     #define COLOR_RED    "\033[31;1m"
     #define COLOR_YELLOW "\033[33;1m"
@@ -133,9 +132,11 @@
     #define TB(x)   (x / (1024 * 1024 * 1024 * 1024.0))
 
     #ifndef RELEASE
+        #define verbose(...) { printf(__VA_ARGS__); }
         #define debug(...) { printf(__VA_ARGS__); }
         #define debughex(...) { hexdump(__VA_ARGS__); }
     #else
+        #define verbose(...) { if(rootsettings.verbose) { printf(__VA_ARGS__); } }
         #define debug(...) ((void)0)
         #define debughex(...) ((void)0)
     #endif
@@ -144,4 +145,5 @@
 
     void diep(char *str);
     void *warnp(char *str);
+    void verbosep(char *prefix, char *str);
 #endif

@@ -173,7 +173,7 @@ static index_scan_t index_next_header_real(index_scan_t scan) {
 
     // reading the fixed-length
     if(read(scan.fd, &source, sizeof(index_item_t)) != sizeof(index_item_t)) {
-        warnp("index scan: next-header: could not read next offset indexfile");
+        // warnp("index scan: next-header: could not read next offset indexfile");
         // this mean the entry expected is the first of the next indexfile
         scan.target = sizeof(index_header_t);
         return index_scan_error(scan, INDEX_SCAN_EOF_REACHED);

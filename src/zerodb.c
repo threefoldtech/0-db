@@ -127,6 +127,18 @@ void *warnp(char *str) {
     return NULL;
 }
 
+void verbosep(char *prefix, char *str) {
+#ifdef RELEASE
+    // only match on verbose flag if we are
+    // in release mode, otherwise do always the
+    // print, we are in debug mode anyway
+    if(!rootsettings.verbose)
+        return;
+#endif
+
+    fprintf(stderr, "[-] %s: %s: %s\n", prefix, str, strerror(errno));
+}
+
 void diep(char *str) {
     warnp(str);
     exit(EXIT_FAILURE);
