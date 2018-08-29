@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include "zerodb.h"
 #include "index.h"
+#include "index_get.h"
 #include "data.h"
 #include "namespace.h"
 #include "redis.h"
@@ -30,7 +31,8 @@ int command_exists(redis_client_t *client) {
     debughex(request->argv[1]->buffer, request->argv[1]->length);
     debug("\n");
 
-    index_entry_t *entry = redis_get_handlers[rootsettings.mode](client);
+    index_root_t *index = client->ns->index;
+    index_entry_t *entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length);
 
     debug("[+] command: exists: entry found: %s\n", (entry ? "yes" : "no"));
 
@@ -66,7 +68,8 @@ int command_check(redis_client_t *client) {
     debughex(request->argv[1]->buffer, request->argv[1]->length);
     debug("\n");
 
-    index_entry_t *entry = redis_get_handlers[rootsettings.mode](client);
+    index_root_t *index = client->ns->index;
+    index_entry_t *entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length);
 
     // key not found at all
     if(!entry) {
@@ -120,7 +123,7 @@ int command_del(redis_client_t *client) {
     index_entry_t *entry;
 
     // grabbing original entry
-    if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
+    if(!(entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length))) {
         debug("[-] command: del: key not found\n");
         redis_hardsend(client, "-Key not found");
         return 1;

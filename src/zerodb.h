@@ -29,7 +29,7 @@
     // define here version of 0-db itself
     // version is made as following:
     //
-    //   Major.Minor.Revision
+    //   Major.Minor.Review
     //
     //               ^-- incremented on bug fix and small changes
     //
@@ -41,28 +41,6 @@
     //             out of box on a version 2.x.x)
     #define ZDB_VERSION     "1.0.0"
 
-    typedef enum db_mode_t {
-        // default key-value store
-        KEYVALUE = 0,
-
-        // auto-generated sequential id
-        SEQUENTIAL = 1,
-
-        // id is hard-fixed data position
-        DIRECTKEY = 2,
-
-        // fixed-block length
-        DIRECTBLOCK = 3,
-
-        // amount of modes available
-        ZDB_MODES
-
-    } db_mode_t;
-
-    // when adding or removing some modes
-    // don't forget to adapt correctly the handlers
-    // function pointers (basicly for GET and SET)
-
     typedef struct settings_t {
         char *datapath;   // path where data files will be written
         char *indexpath;  // path where index files will be written
@@ -72,7 +50,7 @@
         int dump;         // ask to dump index on the load-time
         int sync;         // force to sync each write
         int synctime;     // force to sync writes after this amount of seconds
-        db_mode_t mode;   // default index running mode
+        int mode;         // default index running mode (should be index_mode_t)
         char *adminpwd;   // admin password, if NULL, all users are admin
         char *socket;     // unix socket path
         int background;   // flag to run in background
@@ -82,7 +60,7 @@
         int protect;      // flag default namespace to use admin password (for writing)
         size_t maxsize;   // default namespace maximum datasize
 
-        char *zdbid;      // fake-0db id generated based on listening
+        char *zdbid;      // fake 0-db id generated based on listening
 
         // the synctime can be useful to add basic security without killing
         // performance

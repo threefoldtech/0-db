@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include "zerodb.h"
 #include "index.h"
+#include "index_get.h"
 #include "index_scan.h"
 #include "data.h"
 #include "namespace.h"
@@ -159,7 +160,7 @@ int command_history(redis_client_t *client) {
     // this basicly request the first older entry of a specific key
     if(client->request->argc == 2) {
         // grabbing original entry
-        if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
+        if(!(entry = index_get(index, client->request->argv[1]->buffer, client->request->argv[1]->length))) {
             debug("[-] command: history: key not found\n");
             redis_hardsend(client, "-Key not found");
             return 1;

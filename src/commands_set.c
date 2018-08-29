@@ -7,8 +7,9 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include <time.h>
-#include "zerodb.h"
 #include "index.h"
+#include "index_get.h"
+#include "zerodb.h"
 #include "data.h"
 #include "namespace.h"
 #include "redis.h"
@@ -140,7 +141,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
         index_entry_t *found = NULL;
 
         // looking for the requested key
-        if(!(found = redis_get_handlers[SEQUENTIAL](client))) {
+        if(!(found = index_get(index, request->argv[1]->buffer, request->argv[1]->length))) {
             debug("[-] redis: set: trying to insert invalid key\n");
             redis_hardsend(client, "-Invalid key, only update authorized");
             return 0;
@@ -373,7 +374,7 @@ int command_set(redis_client_t *client) {
     // update an existing key, we can only delete it
     if(request->argv[1]->length && rootsettings.mode != DIRECTKEY) {
         // userkey id is not null
-        if((entry = redis_get_handlers[rootsettings.mode](client)))
+        if((entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length)))
             floating = entry->length;
     }
 

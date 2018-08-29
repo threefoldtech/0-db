@@ -1,6 +1,29 @@
 #ifndef __ZDB_INDEX_H
     #define __ZDB_INDEX_H
 
+    typedef enum index_mode_t {
+        // default key-value store
+        KEYVALUE = 0,
+
+        // auto-generated sequential id
+        SEQUENTIAL = 1,
+
+        // id is hard-fixed data position
+        DIRECTKEY = 2,
+
+        // fixed-block length
+        DIRECTBLOCK = 3,
+
+        // amount of modes available
+        ZDB_MODES
+
+    } index_mode_t;
+
+    // when adding or removing some modes
+    // don't forget to adapt correctly the handlers
+    // function pointers (basicly for GET and SET)
+
+
     // index file header
     // this file is more there for information
     // this is not really relevant but can be used
@@ -123,7 +146,7 @@
         int sync;           // flag to force write sync
         int synctime;       // force sync index after this amount of time
         time_t lastsync;    // keep track when the last sync was explictly made
-        db_mode_t mode;     // running mode for that index
+        index_mode_t mode;  // running mode for that index
 
         void *namespace;    // see index_entry_t, same reason
 
@@ -178,6 +201,7 @@
         uint32_t offset;
 
     } __attribute__((packed)) index_ekey_t;
+
 
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1

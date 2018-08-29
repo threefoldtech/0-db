@@ -6,61 +6,14 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <inttypes.h>
-#include "zerodb.h"
 #include "index.h"
+#include "zerodb.h"
 #include "index_seq.h"
+#include "index_get.h"
 #include "data.h"
 #include "namespace.h"
 #include "redis.h"
 #include "commands.h"
-
-static index_entry_t *redis_get_handler_memkey(redis_client_t *client) {
-    resp_request_t *request = client->request;
-    index_root_t *index = client->ns->index;
-    return index_entry_get(index, request->argv[1]->buffer, request->argv[1]->length);
-}
-
-static index_entry_t *redis_get_handler_sequential(redis_client_t *client) {
-    resp_request_t *request = client->request;
-    index_root_t *index = client->ns->index;
-
-    if(request->argv[1]->length != sizeof(uint32_t)) {
-        debug("[-] command: get seq: invalid key length\n");
-        return NULL;
-    }
-
-    // converting key into binary format
-    uint32_t key;
-    memcpy(&key, request->argv[1]->buffer, sizeof(uint32_t));
-
-    // resolving key into file id
-    index_seqmap_t *seqmap = index_fileid_from_seq(index, key);
-
-    // resolving relative offset
-    uint32_t relative = key - seqmap->seqid;
-    uint32_t offset = index_seq_offset(relative);
-
-    index_item_t *item = index_item_get_disk(index, seqmap->fileid, offset, sizeof(uint32_t));
-
-    // something went wrong
-    if(item == NULL)
-        return NULL;
-
-    index_reusable_entry->idlength = item->idlength;
-    index_reusable_entry->offset = item->offset;
-    index_reusable_entry->dataid = item->dataid;
-    index_reusable_entry->flags = item->flags;
-    index_reusable_entry->idxoffset = offset;
-    index_reusable_entry->crc = item->crc;
-
-    // force length to zero, this leads to fetch
-    // the length from data file
-    index_reusable_entry->length = 0;
-
-    free(item);
-
-    return index_reusable_entry;
-}
 
 #if 0
 static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
@@ -139,15 +92,9 @@ static index_entry_t *redis_get_handler_direct(redis_client_t *client) {
 }
 #endif
 
-index_entry_t * (*redis_get_handlers[])(redis_client_t *client) = {
-    redis_get_handler_memkey,     // key-value mode
-    redis_get_handler_sequential, // incremental mode
-    redis_get_handler_sequential, // direct-key mode (not used anymore)
-    redis_get_handler_sequential  // fixed block mode (not implemented yet)
-};
-
 int command_get(redis_client_t *client) {
     resp_request_t *request = client->request;
+    index_entry_t *entry = NULL;
 
     if(!command_args_validate(client, 2))
         return 1;
@@ -158,14 +105,8 @@ int command_get(redis_client_t *client) {
         return 1;
     }
 
-    debug("[+] command: get: lookup key: ");
-    debughex(request->argv[1]->buffer, request->argv[1]->length);
-    debug("\n");
-
-    index_entry_t *entry = redis_get_handlers[rootsettings.mode](client);
-
-    // key not found at all
-    if(!entry) {
+    // fetching index entry for this key
+    if(!(entry = index_get(client->ns->index, request->argv[1]->buffer, request->argv[1]->length))) {
         debug("[-] command: get: key not found\n");
         redis_hardsend(client, "$-1");
         return 1;
