@@ -327,11 +327,6 @@ static size_t index_load_file(index_root_t *root) {
 
         // moving seeker to next entry in the buffer
         seeker += sizeof(index_item_t) + entry->idlength;
-
-        // cleaning this entry in direct mode
-        // we don't keep any key in memory, just the statistics
-        if(rootsettings.mode == DIRECTKEY || rootsettings.mode == SEQUENTIAL)
-            free(fresh);
     }
 
     debug("[+] index: last offset: %lu\n", root->previous);

@@ -372,7 +372,7 @@ int command_set(redis_client_t *client) {
     //
     // this make no sense in direct key mode, since we can't
     // update an existing key, we can only delete it
-    if(request->argv[1]->length && rootsettings.mode != DIRECTKEY) {
+    if(request->argv[1]->length) {
         // userkey id is not null
         if((entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length)))
             floating = entry->length;
