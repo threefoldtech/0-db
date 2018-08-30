@@ -47,12 +47,15 @@ static index_entry_t *index_get_handler_sequential(index_root_t *index, void *id
         return NULL;
     }
 
+    memcpy(index_reusable_entry->id, item->id, item->idlength);
     index_reusable_entry->idlength = item->idlength;
     index_reusable_entry->offset = item->offset;
     index_reusable_entry->dataid = item->dataid;
     index_reusable_entry->flags = item->flags;
     index_reusable_entry->idxoffset = offset;
     index_reusable_entry->crc = item->crc;
+    index_reusable_entry->parentid = item->parentid;
+    index_reusable_entry->parentoff = item->parentoff;
 
     // force length to zero, this leads to fetch
     // the length from data file
