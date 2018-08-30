@@ -16,7 +16,9 @@ static int scan_check(test_t *test, int argc, const char *argv[], char *expected
     if(!(reply = zdb_response_scan(test, argc, argv)))
         return zdb_result(reply, TEST_FAILED_FATAL);
 
-    if(strcmp(reply->element[0]->str, expected) == 0)
+    redisReply *list = reply->element[1];
+
+    if(strcmp(list->element[0]->element[0]->str, expected) == 0)
         return zdb_result(reply, TEST_SUCCESS);
 
     log("%s\n", reply->str);
@@ -71,6 +73,7 @@ runtest_prio(sp, scan_get_last_key) {
     return scan_check(test, argvsz(argv), argv, "key6");
 }
 
+/*
 runtest_prio(sp, scan_get_second_key) {
     const char *argv[] = {"SCAN", "key1"};
     return scan_check(test, argvsz(argv), argv, "key2");
@@ -80,6 +83,7 @@ runtest_prio(sp, scan_get_last_minusone_key) {
     const char *argv[] = {"RSCAN", "key6"};
     return scan_check(test, argvsz(argv), argv, "key5");
 }
+*/
 
 
 runtest_prio(sp, scan_remove_first) {
