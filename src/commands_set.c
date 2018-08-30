@@ -93,6 +93,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
         .length = request->argv[2]->length,
         .crc = dreq.crc,
         .flags = 0,
+        .timestamp = timestamp,
     };
 
     // inserting this offset with the id on the index

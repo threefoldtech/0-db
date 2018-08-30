@@ -83,6 +83,7 @@
         uint32_t crc;        // the data payload crc32
         uint16_t parentid;   // parent index file id (history)
         uint32_t parentoff;  // parent index file offset (history)
+        uint32_t timestamp;  // unix timestamp of key creation
         unsigned char id[];  // the id accessor, dynamically loaded
 
     } index_entry_t;
