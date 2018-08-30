@@ -10,7 +10,6 @@
 #include "index.h"
 #include "index_seq.h"
 #include "index_get.h"
-// #include "namespace.h"
 
 static index_entry_t *index_get_handler_memkey(index_root_t *index, void *id, uint8_t idlength) {
     return index_entry_get(index, id, idlength);
@@ -38,14 +37,6 @@ static index_entry_t *index_get_handler_sequential(index_root_t *index, void *id
 
     if(!(item = index_item_get_disk(index, seqmap->fileid, offset, sizeof(uint32_t))))
         return NULL;
-
-    index_entry_t *entry;
-
-    if(!(entry = malloc(sizeof(index_entry_t) + idlength))) {
-        verbosep("index: get sequential", "malloc");
-        free(item);
-        return NULL;
-    }
 
     memcpy(index_reusable_entry->id, item->id, item->idlength);
     index_reusable_entry->idlength = item->idlength;
