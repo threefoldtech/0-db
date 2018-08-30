@@ -133,7 +133,7 @@ static int index_open_file(index_root_t *root, int fileid) {
     return index_open_file_mode(root, fileid, O_RDONLY);
 }
 
-static int index_open_file_rw(index_root_t *root, int fileid) {
+int index_open_file_rw(index_root_t *root, int fileid) {
     return index_open_file_mode(root, fileid, O_RDWR);
 }
 
@@ -254,7 +254,7 @@ uint32_t index_next_objectid(index_root_t *root) {
 
 // perform the basic "hashing" (crc based) used to point to the expected branch
 // we only keep partial amount of the result to not fill the memory too fast
-static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
+uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
     uint64_t *input = (uint64_t *) id;
     uint32_t hash = 0;
     ssize_t i = 0;
@@ -328,139 +328,12 @@ index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t o
     return item;
 }
 
-// insert a key, only in memory, no disk is touched
-// this function should be called externaly only when populating something
-// if we need to add something new on the index, we should write it on disk
-//
-// the id on the struct is not really allocated, except if explicity done
-// by default, no memory space is allocated (on the stack) for the id, so we need the
-// id in external variable, this variable will be copy on the right place if needed
-//
-// note that we use everything else (including 'idlength') from the new index_entry_t provided
-//
-index_entry_t *index_entry_update_memory(index_root_t *root, index_entry_t *new, index_entry_t *exists) {
-    debug("[+] index: key already exists\n");
-
-    debug("[+] index: flagging previous key as deleted, on disk\n");
-    index_entry_delete_disk(root, exists);
-
-    debug("[+] index: updating current entry in memory\n");
-    // update statistics
-    root->datasize -= exists->length;
-    root->datasize += new->length;
-
-    // updating parent id and parent offset
-    // to the previous item itself, which
-    // will be used to keep track of the history
-    exists->parentid = exists->dataid;
-    exists->parentoff = exists->idxoffset;
-
-    // re-use existing entry
-    exists->length = new->length;
-    exists->offset = new->offset;
-    exists->flags = new->flags;
-    exists->dataid = root->indexid;
-    exists->idxoffset = new->idxoffset;
-    exists->crc = new->crc;
-
-    return exists;
-}
-
-index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *realid, index_entry_t *new) {
-    // calloc will ensure any unset fields (eg: flags) are zero
-    size_t entrysize = sizeof(index_entry_t) + new->idlength;
-    index_entry_t *entry = calloc(entrysize, 1);
-
-    memcpy(entry->id, realid, new->idlength);
-    entry->idlength = new->idlength;
-    entry->namespace = root->namespace;
-    entry->offset = new->offset;
-    entry->length = new->length;
-    entry->dataid = root->indexid;
-    entry->idxoffset = new->idxoffset;
-    entry->flags = new->flags;
-    entry->crc = new->crc;
-
-    uint32_t branchkey = index_key_hash(entry->id, entry->idlength);
-
-    // commit entry into memory
-    index_branch_append(root->branches, branchkey, entry);
-
-    // update statistics (if the key exists)
-    // maybe it doesn't exists if it comes from a replay
-    root->entries += 1;
-    root->datasize += new->length;
-    root->indexsize += entrysize;
-
-    // update next entry id
-    root->nextentry += 1;
-    root->nextid += 1;
-
-    return entry;
-}
-
 // this will be a global item we will allocate only once, to avoid
 // useless reallocation
 // this item will be used to move from an index_entry_t (disk) to index_item_t (memory)
 index_item_t *index_transition = NULL;
 index_entry_t *index_reusable_entry = NULL;
 
-// main function to insert anything on the index, in memory and on the disk
-// perform at first a memory insertion then disk writing
-//
-// if the key already exists, the in memory version will be updated
-// and the on-disk version is appended anyway, when reloading the index
-// we call the same sets of function which overwrite existing key, we
-// will always have the last version in memory
-index_entry_t *index_entry_insert_new(index_root_t *root, void *vid, index_entry_t *new, time_t timestamp, index_entry_t *existing) {
-    unsigned char *id = (unsigned char *) vid;
-    index_entry_t *entry = NULL;
-    off_t curoffset = lseek(root->indexfd, 0, SEEK_END);
-
-    // ensure flags are empty
-    new->flags = 0;
-
-    // setting the current index offset
-    new->idxoffset = curoffset;
-
-    if(existing) {
-        if(!(entry = index_entry_update_memory(root, new, existing)))
-            return NULL;
-
-    } else {
-        if(!(entry = index_entry_insert_memory(root, id, new)))
-            return NULL;
-    }
-
-    size_t entrylength = sizeof(index_item_t) + entry->idlength;
-
-    memcpy(index_transition->id, entry->id, entry->idlength);
-    index_transition->idlength = entry->idlength;
-    index_transition->offset = entry->offset;
-    index_transition->length = entry->length;
-    index_transition->flags = entry->flags;
-    index_transition->dataid = entry->dataid;
-    index_transition->timestamp = timestamp;
-    index_transition->previous = root->previous;
-    index_transition->parentid = entry->parentid;
-    index_transition->parentoff = entry->parentoff;
-    index_transition->crc = entry->crc;
-
-    // updating global previous
-    root->previous = curoffset;
-
-    if(!index_write(root->indexfd, index_transition, entrylength, root)) {
-        fprintf(stderr, "[-] index: cannot write index entry on disk\n");
-
-        // it's easier to flag the entry as deleted than
-        // removing it from the list
-        entry->flags |= INDEX_ENTRY_DELETED;
-
-        return NULL;
-    }
-
-    return entry;
-}
 
 // IMPORTANT:
 //   this function is the only one to 'break' the always append

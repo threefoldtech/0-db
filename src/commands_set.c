@@ -7,9 +7,10 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include <time.h>
+#include "zerodb.h"
 #include "index.h"
 #include "index_get.h"
-#include "zerodb.h"
+#include "index_set.h"
 #include "data.h"
 #include "namespace.h"
 #include "redis.h"
@@ -96,8 +97,12 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
         .timestamp = timestamp,
     };
 
-    // inserting this offset with the id on the index
-    if(!index_entry_insert_new(index, id, &idxreq, timestamp, existing)) {
+    index_set_t setter = {
+        .entry = &idxreq,
+        .id = id,
+    };
+
+    if(!index_set(index, &setter, existing)) {
         // cannot insert index (disk issue)
         redis_hardsend(client, "$-1");
         return 0;
@@ -126,31 +131,23 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
     data_root_t *data = client->ns->data;
     index_entry_t *idxentry = NULL;
 
+    // if user provided a key and existing is not set
+    // this means the key was not found, and we cannot update
+    // it (obviously)
+    if(request->argv[1]->length && !existing) {
+        redis_hardsend(client, "-Invalid key, only update authorized");
+        return 0;
+    }
+
     // create some easier accessor
     // grab the next id, this may be replaced
     // by user input if the key exists
     uint32_t id = index_next_id(index);
     uint8_t idlength = sizeof(uint32_t);
 
-    if(request->argv[1]->length) {
-        if(request->argv[1]->length != idlength) {
-            debug("[-] redis: set: trying to insert key with invalid size\n");
-            redis_hardsend(client, "-Invalid key, use empty key for auto-generated key");
-            return 0;
-        }
-
-        index_entry_t *found = NULL;
-
-        // looking for the requested key
-        if(!(found = index_get(index, request->argv[1]->buffer, request->argv[1]->length))) {
-            debug("[-] redis: set: trying to insert invalid key\n");
-            redis_hardsend(client, "-Invalid key, only update authorized");
-            return 0;
-        }
-
-        memcpy(&id, found->id, idlength);
-        debug("[+] redis: set: updating existing key: %08x\n", id);
-    }
+    // setting key to existing if we do an update
+    if(existing)
+        memcpy(&id, existing->id, existing->idlength);
 
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
@@ -202,19 +199,19 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
         .length = request->argv[2]->length,
         .crc = dreq.crc,
         .flags = 0,
+        .timestamp = timestamp,
     };
 
+    index_set_t setter = {
+        .entry = &idxreq,
+        .id = &id,
+    };
 
-    // inserting this offset with the id on the index
-    // if(!index_entry_insert(id, idlength, offset, request->argv[2]->length)) {
-    if(!(idxentry = index_entry_insert_new(index, &id, &idxreq, timestamp, existing))) {
+    if(!(idxentry = index_set(index, &setter, existing))) {
         // cannot insert index (disk issue)
-        redis_hardsend(client, "-Internal Error (index)");
+        redis_hardsend(client, "$-1");
         return 0;
     }
-
-    // cleaning this entry, we don't need it in memory
-    free(idxentry);
 
     // building response
     // here, from original redis protocol, we don't reply with a basic
@@ -233,99 +230,6 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
 
     return offset;
 }
-
-#if 0
-static size_t redis_set_handler_directkey(redis_client_t *client, index_entry_t *existing) {
-    resp_request_t *request = client->request;
-    index_root_t *index = client->ns->index;
-    data_root_t *data = client->ns->data;
-    index_entry_t *idxentry = NULL;
-
-    // we don't care about any existing value in direct-mode
-    // since it's not possible (always new data)
-    (void) existing;
-
-    // create some easier accessor
-    uint8_t idlength = sizeof(index_dkey_t);
-    index_dkey_t id = {
-        .indexid = index_indexid(index),        // current index fileid
-        .objectid = index_next_objectid(index), // needed now, it's part of the id
-    };
-
-    unsigned char *value = request->argv[2]->buffer;
-    uint32_t valuelength = request->argv[2]->length;
-
-    // setting the timestamp
-    time_t timestamp = timestamp_from_set(request);
-
-    debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
-
-    data_request_t dreq = {
-        .data = value,
-        .datalength = valuelength,
-        .vid = &id,
-        .idlength = idlength,
-        .flags = 0,
-        .crc = data_crc32(value, valuelength),
-        .timestamp = timestamp,
-    };
-
-    // insert the data on the datafile
-    // this will returns us the offset where the header is
-    size_t offset = data_insert(data, &dreq);
-
-    // checking for writing error
-    // if we couldn't write the data, we won't add entry on the index
-    // and report to the client an error
-    if(offset == 0) {
-        redis_hardsend(client, "-Internal Error (data)");
-        return 0;
-    }
-
-    debug("[+] command: set: direct-key: ");
-    debughex(&id, idlength);
-    debug("\n");
-
-    debug("[+] command: set: offset: %lu\n", offset);
-
-    index_entry_t idxreq = {
-        .idlength = idlength,
-        .offset = offset,
-        .length = request->argv[2]->length,
-        .crc = dreq.crc,
-        .flags = 0,
-    };
-
-    // previously, we was skipping index at all on this mode
-    // since there was no index, but now we use the index as statistics
-    // manager, we use index, on the branch code, if there is no index in
-    // memory, the memory part is skipped but index is still written
-    if(!(idxentry = index_entry_insert_new(index, &id, &idxreq, timestamp, existing))) {
-        // cannot insert index (disk issue)
-        redis_hardsend(client, "-Internal Error (index)");
-        return 0;
-    }
-
-    // cleaning this entry, we don't need it in memory
-    free(idxentry);
-
-    // building response
-    // here, from original redis protocol, we don't reply with a basic
-    // OK or Error when inserting a key, we reply with the key itself
-    //
-    // this is how the direct-id can returns the id generated
-    redis_bulk_t response = redis_bulk(&id, idlength);
-    if(!response.buffer) {
-        redis_hardsend(client, "-Internal Error (bulk)");
-        return 0;
-    }
-
-    redis_reply(client, response.buffer, response.length);
-    free(response.buffer);
-
-    return offset;
-}
-#endif
 
 static size_t (*redis_set_handlers[])(redis_client_t *client, index_entry_t *existing) = {
     redis_set_handler_userkey,    // key-value mode

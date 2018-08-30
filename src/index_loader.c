@@ -15,6 +15,7 @@
 #include "index_seq.h"
 #include "index_loader.h"
 #include "index_branch.h"
+#include "index_set.h"
 #include "data.h"
 
 //
@@ -302,11 +303,14 @@ static size_t index_load_file(index_root_t *root) {
         // insert this entry like it was inserted by a user
         // this allows us to keep a generic way of inserting data and keeping a
         // single point of logic when adding data (logic for overwrite, resize bucket, ...)
-        fresh = index_entry_insert_memory(root, entry->id, &source);
+        fresh = index_set_memory(root, entry->id, &source);
 
         // now we added the entry (whatever it was)
         // if this entry was flagged as deleted, let simulate a deletion
         // like it was (we do replay here), this ensure coherence of data
+        //
+        // we can't just skip deleted entries, otherwise previously
+        // inserted data won't be flagged as deleted
         if(index_entry_is_deleted(fresh))
             index_entry_delete_memory(root, fresh);
 

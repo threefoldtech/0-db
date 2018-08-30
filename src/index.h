@@ -250,4 +250,7 @@
     void index_release_fileid(index_root_t *root, uint16_t fileid, int fd);
 
     void index_item_header_dump(index_item_t *item);
+
+    uint32_t index_key_hash(unsigned char *id, uint8_t idlength);
+    int index_open_file_rw(index_root_t *root, int fileid);
 #endif
