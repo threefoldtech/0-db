@@ -143,11 +143,13 @@ int redis_dispatcher(redis_client_t *client) {
 // set the client to wait on a special handler to be triggered
 int command_wait(redis_client_t *client) {
     resp_request_t *request = client->request;
-    resp_object_t *key = request->argv[1];
     int (*handler)(redis_client_t *client) = NULL;
 
     if(!command_args_validate(client, 2))
         return 1;
+
+    // extract argument
+    resp_object_t *key = request->argv[1];
 
     // checking if the requested command is supported
     for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
