@@ -707,12 +707,15 @@ redis_client_t *socket_client_new(int fd) {
 
     // allocating a fixed buffer
     client->buffer = buffer_new();
-    if(!client->buffer.buffer)
+    if(!client->buffer.buffer) {
+        free(client);
         return NULL;
+    }
 
     // allocating single request object
     if(!(client->request = (resp_request_t *) malloc(sizeof(resp_request_t)))) {
         warnp("new client request malloc");
+        free(client);
         return NULL;
     }
 

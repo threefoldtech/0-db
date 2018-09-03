@@ -310,8 +310,10 @@ index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t o
         return NULL;
 
     // open requested file
-    if((fd = index_open_file(root, indexid)) < 0)
+    if((fd = index_open_file(root, indexid)) < 0) {
+        free(item);
         return NULL;
+    }
 
     // seek to requested offset
     lseek(fd, offset, SEEK_SET);
