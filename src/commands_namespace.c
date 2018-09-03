@@ -33,6 +33,12 @@ int command_nsnew(redis_client_t *client) {
     // get string formatted namespace
     sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
 
+    if(!namespace_valid_name(target)) {
+        debug("[-] command: nsnew: namespace name doesn't fit critera\n");
+        redis_hardsend(client, "-This name is not allowed");
+        return 1;
+    }
+
     // deny already existing namespace
     if(namespace_get(target)) {
         debug("[-] command: nsnew: namespace already exists\n");

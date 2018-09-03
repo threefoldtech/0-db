@@ -330,8 +330,11 @@ int namespace_create(char *name) {
     return 1;
 }
 
-static int namespace_valid_name(char *name) {
+int namespace_valid_name(char *name) {
     if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+        return 0;
+
+    if(strchr(name, '/'))
         return 0;
 
     // FIXME: better support (slash, coma, ...)

@@ -51,6 +51,8 @@
     } ns_root_t;
 
     size_t namespace_length();
+    int namespace_valid_name(char *name);
+
     namespace_t *namespace_iter();
     namespace_t *namespace_iter_next(namespace_t *namespace);
 
