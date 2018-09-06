@@ -9,11 +9,11 @@
 #include "zerodb.h"
 #include "index.h"
 #include "index_scan.h"
+#include "index_get.h"
 #include "data.h"
 #include "namespace.h"
 #include "redis.h"
 #include "commands.h"
-#include "commands_get.h"
 #include "commands_scan.h"
 
 uint64_t ustime() {
@@ -306,3 +306,40 @@ int command_rscan(redis_client_t *client) {
     return 0;
 }
 
+//
+// KEYCUR
+//
+int command_keycur(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    index_entry_t *entry;
+
+    if(!command_args_validate(client, 2))
+        return 1;
+
+    index_root_t *index = client->ns->index;
+    resp_object_t *key = request->argv[1];
+
+    if(!(entry = index_get(index, key->buffer, key->length))) {
+        redis_hardsend(client, "-Key not found");
+        return 1;
+    }
+
+    char response[64];
+    size_t offset = 0;
+
+    // building binary key
+    index_bkey_t bkey = index_entry_serialize(entry);
+
+    // building binary response string
+    offset += snprintf(response, sizeof(response), "$%lu\r\n", sizeof(index_bkey_t));
+
+    memcpy(response + offset, &bkey, sizeof(index_bkey_t));
+    offset += sizeof(index_bkey_t);
+
+    memcpy(response + offset, "\r\n", 2);
+    offset += 2;
+
+    redis_reply(client, response, offset);
+
+    return 0;
+}

@@ -3,6 +3,7 @@
 
     int command_scan(redis_client_t *client);
     int command_rscan(redis_client_t *client);
+    int command_keycur(redis_client_t *client);
 
     typedef struct scan_list_t {
         size_t length;

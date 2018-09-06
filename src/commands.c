@@ -80,6 +80,7 @@ static command_t commands_handlers[] = {
     {.command = "SCANX",   .handler = command_scan},    // alias for SCAN command
     {.command = "RSCAN",   .handler = command_rscan},   // custom command to walk backward dataset
     {.command = "HISTORY", .handler = command_history}, // custom command to get previous version of a key
+    {.command = "KEYCUR",  .handler = command_keycur},  // custom command to get cursor id from a key
 
     // query
     {.command = "INFO", .handler = command_info}, // returns 0-db server name

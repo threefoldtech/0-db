@@ -244,6 +244,7 @@
     uint16_t index_indexid(index_root_t *root);
 
     index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset);
+    index_bkey_t index_entry_serialize(index_entry_t *entry);
     index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key);
 
     int index_grab_fileid(index_root_t *root, uint16_t fileid);

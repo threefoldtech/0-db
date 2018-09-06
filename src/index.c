@@ -451,6 +451,19 @@ index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset) {
     return key;
 }
 
+index_bkey_t index_entry_serialize(index_entry_t *entry) {
+    index_bkey_t key = {
+        .idlength = entry->idlength,
+        .fileid = entry->dataid,
+        .length = entry->length,
+        .idxoffset = entry->idxoffset,
+        .crc = entry->crc
+    };
+
+    return key;
+}
+
+
 // read an object from disk, based on binarykey provided
 // and ensure the key object seems legit with the requested key
 index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key) {
