@@ -79,6 +79,7 @@ static command_t commands_handlers[] = {
     {.command = "SCAN",    .handler = command_scan},    // modified SCAN which walk forward dataset
     {.command = "SCANX",   .handler = command_scan},    // alias for SCAN command
     {.command = "RSCAN",   .handler = command_rscan},   // custom command to walk backward dataset
+    {.command = "KSCAN",   .handler = command_kscan},   // custom command to iterate over keys matching pattern
     {.command = "HISTORY", .handler = command_history}, // custom command to get previous version of a key
     {.command = "KEYCUR",  .handler = command_keycur},  // custom command to get cursor id from a key
 

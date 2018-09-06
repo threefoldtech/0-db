@@ -10,6 +10,7 @@
 #include "index.h"
 #include "index_scan.h"
 #include "index_get.h"
+#include "index_branch.h"
 #include "data.h"
 #include "namespace.h"
 #include "redis.h"
@@ -343,3 +344,133 @@ int command_keycur(redis_client_t *client) {
 
     return 0;
 }
+
+
+
+list_t *list_append(list_t *list, void *item) {
+    if(list->length + 1 > list->allocated) {
+        list->allocated += 32;
+
+        if(!(list->items = realloc(list->items, list->allocated * sizeof(void *))))
+            return NULL;
+    }
+
+    list->items[list->length] = item;
+    list->length += 1;
+
+    return list;
+}
+
+list_t list_init(list_t *list) {
+    list_t empty;
+
+    if(!list)
+        list = &empty;
+
+    memset(list, 0x00, sizeof(list_t));
+    return *list;
+}
+
+void list_free(list_t *list) {
+    free(list->items);
+}
+
+
+
+//
+// KSCAN
+//
+static int command_kscan_send_list(redis_client_t *client, list_t *list) {
+    char *response;
+    size_t offset = 0;
+    index_entry_t *entry;
+
+    // if the list is empty, we have nothing
+    // to send, obviously
+    if(list->length == 0) {
+        redis_hardsend(client, "-No keys match");
+        return 0;
+    }
+
+    // array response, with 2 arguments:
+    //  - first one is the next SCAN key value
+    //    (in our case, this is always the same value as the returned id)
+    //  - the second one is another array, of each keys found, each entry containins
+    //    information about this key like timestamp and size
+    if(!(response = malloc(((MAX_KEY_LENGTH * 2) + 128) * list->length)))
+        return 1;
+
+    offset = sprintf(response, "*2\r\n$1\r\n0\r\n");
+
+    // iterating over the full list and building the list response
+    offset += sprintf(response + offset, "*%lu\r\n", list->length);
+
+    for(size_t i = 0; i < list->length; i++) {
+        entry = list->items[i];
+
+        // adding the key
+        offset += sprintf(response + offset, "$%u\r\n", entry->idlength);
+        memcpy(response + offset, entry->id, entry->idlength);
+        offset += entry->idlength;
+
+
+        offset += sprintf(response + offset, "\r\n");
+    }
+
+    redis_reply(client, response, offset);
+    free(response);
+
+    return 0;
+}
+
+int command_kscan(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    index_root_t *index = client->ns->index;
+
+    #ifdef RELEASE
+    redis_hardsend(client, "-Command disabled in release code, not yet available");
+    return 1;
+    #endif
+
+    // it doesn't make sens to do that on sequential index
+    if(index->mode != KEYVALUE) {
+        redis_hardsend(client, "-Index running mode doesn't support this feature");
+        return 1;
+    }
+
+    if(request->argc != 2) {
+        redis_hardsend(client, "-Nope");
+        return 1;
+    }
+
+    resp_object_t *key = request->argv[1];
+    list_t keys = list_init(NULL);
+
+    for(size_t i = 0; i < buckets_branches; i++) {
+        index_branch_t *branch = index->branches[i];
+
+        // skipping not allocated branches
+        if(!branch)
+            continue;
+
+        for(index_entry_t *entry = branch->list; entry; entry = entry->next) {
+            // this key doesn't belong to the current namespace
+            if(entry->namespace != client->ns)
+                continue;
+
+            // key is shorter than requested prefix
+            // it won't match at all
+            if(entry->idlength < key->length)
+                continue;
+
+            if(memcmp(entry->id, key->buffer, key->length) == 0)
+                list_append(&keys, entry);
+        }
+    }
+
+    command_kscan_send_list(client, &keys);
+    list_free(&keys);
+
+    return 0;
+}
+
