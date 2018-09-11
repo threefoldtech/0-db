@@ -791,22 +791,41 @@ int redis_detach_clients(namespace_t *namespace) {
 // some waiting was set, if waiting was set on the same handler
 // we just called, we trigger (notify) it and unlock it
 int redis_posthandler_client(redis_client_t *client) {
+    char response[64];
+
+    // the client didn't executed any
+    // valid command, nothing to check
+    if(!client->executed)
+        return 0;
+
     for(size_t i = 0; i < clients.length; i++) {
         redis_client_t *checking = clients.list[i];
 
-        if(!checking || checking->ns != client->ns)
+        // this client doesn't exists (can be ourself disconnected)
+        // or this client is not waiting on commands
+        // or this client is not waiting on the same namespace
+        // ignoring
+        if(!checking || !checking->watching || checking->ns != client->ns)
             continue;
 
-        if(!checking->watching)
+        // skipping the client itself (prevent matching it's own command)
+        if(checking == client)
             continue;
 
-        if(checking->watching == client->executed) {
+        // matching on the exact command
+        // or the wildcard command
+        if(checking->watching == client->executed || checking->watching->handler == command_asterisk) {
+            char *waiting = checking->watching->command;
+            char *matching = client->executed->command;
+
             // trigger done, discarding watcher
             checking->watching = NULL;
 
             // sending notification
-            debug("[+] redis: posthandler: client %d was waiting, notifing\n", checking->fd);
-            redis_hardsend(checking, "+OK");
+            debug("[+] redis: trigger: client %d waits on <%s>, trigger <%s>\n", checking->fd, waiting, matching);
+
+            snprintf(response, sizeof(response), "+%s\r\n", matching);
+            redis_reply_stack(checking, response, strlen(response));
         }
     }
 

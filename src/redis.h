@@ -80,8 +80,18 @@
 
     } redis_response_t;
 
+    typedef struct command_t command_t;
+    typedef struct redis_client_t redis_client_t;
+
+    // command name and associated handler
+    struct command_t {
+        char *command;
+        int (*handler)(redis_client_t *client);
+
+    };
+
     // represent one client in memory
-    typedef struct redis_client_t {
+    struct redis_client_t {
         int fd;           // socket file descriptor
         namespace_t *ns;  // connection namespace
         time_t connected; // connection time
@@ -94,8 +104,8 @@
         // an event is basicly somebody else doing some command
         // we keep track if a client wants to monitor some event
         // and a pointer to the last command executed
-        int (*watching)(void *);
-        int (*executed)(void *);
+        command_t *watching;
+        command_t *executed;
 
         // each client will be attached to a request
         // this request will contains one-per-one commands
@@ -106,7 +116,7 @@
         // client
         redis_response_t response;
 
-    } redis_client_t;
+    };
 
     // represent all clients in memory
     typedef struct redis_clients_t {

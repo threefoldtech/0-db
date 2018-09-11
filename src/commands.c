@@ -63,11 +63,14 @@ int command_admin_authorized(redis_client_t *client) {
 // dispatch command to the right handler
 
 static command_t commands_handlers[] = {
+    // special
+    {.command = "*", .handler = command_asterisk}, // special command used to match all in WAIT
+
     // system
     {.command = "PING", .handler = command_ping}, // default PING command
     {.command = "TIME", .handler = command_time}, // default TIME command
     {.command = "AUTH", .handler = command_auth}, // custom AUTH command to authentifcate admin
-    {.command = "WAIT", .handler = command_wait},    // custom command to wait on events
+    {.command = "WAIT", .handler = command_wait}, // custom WAIT command to wait on events
 
     // dataset
     {.command = "SET",     .handler = command_set},     // default SET command
@@ -126,17 +129,16 @@ int redis_dispatcher(redis_client_t *client) {
 
     for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
         if(strncasecmp(key->buffer, commands_handlers[i].command, key->length) == 0) {
-            client->executed = (int (*)(void *)) commands_handlers[i].handler;
-            int value = commands_handlers[i].handler(client);
-
-
-
-            return value;
+            client->executed = &commands_handlers[i];
+            return commands_handlers[i].handler(client);
         }
     }
 
     // unknown command
     printf("[-] command: unsupported redis command\n");
+
+    // reset executed flag, this was a non-existing command
+    client->executed = NULL;
     redis_hardsend(client, "-Command not supported");
 
     return 1;
@@ -145,7 +147,7 @@ int redis_dispatcher(redis_client_t *client) {
 // set the client to wait on a special handler to be triggered
 int command_wait(redis_client_t *client) {
     resp_request_t *request = client->request;
-    int (*handler)(redis_client_t *client) = NULL;
+    command_t *handler = NULL;
 
     if(!command_args_validate(client, 2))
         return 1;
@@ -156,7 +158,7 @@ int command_wait(redis_client_t *client) {
     // checking if the requested command is supported
     for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
         if(strncasecmp(key->buffer, commands_handlers[i].command, key->length) == 0) {
-            handler = commands_handlers[i].handler;
+            handler = &commands_handlers[i];
             break;
         }
     }
@@ -167,12 +169,17 @@ int command_wait(redis_client_t *client) {
     }
 
     // nothing to send to client, he is waiting now
-    // we set the handler pointer to that client waiting flag
+    // we set the command pointer to that client waiting flag
     // and as soon as someone else on the same namespace will
     // request this command, this client will be notified
-    client->watching = (int (*)(void *)) handler;
+    client->watching = handler;
 
     return 1;
 }
 
-
+// dummy handler which does nothing
+// this is only used to match 'WAIT *' command dispatching
+int command_asterisk(redis_client_t *client) {
+    redis_hardsend(client, "-This is not a valid command");
+    return 0;
+}
