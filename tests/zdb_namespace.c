@@ -60,6 +60,9 @@ runtest_prio(sp, namespace_simple_set) {
 
 // read the value back
 runtest_prio(sp, namespace_simple_get) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     return zdb_check(test, "hello", "world");
 }
 
@@ -70,6 +73,9 @@ runtest_prio(sp, namespace_special_set) {
 
 // read this new value to be sure
 runtest_prio(sp, namespace_special_get) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     return zdb_check(test, "special-key", "hello");
 }
 
@@ -83,6 +89,9 @@ runtest_prio(sp, namespace_switchback_default) {
 
 // we should not find "special-key" here (another namespace)
 runtest_prio(sp, namespace_default_ensure) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"GET", "special-key"};
     return zdb_command_error(test, argvsz(argv), argv);
 }
@@ -184,12 +193,18 @@ runtest_prio(sp, namespace_select_public) {
 
 // we should be in read-only now
 runtest_prio(sp, namespace_write_on_protected) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"SET", "should", "fails"};
     return zdb_command_error(test, argvsz(argv), argv);
 }
 
 // still in read-only
 runtest_prio(sp, namespace_del_on_protected) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"DEL", "hello"};
     return zdb_command_error(test, argvsz(argv), argv);
 }
@@ -301,6 +316,9 @@ runtest_prio(sp, namespace_limit_write_exact_limit) {
 
 // writing 1 more byte should fail
 runtest_prio(sp, namespace_limit_write_over) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"SET", "key4", "X"};
     return zdb_command_error(test, argvsz(argv), argv);
 }
@@ -317,6 +335,9 @@ runtest_prio(sp, namespace_limit_replace_shrink) {
 
 // try to write over again
 runtest_prio(sp, namespace_limit_write_over_shrink) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"SET", "key5", "67890X"};
     return zdb_command_error(test, argvsz(argv), argv);
 }
@@ -502,6 +523,9 @@ runtest_prio(sp, namespace_reload_execute) {
 }
 
 runtest_prio(sp, namespace_simple_get_after_reload) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     return zdb_check(test, "keypresent", "helloworld");
 }
 

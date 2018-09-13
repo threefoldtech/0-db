@@ -17,6 +17,7 @@
         unsigned int failed;
         unsigned int failed_fatal;
         unsigned int warning;
+        unsigned int skipped;
 
     } registered_tests_t;
 

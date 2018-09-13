@@ -11,6 +11,9 @@
 static char *namespace_scan = "test_scan";
 
 static int scan_check(test_t *test, int argc, const char *argv[], char *expected) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     redisReply *reply;
 
     if(!(reply = zdb_response_scan(test, argc, argv)))
@@ -87,6 +90,9 @@ runtest_prio(sp, scan_get_last_minusone_key) {
 
 
 runtest_prio(sp, scan_remove_first) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"DEL", "key1"};
     return zdb_command(test, argvsz(argv), argv);
 }
@@ -98,6 +104,9 @@ runtest_prio(sp, scan_get_new_first_key) {
 
 
 runtest_prio(sp, scan_remove_last) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"DEL", "key6"};
     return zdb_command(test, argvsz(argv), argv);
 }

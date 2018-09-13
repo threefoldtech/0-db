@@ -43,6 +43,9 @@ int zdb_command_error(test_t *test, int argc, const char *argv[]) {
 
 
 int zdb_set(test_t *test, char *key, char *value) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     redisReply *reply;
 
     if(!(reply = redisCommand(test->zdb, "SET %s %s", key, value)))

@@ -11,6 +11,9 @@
 static char *namespace_payload = "test_payload";
 
 int payload_execute(test_t *test, size_t length, int (*command)(test_t *, void *, size_t, void *, size_t)) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     char key[64];
     char *payload;
 

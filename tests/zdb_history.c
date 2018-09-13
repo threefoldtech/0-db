@@ -61,6 +61,9 @@ runtest_prio(sp, history_init_chain6) {
 }
 
 runtest_prio(sp, history_first_hit) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"HISTORY", "changeme"};
     return history_check(test, argvsz(argv), argv, "history value 6");
 }

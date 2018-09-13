@@ -106,6 +106,9 @@ runtest_prio(sp, lowlevel_not_string_argument) {
 // enough to make the final \r\n between two buffer
 // read server side (by default buffer is 8192 bytes)
 runtest_prio(sp, lowlevel_tricky_buffer_limit) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     char buffer[8195];
     ssize_t length;
 
@@ -129,6 +132,9 @@ runtest_prio(sp, lowlevel_tricky_buffer_limit) {
 // between two buffer read server side
 // (by default buffer is 8192 bytes)
 runtest_prio(sp, lowlevel_tricky_buffer_header_limit) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     char buffer[8201];
     ssize_t length;
 
@@ -152,6 +158,9 @@ runtest_prio(sp, lowlevel_tricky_buffer_header_limit) {
 // at the end of one packet buffer
 // (by default buffer is 8192 bytes)
 runtest_prio(sp, lowlevel_tricky_buffer_header_split) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     char buffer[8198];
     ssize_t length;
 

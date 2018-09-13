@@ -16,6 +16,7 @@ static registered_tests_t tests = {
     .failed = 0,
     .failed_fatal = 0,
     .warning = 0,
+    .skipped = 0,
 };
 
 // register a function as runtest
@@ -63,6 +64,7 @@ void testsuite(test_t *maintest) {
 
             case TEST_SKIPPED:
                 printf("[-] >> " CYAN("%s") ": " GREY("skipped") "\n", test->name);
+                tests.skipped += 1;
                 break;
         }
     }
@@ -131,6 +133,7 @@ int main(int argc, char *argv[]) {
     printf("[+]   " GREEN("success") ": %u\n", tests.success);
     printf("[+]   " RED("failed") " : %u (%u fatal)\n", tests.failed, tests.failed_fatal);
     printf("[+]   " YELLOW("warning") ": %u\n", tests.warning);
+    printf("[+]   " GREY("skipped") ": %u\n", tests.skipped);
     printf("[+]\n");
 
     return 0;

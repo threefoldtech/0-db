@@ -36,16 +36,40 @@ runtest_prio(102, ensure_db_empty) {
     return TEST_SUCCESS;
 }
 
+runtest_prio(103, check_running_mode) {
+    redisReply *reply;
+
+    if(!(reply = redisCommand(test->zdb, "NSINFO default")))
+        return zdb_result(reply, TEST_FAILED_FATAL);
+
+    if(strstr(reply->str, "mode: userkey")) {
+        test->mode = USERKEY;
+        log("Running in user-key mode\n");
+    }
+
+    if(strstr(reply->str, "mode: sequential")) {
+        test->mode = SEQUENTIAL;
+        log("Running in sequential mode\n");
+    }
+
+    return TEST_SUCCESS;
+}
 
 runtest_prio(110, default_set_hello) {
     return zdb_set(test, "hello", "world");
 }
 
 runtest_prio(110, default_get_hello) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     return zdb_check(test, "hello", "world");
 }
 
 runtest_prio(110, default_del_hello) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"DEL", "hello"};
     return zdb_command(test, argvsz(argv), argv);
 }
@@ -55,6 +79,9 @@ runtest_prio(110, default_set_hello_again) {
 }
 
 runtest_prio(110, default_get_hello_new) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     return zdb_check(test, "hello", "world-new");
 }
 
@@ -64,11 +91,17 @@ runtest_prio(110, default_set_deleted) {
 }
 
 runtest_prio(110, default_del_deleted) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"DEL", "deleted"};
     return zdb_command(test, argvsz(argv), argv);
 }
 
 runtest_prio(110, default_get_deleted) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"GET", "deleted"};
     return zdb_command_error(test, argvsz(argv), argv);
 }
@@ -80,6 +113,9 @@ runtest_prio(110, default_unknown_command) {
 }
 
 static int overwrite(test_t *test, char *key, char *original, char *newvalue) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     redisReply *reply;
 
     // first set
@@ -108,14 +144,23 @@ static int overwrite(test_t *test, char *key, char *original, char *newvalue) {
 }
 
 runtest_prio(115, simple_overwrite_same_length) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     return overwrite(test, "overwrite_normal", "original", "newvalue");
 }
 
 runtest_prio(115, simple_overwrite_shorter) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     return overwrite(test, "overwrite_shorter", "original", "new");
 }
 
 runtest_prio(115, simple_overwrite_longer) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     return overwrite(test, "overwrite_longer", "original", "newvaluelonger");
 }
 
@@ -156,6 +201,9 @@ runtest_prio(120, default_exists_large_key) {
 
 
 runtest_prio(120, default_exists) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"EXISTS", "hello"};
     long long value = zdb_command_integer(test, argvsz(argv), argv);
 
@@ -184,6 +232,9 @@ runtest_prio(120, default_check_deleted) {
 
 
 runtest_prio(120, default_check) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"CHECK", "hello"};
     long long value = zdb_command_integer(test, argvsz(argv), argv);
 
