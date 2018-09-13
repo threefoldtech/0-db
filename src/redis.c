@@ -962,13 +962,13 @@ int redis_posthandler_client(redis_client_t *client) {
         if(checking->watching == client->executed || checking->watching->handler == command_asterisk) {
             char *matching = client->executed->command;
 
-            // trigger done, discarding watcher
-            checking->watching = NULL;
-
             #ifndef RELEASE
             char *waiting = checking->watching->command;
             debug("[+] redis: trigger: client %d waits on <%s>, trigger <%s>\n", checking->fd, waiting, matching);
             #endif
+
+            // trigger done, discarding watcher
+            checking->watching = NULL;
 
             // sending notification
             snprintf(response, sizeof(response), "+%s\r\n", matching);
