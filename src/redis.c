@@ -149,6 +149,7 @@ void redis_response_push(redis_client_t *client, redis_response_t *response) {
         client->responses = response;
         client->responsetail = response;
         response->next = NULL;
+        return;
     }
 
     // there are already pending response on the queue
@@ -247,7 +248,7 @@ int redis_reply_heap(redis_client_t *client, void *payload, size_t length, void 
 
     // create a response based on parameters
     if(!(response = redis_response_new(payload, length, destructor))) {
-        pdebug("[+] redis: reply stack: no stack duplication needed\n");
+        warnp("redis_reply_head: malloc");
         return 1;
     }
 
