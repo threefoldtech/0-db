@@ -784,6 +784,7 @@ redis_client_t *socket_client_new(int fd) {
     client->commands = 0;
     client->executed = NULL;
     client->watching = NULL;
+    client->mirror = 0;
 
     // allocating a fixed buffer
     client->buffer = buffer_new();
@@ -867,6 +868,63 @@ int redis_detach_clients(namespace_t *namespace) {
     return 0;
 }
 
+
+int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
+    char temp[256];
+    char *buffer;
+
+    // the forward query is the same as the input one
+    // but with two more fields: the socket id and the namespace in
+    // which the user is attached to
+
+    // computing the buffer size
+    size_t length = 0;
+    size_t offset = 0;
+
+    // computing length of the array (original one + the 2 fields we prepend)
+    length += sprintf(temp, "*%d\r\n", source->request->argc + 2);
+
+    // socket id
+    length += sprintf(temp, ":%d\r\n", source->fd);
+
+    // namespace
+    length += snprintf(temp, sizeof(temp), "$%lu\r\n%s\r\n", strlen(source->ns->name), source->ns->name);
+
+    // length contains:
+    //  - header prefix (string length of the size with header)
+    //  - payload (buffer length)
+    //  - final \r\n (length: 2)
+    for(int i = 0; i < source->request->argc; i++) {
+        length += sprintf(temp, "$%d\r\n", source->request->argv[i]->length);
+        length += source->request->argv[i]->length + 2;
+    }
+
+    debug("[+] redis: mirroring %lu bytes from <%d> to <%d>\n", length, source->fd, target->fd);
+
+    if(!(buffer = malloc(length)))
+        return 1;
+
+    // building buffer
+    offset += sprintf(buffer, "*%d\r\n", source->request->argc + 2);
+    offset += sprintf(buffer + offset, ":%d\r\n", source->fd);
+    offset += sprintf(buffer + offset, "$%lu\r\n%s\r\n", strlen(source->ns->name), source->ns->name);
+
+    for(int i = 0; i < source->request->argc; i++) {
+        offset += sprintf(buffer + offset, "$%d\r\n", source->request->argv[i]->length);
+
+        memcpy(buffer + offset, source->request->argv[i]->buffer, source->request->argv[i]->length);
+        offset += source->request->argv[i]->length;
+
+        memcpy(buffer + offset, "\r\n", 2);
+        offset += 2;
+    }
+
+    // redis_reply_delayed(target, buffer, length);
+    redis_reply_heap(target, buffer, length, free);
+
+    return 0;
+}
+
 // handler executed after each command executed
 // basicly for now, walk over all the clients, if they are
 // on the same namespace as the current client, checking if
@@ -883,29 +941,36 @@ int redis_posthandler_client(redis_client_t *client) {
     for(size_t i = 0; i < clients.length; i++) {
         redis_client_t *checking = clients.list[i];
 
-        // this client doesn't exists (can be ourself disconnected)
+        // client doesn't exists anymore in the meantime
+        // or target is the current client
+        if(!checking || checking == client)
+            continue;
+
+        if(checking->mirror) {
+            redis_mirror_client(client, checking);
+            continue;
+        }
+
         // or this client is not waiting on commands
         // or this client is not waiting on the same namespace
         // ignoring
         if(!checking || !checking->watching || checking->ns != client->ns)
             continue;
 
-        // skipping the client itself (prevent matching it's own command)
-        if(checking == client)
-            continue;
-
         // matching on the exact command
         // or the wildcard command
         if(checking->watching == client->executed || checking->watching->handler == command_asterisk) {
-            char *waiting = checking->watching->command;
             char *matching = client->executed->command;
 
             // trigger done, discarding watcher
             checking->watching = NULL;
 
-            // sending notification
+            #ifndef RELEASE
+            char *waiting = checking->watching->command;
             debug("[+] redis: trigger: client %d waits on <%s>, trigger <%s>\n", checking->fd, waiting, matching);
+            #endif
 
+            // sending notification
             snprintf(response, sizeof(response), "+%s\r\n", matching);
             redis_reply_stack(checking, response, strlen(response));
         }

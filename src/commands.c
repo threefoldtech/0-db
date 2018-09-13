@@ -19,6 +19,7 @@
 #include "commands_namespace.h"
 #include "commands_system.h"
 #include "commands_history.h"
+#include "commands_mirror.h"
 
 // ensure number of argument and their validity
 static int real_command_args_validate(redis_client_t *client, int expected, int nullallowed) {
@@ -63,42 +64,43 @@ int command_admin_authorized(redis_client_t *client) {
 // dispatch command to the right handler
 
 static command_t commands_handlers[] = {
-    // special
-    {.command = "*", .handler = command_asterisk}, // special command used to match all in WAIT
+    // replication
+    {.command = "*",       .handler = command_asterisk}, // special command used to match all in WAIT
+    {.command = "WAIT",    .handler = command_wait},     // custom WAIT command to wait on events
+    {.command = "MIRROR",  .handler = command_mirror},   // custom MIRROR command to sync full network traffic
 
     // system
-    {.command = "PING", .handler = command_ping}, // default PING command
-    {.command = "TIME", .handler = command_time}, // default TIME command
-    {.command = "AUTH", .handler = command_auth}, // custom AUTH command to authentifcate admin
-    {.command = "WAIT", .handler = command_wait}, // custom WAIT command to wait on events
+    {.command = "PING",    .handler = command_ping},     // default PING command
+    {.command = "TIME",    .handler = command_time},     // default TIME command
+    {.command = "AUTH",    .handler = command_auth},     // custom AUTH command to authentifcate admin
 
     // dataset
-    {.command = "SET",     .handler = command_set},     // default SET command
-    {.command = "SETX",    .handler = command_set},     // alias for SET command
-    {.command = "GET",     .handler = command_get},     // default GET command
-    {.command = "DEL",     .handler = command_del},     // default DEL command
-    {.command = "EXISTS",  .handler = command_exists},  // default EXISTS command
-    {.command = "CHECK",   .handler = command_check},   // custom command to verify data integrity
-    {.command = "SCAN",    .handler = command_scan},    // modified SCAN which walk forward dataset
-    {.command = "SCANX",   .handler = command_scan},    // alias for SCAN command
-    {.command = "RSCAN",   .handler = command_rscan},   // custom command to walk backward dataset
-    {.command = "KSCAN",   .handler = command_kscan},   // custom command to iterate over keys matching pattern
-    {.command = "HISTORY", .handler = command_history}, // custom command to get previous version of a key
-    {.command = "KEYCUR",  .handler = command_keycur},  // custom command to get cursor id from a key
+    {.command = "SET",     .handler = command_set},      // default SET command
+    {.command = "SETX",    .handler = command_set},      // alias for SET command
+    {.command = "GET",     .handler = command_get},      // default GET command
+    {.command = "DEL",     .handler = command_del},      // default DEL command
+    {.command = "EXISTS",  .handler = command_exists},   // default EXISTS command
+    {.command = "CHECK",   .handler = command_check},    // custom command to verify data integrity
+    {.command = "SCAN",    .handler = command_scan},     // modified SCAN which walk forward dataset
+    {.command = "SCANX",   .handler = command_scan},     // alias for SCAN command
+    {.command = "RSCAN",   .handler = command_rscan},    // custom command to walk backward dataset
+    {.command = "KSCAN",   .handler = command_kscan},    // custom command to iterate over keys matching pattern
+    {.command = "HISTORY", .handler = command_history},  // custom command to get previous version of a key
+    {.command = "KEYCUR",  .handler = command_keycur},   // custom command to get cursor id from a key
 
     // query
-    {.command = "INFO", .handler = command_info}, // returns 0-db server name
-    {.command = "STOP", .handler = command_stop}, // custom command for debug purpose
+    {.command = "INFO",    .handler = command_info},     // returns 0-db server name
+    {.command = "STOP",    .handler = command_stop},     // custom command for debug purpose
 
     // namespace
-    {.command = "DBSIZE", .handler = command_dbsize},  // default DBSIZE command
-    {.command = "NSNEW",  .handler = command_nsnew},   // custom command to create a namespace
-    {.command = "NSDEL",  .handler = command_nsdel},   // custom command to remove a namespace
-    {.command = "NSLIST", .handler = command_nslist},  // custom command to list namespaces
-    {.command = "NSSET",  .handler = command_nsset},   // custom command to edit namespace settings
-    {.command = "NSINFO", .handler = command_nsinfo},  // custom command to get namespace information
-    {.command = "SELECT", .handler = command_select},  // default SELECT (with pwd) namespace switch
-    {.command = "RELOAD", .handler = command_reload},  // custom command to reload a namespace
+    {.command = "DBSIZE",  .handler = command_dbsize},   // default DBSIZE command
+    {.command = "NSNEW",   .handler = command_nsnew},    // custom command to create a namespace
+    {.command = "NSDEL",   .handler = command_nsdel},    // custom command to remove a namespace
+    {.command = "NSLIST",  .handler = command_nslist},   // custom command to list namespaces
+    {.command = "NSSET",   .handler = command_nsset},    // custom command to edit namespace settings
+    {.command = "NSINFO",  .handler = command_nsinfo},   // custom command to get namespace information
+    {.command = "SELECT",  .handler = command_select},   // default SELECT (with pwd) namespace switch
+    {.command = "RELOAD",  .handler = command_reload},   // custom command to reload a namespace
 };
 
 int redis_dispatcher(redis_client_t *client) {
@@ -183,3 +185,4 @@ int command_asterisk(redis_client_t *client) {
     redis_hardsend(client, "-This is not a valid command");
     return 0;
 }
+

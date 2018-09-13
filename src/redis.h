@@ -105,6 +105,7 @@
         size_t commands;  // request (commands) counter
         int writable;     // does the client can write on the namespace
         int admin;        // does the client is admin
+        int mirror;       // does this client needs a mirroring
         buffer_t buffer;  // per-client buffer
 
         // each client can request to wait for an event
