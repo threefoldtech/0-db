@@ -612,3 +612,14 @@ int index_emergency(index_root_t *root) {
     return 1;
 }
 
+// returns a string mode name about the
+// current running mode
+const char *index_modename(index_root_t *index) {
+    if(index->mode == KEYVALUE)
+        return "userkey";
+
+    if(index->mode == SEQUENTIAL)
+        return "sequential";
+
+    return "unknown";
+}

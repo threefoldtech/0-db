@@ -254,4 +254,6 @@
 
     uint32_t index_key_hash(unsigned char *id, uint8_t idlength);
     int index_open_file_rw(index_root_t *root, int fileid);
+
+    const char *index_modename(index_root_t *index);
 #endif

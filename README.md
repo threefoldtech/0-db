@@ -255,6 +255,20 @@ Warning:
 ## NSINFO
 Returns basic informations about a namespace
 
+```
+# namespace
+name: default          # namespace name
+entries: 0             # amount of entries
+public: yes            # public writable (yes/no)
+password: no           # password protected (yes/no)
+data_size_bytes: 0     # total data payload in bytes
+data_size_mb: 0.00     # total data payload in MB
+data_limits_bytes: 0   # namespace size limit (0 for unlimited)
+index_size_bytes: 0    # index size in bytes (thanks captain obvious)
+index_size_kb: 0.00    # index size in KB
+mode: userkey          # running mode (userkey/sequential)
+```
+
 ## NSLIST
 Returns an array of all available namespaces.
 

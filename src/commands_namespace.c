@@ -251,6 +251,7 @@ int command_nsinfo(redis_client_t *client) {
     sprintf(info + strlen(info), "data_limits_bytes: %lu\n", namespace->maxsize);
     sprintf(info + strlen(info), "index_size_bytes: %lu\n", namespace->index->indexsize);
     sprintf(info + strlen(info), "index_size_kb: %.2f\n", KB(namespace->index->indexsize));
+    sprintf(info + strlen(info), "mode: %s\n", index_modename(namespace->index));
 
     redis_bulk_t response = redis_bulk(info, strlen(info));
     if(!response.buffer) {
