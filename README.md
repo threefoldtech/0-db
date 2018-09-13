@@ -176,7 +176,7 @@ This mode is not possible if you don't have any data/index already available.
 - `SCAN [optional key]`
 - `SCANX [optional key]` (this is just an alias for `SCAN`)
 - `RSCAN [optional key]`
-- `WAIT command`
+- `WAIT command | *`
 - `HISTORY key [binary-data]`
 
 `SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
@@ -280,10 +280,12 @@ doing some commands. This can be useful to avoid polling the server if you want 
 queries (like waiting for a `SET`).
 
 Wait takes one argument: a command name to wait for. The event will only be triggered for clients
-on the same namespace as you (same `SELECT`)
+on the same namespace as you (same `SELECT`), the special command '`*`' can be used to wait on any commands.
 
 This is the only blocking function right now. In server side, your connection is set `pending` and
 you won't receive anything until someone executed the expected command.
+
+When the command is triggered by someone else, you receive `+COMMAND_NAME` as response.
 
 ## HISTORY
 This command allows you to go back in time, when your overwrite a key.
