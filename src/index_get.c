@@ -48,10 +48,7 @@ static index_entry_t *index_get_handler_sequential(index_root_t *index, void *id
     index_reusable_entry->parentid = item->parentid;
     index_reusable_entry->parentoff = item->parentoff;
     index_reusable_entry->timestamp = item->timestamp;
-
-    // force length to zero, this leads to fetch
-    // the length from data file
-    index_reusable_entry->length = 0;
+    index_reusable_entry->length = item->length;
 
     // cleaning intermediate object
     free(item);

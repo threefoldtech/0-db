@@ -472,6 +472,9 @@ index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key) {
     if(!(item = index_item_get_disk(root, key->fileid, key->idxoffset, key->idlength)))
         return NULL;
 
+    debug("[+] index: deserialize: length %u <> %u\n", item->length, key->length);
+    debug("[+] index: deserialize: crc %08x <> %08x\n", item->crc, key->crc);
+
     if(item->length != key->length || item->crc != key->crc) {
         debug("[-] index: deserialize: invalid key requested (fields mismatch)\n");
         free(item);
