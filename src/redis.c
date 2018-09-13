@@ -110,24 +110,57 @@ static void buffer_free(buffer_t *buffer) {
 // for the others client connected, and threading or anything parallele execution
 // is prohibed by design in this project
 //
-// in the function redis_reply, the workflow is documented
-// basicly, if we can't send data (because of EAGAIN), we wait the socket
-// to be ready later, by the main poll system
+// when we need to send a response to a client, we try to do it without
+// any extra allocation, we just send data as it, if they was sent in one shot, there
+// is nothing more to do, otherwise we need to start queuing stuff
 //
-static void redis_send_reset(redis_client_t *client) {
-    redis_response_t *response = &client->response;
+// if a queue for a client exists, we can't do our preliminary send anymore, since this
+// could break the protocol stream
+//
+// the response object have a buffer, a reader pointer and a destruction function pointer
+// which is used to destroy the buffer when it's not needed anymore
+redis_response_t *redis_response_new(void *payload, size_t length, void (*destructor)(void *)) {
+    redis_response_t *response;
 
-    // free memory
-    free(response->buffer);
+    if(!(response = calloc(sizeof(redis_response_t), 1)))
+        return NULL;
 
-    // reset structure
-    response->buffer = NULL;
-    response->reader = NULL;
-    response->length = 0;
+    response->buffer = payload;
+    response->length = length;
+    response->reader = response->buffer;
+    response->destructor = destructor;
+
+    return response;
 }
 
-int redis_send_reply(redis_client_t *client) {
-    redis_response_t *response = &client->response;
+// clean the response object and call the destructor
+// if set, to clean the buffer
+void redis_response_free(redis_response_t *response) {
+    if(response->destructor)
+        response->destructor(response->buffer);
+
+    free(response);
+}
+
+// add a response to the client responses queue
+void redis_response_push(redis_client_t *client, redis_response_t *response) {
+    // no pending response was there, just point to the new one
+    if(client->responses == NULL) {
+        client->responses = response;
+        client->responsetail = response;
+        response->next = NULL;
+    }
+
+    // there are already pending response on the queue
+    // appending our response to the list
+    client->responsetail->next = response;
+    client->responsetail = response;
+}
+
+// try to send a response to a client, if succeed returns NULL
+// otherwise update reader on the response and returns it (there are more stuff
+// to do, but later, now client is busy)
+redis_response_t *redis_send_response(redis_client_t *client, redis_response_t *response) {
     ssize_t sent;
 
     while(response->length > 0) {
@@ -135,8 +168,12 @@ int redis_send_reply(redis_client_t *client) {
 
         if((sent = send(client->fd, response->reader, response->length, 0)) < 0) {
             if(errno != EAGAIN) {
-                warnp("redis_send_reply, send");
-                return errno;
+                warnp("redis_send_reply: send");
+
+                // we reply NULL because this is an error, the socket is not
+                // ready to receive this anyway, we won't sent it at all
+                // we won't tell the caller to push this on a queue
+                return NULL;
             }
 
             debug("[-] redis: send: client %d is not ready for the send\n", client->fd);
@@ -148,87 +185,142 @@ int redis_send_reply(redis_client_t *client) {
             // we don't change anything to the buffer
             // and we wait the next trigger from the polling system
             // to ask us the write is available again
-            return errno;
+            return response;
         }
 
         response->reader += sent;
         response->length -= sent;
     }
 
-    // the buffer was fully sent, let's clean everything
-    // which was related to this
     debug("[+] redis: send: buffer sucessfully sent\n");
-    redis_send_reset(client);
-
-    return 0;
+    return NULL;
 }
 
-int redis_reply(redis_client_t *client, void *payload, size_t length) {
-    redis_response_t *response = &client->response;
+// callback called when a socket becomes available in write
+// this mean the client was waiting something (in theory), so let's
+// start sending the buffer/queue attached to that client
+resp_status_t redis_delayed_write(int fd) {
+    redis_client_t *client = clients.list[fd];
+    redis_response_t *response;
 
-    // we need to send data, we maybe still have something on the buffer
-    // if the client was doing some pipeline (maybe we still have something to
-    // send, in pending, and we received another command in the mean time, because
-    // we received them in batch)
-    //
-    // we need to append this response to the existing response, the current only easy
-    // solution is just growing up the buffer and appending the data
-
-    // saving the current buffer, to free it after
-    void *backup = response->buffer;
-
-    // reallocating the buffer, with the new expected size
-    // this size if the remaining size of the data in the buffer
-    // plus the size we want to add
-    response->buffer = malloc(response->length + length);
-
-    // let's copy what's still need to be sent on the existing buffer
-    memcpy(response->buffer, response->reader, response->length);
-
-    // now copy the new payload we just want to send
-    memcpy(response->buffer + response->length, payload, length);
-
-    // updating structure pointer to point to the new buffer
-    response->reader = response->buffer;
-    response->length += length;
-
-    // cleaning the old buffer not used anymore
-    free(backup);
-
-    debug("[+] redis: force sending first chunk (client %d)\n", client->fd);
-    if(redis_send_reply(client) != EAGAIN) {
-        // no EAGAIN and no buffer set, the send request
-        // was sucessful, nothing more to do since everything was
-        // already cleaned by redis_send_reply
-        if(response->buffer == NULL)
-            return 0;
-
-        // something went wrong during the send call
-        // and it was not a EAGAIN, this is a real error
-        // let's clean everything and drop this request
-        debug("[-] redis: something went wrong while sending, discarding\n");
-        redis_send_reset(client);
+    if(!client || client->responses == NULL) {
+        debug("[+] redis: nothing to send to client (fd: %d)\n", fd);
+        return 0;
     }
 
-    // if we are here, we hit a EAGAIN, this could occures for different
-    // reasons:
-    //  - the buffer to send is too big to be sent in one shot
-    //  - the client is not ready to receive data right now
-    //
-    // since we are full non-blocking socket, we don't want to block
-    // the others clients waiting this client is ready
-    //
-    // we already duplicated the data received, whatever it comes from
-    // so we don't have anything more to do, just waiting for the socket
-    // to be ready to send the next chunks
-    debug("[+] redis: reply: client %d not ready for sending data\n", client->fd);
+    response = client->responses;
+
+    debug("[+] redis: sending available buffer to socket %d\n", fd);
+    while(response) {
+        // sending this response
+        // if the send_response returns us something, then it
+        // was not fully sent, let's try again later, we are done for now
+        if(redis_send_response(client, response) != NULL)
+            return 0;
+
+        // this response was successfuly sent
+        // let's remove it from the list and keep going
+
+        // saving the next pointer
+        redis_response_t *next = response->next;
+
+        // freeing this response
+        redis_response_free(response);
+        response = next;
+
+        // updating list
+        client->responses = next;
+
+        // this was the last response, cleaning the tail
+        if(next == NULL)
+            client->responsetail = NULL;
+    }
 
     return 0;
 }
 
-// legacy function when destructor was existing
-inline int redis_reply_stack(redis_client_t *client, void *payload, size_t length) {
-    return redis_reply(client, payload, length);
+// entry point when you want to send data to the client, and the buffer
+// was allocated on the heap (malloc), this function will just take the payload
+// create a response based on that, and send it (pushing on the queue if needed)
+int redis_reply_heap(redis_client_t *client, void *payload, size_t length, void (*destructor)(void *)) {
+    redis_response_t *response;
+
+    // create a response based on parameters
+    if(!(response = redis_response_new(payload, length, destructor))) {
+        pdebug("[+] redis: reply stack: no stack duplication needed\n");
+        return 1;
+    }
+
+    if(client->responses == NULL) {
+        // try to send this response a first time
+        if(redis_send_response(client, response) == NULL) {
+            pdebug("[+] redis: reply heap: send was made in single shot\n");
+            redis_response_free(response);
+            return 0;
+        }
+    }
+
+    // we could not send that response this time, for some reason
+    // pushing this response to the client queue
+    redis_response_push(client, response);
+
+    return 0;
+}
+
+// entry point when you want to send data to the client and the buffer
+// is stack allocated (hardcoded string, stack buffer, anything which can't be free'd
+// and can't be reached anymore when call is done)
+//
+// we first try to send it as it, and if this succeed, we're done, otherwise
+// we duplicate that data and push it to the client queue
+int redis_reply_stack(redis_client_t *client, void *payload, size_t length) {
+    redis_response_t response;
+
+    response.buffer = payload;
+    response.reader = payload;
+    response.length = length;
+    response.destructor = NULL;
+
+    // try to send this response a first time, without any extra allocation
+    // usually from the stack this will be enough
+    //
+    // this can only be done if nothing was pending, otherwise we will
+    // break protocol serialization (some pending stuff needs to be sent before)
+    if(client->responses == NULL) {
+        if(redis_send_response(client, &response) == NULL) {
+            pdebug("[+] redis: reply stack: no stack duplication needed\n");
+            return 0;
+        }
+    }
+
+    // we could not send that response this time, for some reason
+    // we need now to duplicate response, to keep it somewhere on the heap
+    // and push it to the sending queue of that client
+    redis_response_t *newresponse;
+    void *copypayload;
+
+    // duplicate payload
+    if(!(copypayload = malloc(length)))
+        return 1;
+
+    memcpy(copypayload, payload, length);
+
+    if(!(newresponse = redis_response_new(copypayload, length, free)))
+        return 1;
+
+    // maybe some part of the buffer was already sent
+    // but not everything, this means we need to reflect that change
+    // on the duplicated buffer we just made
+    if(response.reader != response.buffer) {
+        size_t difference = response.reader - response.buffer;
+        newresponse->reader += difference;
+        newresponse->length -= difference;
+    }
+
+    // pushing this response to the client queue
+    redis_response_push(client, newresponse);
+
+    return 0;
 }
 
 //
@@ -649,18 +741,6 @@ go_again:
     return RESP_STATUS_SUCCESS;
 }
 
-resp_status_t redis_delayed_write(int fd) {
-    redis_client_t *client = clients.list[fd];
-
-    if(!client || !client->response.buffer)
-        return 0;
-
-    debug("[+] redis: write available to socket %d, sending data\n", fd);
-    redis_send_reply(client);
-
-    return 0;
-}
-
 void socket_nonblock(int fd) {
     int flags;
 
@@ -719,7 +799,9 @@ redis_client_t *socket_client_new(int fd) {
         return NULL;
     }
 
-    memset(&client->response, 0x00, sizeof(redis_response_t));
+    // no pending responses
+    client->responses = NULL;
+    client->responsetail = NULL;
 
     client->request->state = RESP_EMPTY;
     client->request->argc = 0;

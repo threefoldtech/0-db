@@ -135,8 +135,7 @@ static int command_scan_send_scanlist(scan_list_t *scanlist, redis_client_t *cli
         offset += sprintf(response + offset, ":%d\r\n", entry->timestamp);
     }
 
-    redis_reply(client, response, offset);
-    free(response);
+    redis_reply_heap(client, response, offset, free);
 
     return 0;
 }
@@ -340,7 +339,7 @@ int command_keycur(redis_client_t *client) {
     memcpy(response + offset, "\r\n", 2);
     offset += 2;
 
-    redis_reply(client, response, offset);
+    redis_reply_stack(client, response, offset);
 
     return 0;
 }
@@ -417,8 +416,7 @@ static int command_kscan_send_list(redis_client_t *client, list_t *list) {
         offset += sprintf(response + offset, "\r\n");
     }
 
-    redis_reply(client, response, offset);
-    free(response);
+    redis_reply_heap(client, response, offset, free);
 
     return 0;
 }

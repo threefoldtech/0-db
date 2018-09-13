@@ -10,7 +10,7 @@
     //
     // sizeof(message) will contains the null character, to append \r\n the size will
     // just be +1
-    #define redis_hardsend(fd, message) redis_reply_stack(fd, message "\r\n", sizeof(message) + 1)
+    #define redis_hardsend(client, message) redis_reply_stack(client, message "\r\n", sizeof(message) + 1)
 
     //
     // redis protocol oriented objects
@@ -78,6 +78,13 @@
         void *reader;  // current pointer on the buffer, for the next chunk to send
         size_t length; // length of the remain payload to send
 
+        // pointer to a desctuctor function which will be
+        // called when the send if fully complete, to clean
+        // the buffer
+        void (*destructor)(void *target);
+
+        struct redis_response_t *next;
+
     } redis_response_t;
 
     typedef struct command_t command_t;
@@ -114,8 +121,8 @@
         // each client will have some (optional) pending
         // write, we attach a delayed async writer per
         // client
-        redis_response_t response;
-
+        redis_response_t *responses;
+        redis_response_t *responsetail;
     };
 
     // represent all clients in memory
@@ -167,7 +174,8 @@
     int redis_detach_clients(namespace_t *namespace);
 
     // socket generic reply
-    int redis_reply(redis_client_t *client, void *payload, size_t length);
+    redis_response_t *redis_response_new(void *payload, size_t length, void (*destructor)(void *));
+    int redis_reply_heap(redis_client_t *client, void *payload, size_t length, void (*destructor)(void *));
     int redis_reply_stack(redis_client_t *client, void *payload, size_t length);
 
     int redis_posthandler_client(redis_client_t *client);
