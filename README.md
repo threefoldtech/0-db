@@ -199,18 +199,26 @@ Returns 1 or 0 if the key exists
 Check internally if the data is corrupted or not. A CRC check is done internally.
 Returns 1 if integrity is validated, 0 otherwise.
 
+## KEYCUR
+Returns a cursor from a key name. This cursor **should** be valid for life-time.
+You can provide this cursor to SCAN family command in order to start walking from a specific
+key. Even if that key was updated or deleted, the cursor contains enough data to know from
+where to start looking and you won't miss any new stuff.
+
+This cursor is a binary key.
+
 ## SCAN
 Walk forward over a dataset (namespace).
 
 - If `SCAN` is called without argument, it starts from first key (first in time) available in the dataset.
-- If `SCAN` is called with an argument, it starts from provided key.
+- If `SCAN` is called with an argument, it starts from provided key cursor.
 
 If the dataset is empty, or you reach the end of the chain, `-No more data` is returned.
 
-If you provide a non-existing (or deleted) key as argument, `-Invalid index` is returned.
+If you provide an invalid cursor as argument, `-Invalid key format` is returned.
 
 Otherwise, an array (a little bit like original redis `SCAN`) is returned.
-The first item of the array is the next id you need to set to SCAN in order to continue walking.
+The first item of the array is the next id (cursor) you need to set to SCAN in order to continue walking.
 
 The second element of the array is another array which contains one or more entries (keys). Each entries
 contains 3 fields: the key, the size of the payload and the creation timestamp.
@@ -236,6 +244,9 @@ dataset.
 There is a special alias `SCANX` command which does exacly the same, but with another name.
 Some redis client library (like python) expect integer response and not binary response. Using `SCANX` avoid
 this issue.
+
+In order to start scanning from a specific key, you need to get a cursor from that key first,
+see `KEYCUR` command
 
 ## RSCAN
 Same as scan, but backward (last-to-first key)
