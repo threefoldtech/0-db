@@ -174,9 +174,9 @@ This mode is not possible if you don't have any data/index already available.
 - `DBSIZE`
 - `TIME`
 - `AUTH password`
-- `SCAN [optional key]`
-- `SCANX [optional key]` (this is just an alias for `SCAN`)
-- `RSCAN [optional key]`
+- `SCAN [optional cursor]`
+- `SCANX [optional cursor]` (this is just an alias for `SCAN`)
+- `RSCAN [optional cursor]`
 - `WAIT command | *`
 - `HISTORY key [binary-data]`
 
@@ -373,8 +373,12 @@ By default, each datafile is split when bigger than 256 MB.
 
 The datafile id is stored on 16 bits, which makes maximum of 65536 files.
 A database can be maximum ~16 TB. Since one single 0-db is made to be used on a single dedicated disk,
-this should be good, but that's still a hard limitation. This limitation can be changed by changing
-the datafile split size (`data.h`: `DATA_MAXSIZE`), limitation will always be `2^16 * DATA_MAXSIZE`.
+this should be good, but that's still a hard limitation. This limitation can be changed via command line
+option `--datasize`, and provide (in bytes) the size limit of a datafile. Setting `536870912` for exemple
+(which is 512 MB) would set the database limit to ~32 TB. This limit is printed (with verbose flag) on
+the database initializing process.
+
+Please use always the same datasize accross multiple run, but using different size **should not** interfer.
 
 # Tests
 You can run a sets of test on a running 0-db instance.
