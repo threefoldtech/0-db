@@ -163,6 +163,7 @@ This mode is not possible if you don't have any data/index already available.
 - `STOP` (used only for debugging, to check memory leaks)
 - `EXISTS key`
 - `CHECK key`
+- `KEYCUR key`
 - `INFO`
 - `NSNEW namespace`
 - `NSDEL namespace`
