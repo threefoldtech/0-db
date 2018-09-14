@@ -317,6 +317,11 @@ index_entry_t *index_update_entry_sequential(index_root_t *root, index_set_t *se
     set->entry->parentoff = previous->idxoffset;
     index_seq_overwrite(root, set);
 
+    // since we added a new entry on the index, the next id needs
+    // to be incremented to skip this position in the futur
+    root->nextid += 1;
+    root->nextentry += 1;
+
     return set->entry;
 }
 
