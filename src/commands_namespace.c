@@ -296,15 +296,15 @@ int command_nsset(redis_client_t *client) {
         return 1;
     }
 
-    sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
-    sprintf(command, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
-    sprintf(value, "%.*s", request->argv[3]->length, (char *) request->argv[3]->buffer);
-
     // limit size of the value
     if(request->argv[3]->length > 63) {
         redis_hardsend(client, "-Invalid value");
         return 1;
     }
+
+    sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
+    sprintf(command, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
+    sprintf(value, "%.*s", request->argv[3]->length, (char *) request->argv[3]->buffer);
 
     // default namespace cannot be changed
     if(strcmp(target, NAMESPACE_DEFAULT) == 0) {
