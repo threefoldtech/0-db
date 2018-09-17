@@ -82,6 +82,7 @@ rm -rf /tmp/zdbtest
 ./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --protect || true
 ./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --protect --admin helloworld
 ./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --maxsize 131072
+rm -rf /tmp/zdbtest
 
 # create empty dataset in direct mode
 ./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --mode direct
@@ -96,8 +97,10 @@ rm -rf /tmp/zdbtest
 rm -rf /tmp/zdbtest
 
 ./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --mode block
+rm -rf /tmp/zdbtest
 
 # run tests in sequential mode
-rm -rf /tmp/zdbtest
 ./src/zdb --background --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq
 ./tests/zdbtests
+
+echo "All tests done."
