@@ -76,6 +76,12 @@ echo nopenopenope > /tmp/zdbtest-index/default/zdb-index-00000
 # clean
 rm -rf /tmp/zdbtest-data
 rm -rf /tmp/zdbtest-index
+rm -rf /tmp/zdbtest
+
+# test protected mode
+./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --protect || true
+./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --protect --admin helloworld
+./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --maxsize 131072
 
 # create empty dataset in direct mode
 ./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --mode direct

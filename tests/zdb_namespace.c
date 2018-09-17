@@ -18,6 +18,7 @@ static char *namespace_password_try1 = "blabla";
 static char *namespace_password_try2 = "hellowo";
 static char *namespace_password_try3 = "helloworldhello";
 static char *namespace_maxsize = "test_ns_maxsize";
+static char *namespace_traversal = "../../hello";
 
 // select not existing namespace
 runtest_prio(sp, namespace_select_not_existing) {
@@ -251,12 +252,12 @@ runtest_prio(sp, namespace_nsset_unknown_property) {
     return zdb_command_error(test, argvsz(argv), argv);
 }
 
-// nsset on long namespace
-runtest_prio(sp, namespace_nsset_long_name) {
-    const char lkey[512] = {0};
-    memset((char *) lkey, 'x', sizeof(lkey) - 1);
+// nsset on long value
+runtest_prio(sp, namespace_nsset_long_value_light) {
+    const char value[120] = {0};
+    memset((char *) value, '4', sizeof(value) - 1);
 
-    const char *argv[] = {"NSSET", lkey, "public", "0"};
+    const char *argv[] = {"NSSET", namespace_created, "maxsize", value};
     return zdb_command_error(test, argvsz(argv), argv);
 }
 
@@ -369,7 +370,6 @@ runtest_prio(sp, namespace_nsset_not_existing) {
     return zdb_command_error(test, argvsz(argv), argv);
 }
 
-
 runtest_prio(sp, namespace_nsset_long_value) {
     const char lvalue[386] = {0};
     memset((char *) lvalue, 'x', sizeof(lvalue) - 1);
@@ -379,6 +379,11 @@ runtest_prio(sp, namespace_nsset_long_value) {
 }
 
 
+// create a namespace with non-authorized characters
+runtest_prio(sp, namespace_nsnew_traversal) {
+    const char *argv[] = {"NSNEW", namespace_traversal};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
 
 
 runtest_prio(sp, namespace_nsinfo_notfound) {
@@ -442,6 +447,12 @@ runtest_prio(sp, namespace_nsdel_long_name) {
 runtest_prio(sp, namespace_switch_delete) {
     const char *argv[] = {"SELECT", namespace_delete};
     return zdb_command(test, argvsz(argv), argv);
+}
+
+// invalid NSDEL arguments
+runtest_prio(sp, namespace_try_delete_extra_arg) {
+    const char *argv[] = {"NSDEL", namespace_delete, "EXTRARG"};
+    return zdb_command_error(test, argvsz(argv), argv);
 }
 
 // we should not be able to delete it
@@ -515,6 +526,27 @@ runtest_prio(sp, namespace_switch_reload) {
 
 runtest_prio(sp, namespace_fill_reload) {
     return zdb_set(test, "keypresent", "helloworld");
+}
+
+// reload wrong arguments
+runtest_prio(sp, namespace_reload_too_many_args) {
+    const char *argv[] = {"RELOAD", namespace_reload, "OOPS"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// namespace too long
+runtest_prio(sp, namespace_reload_long_namespace) {
+    char nsname[200] = {0};
+    memset(nsname, 'X', sizeof(nsname) - 1);
+
+    const char *argv[] = {"RELOAD", nsname};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// non existing namespace
+runtest_prio(sp, namespace_reload_non_existing) {
+    const char *argv[] = {"RELOAD", "non-existing-namespace"};
+    return zdb_command_error(test, argvsz(argv), argv);
 }
 
 runtest_prio(sp, namespace_reload_execute) {

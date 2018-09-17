@@ -140,7 +140,6 @@ static int overwrite(test_t *test, char *key, char *original, char *newvalue) {
         return zdb_result(reply, TEST_FAILED_FATAL);
 
     return zdb_result(reply, TEST_SUCCESS);
-
 }
 
 runtest_prio(115, simple_overwrite_same_length) {
@@ -163,6 +162,33 @@ runtest_prio(115, simple_overwrite_longer) {
 
     return overwrite(test, "overwrite_longer", "original", "newvaluelonger");
 }
+
+runtest_prio(115, simple_overwrite_same_value) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    redisReply *reply;
+
+    if(zdb_set(test, "noupdate", "helloworld") != TEST_SUCCESS)
+        return TEST_FAILED;
+
+    if(!(reply = redisCommand(test->zdb, "SET noupdate helloworld")))
+        return zdb_result(reply, TEST_FAILED_FATAL);
+
+    if(reply->len != 0)
+        return zdb_result(reply, TEST_FAILED_FATAL);
+
+    return zdb_result(reply, TEST_SUCCESS);
+}
+
+runtest_prio(110, default_set_empty_key) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    const char *argv[] = {"SET", "", "world"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
 
 
 // command: exists
@@ -278,6 +304,14 @@ runtest_prio(122, default_auth_maybe_correct) {
 
     return TEST_SUCCESS;
 }
+
+runtest_prio(125, default_asterisk) {
+    const char *argv[] = {"*"};
+    zdb_command(test, argvsz(argv), argv);
+
+    return TEST_SUCCESS;
+}
+
 
 runtest_prio(990, default_stop) {
     const char *argv[] = {"STOP"};
