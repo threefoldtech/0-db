@@ -90,3 +90,8 @@ rm -rf /tmp/zdbtest
 rm -rf /tmp/zdbtest
 
 ./src/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --mode block
+
+# run tests in sequential mode
+rm -rf /tmp/zdbtest
+./src/zdb --background --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq
+./tests/zdbtests
