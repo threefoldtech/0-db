@@ -241,7 +241,7 @@ static int proceed(struct settings_t *settings) {
     // apply global protected flag to the default namespace
     if(settings->protect) {
         namespace_t *defns = namespace_get_default();
-        defns->password = settings->adminpwd;
+        defns->password = strdup(settings->adminpwd);
     }
 
     // apply global maximum size for the global namespace
