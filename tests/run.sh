@@ -103,4 +103,7 @@ rm -rf /tmp/zdbtest
 ./src/zdb --background --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq
 ./tests/zdbtests
 
+# reload sequential database
+./src/zdb --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq --dump
+
 echo "All tests done."

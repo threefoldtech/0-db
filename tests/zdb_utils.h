@@ -3,6 +3,7 @@
 
     int zdb_result(redisReply *reply, int value);
     int zdb_command(test_t *test, int argc, const char *argv[]);
+    int zdb_command_str(test_t *test, int argc, const char *argv[]);
     int zdb_command_error(test_t *test, int argc, const char *argv[]);
     int zdb_set(test_t *test, char *key, char *value);
     int zdb_set_seq(test_t *test, uint32_t key, char *value, uint32_t *response);

@@ -436,10 +436,8 @@ int command_kscan(redis_client_t *client) {
         return 1;
     }
 
-    if(request->argc != 2) {
-        redis_hardsend(client, "-Nope");
+    if(!command_args_validate(client, 2))
         return 1;
-    }
 
     resp_object_t *key = request->argv[1];
     list_t keys = list_init(NULL);

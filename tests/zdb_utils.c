@@ -27,6 +27,20 @@ int zdb_command(test_t *test, int argc, const char *argv[]) {
     return zdb_result(reply, TEST_SUCCESS);
 }
 
+// send command which should returns string
+int zdb_command_str(test_t *test, int argc, const char *argv[]) {
+    redisReply *reply;
+
+    if(!(reply = redisCommandArgv(test->zdb, argc, argv, NULL)))
+        return zdb_result(reply, TEST_FAILED_FATAL);
+
+    if(reply->type != REDIS_REPLY_STRING)
+        return zdb_result(reply, TEST_FAILED);
+
+    return zdb_result(reply, TEST_SUCCESS);
+}
+
+
 // send command which should fails
 int zdb_command_error(test_t *test, int argc, const char *argv[]) {
     redisReply *reply;

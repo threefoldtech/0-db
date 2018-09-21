@@ -151,4 +151,44 @@ runtest_prio(sp, scan_ask_before_first) {
     return zdb_command_error(test, argvsz(argv), argv);
 }
 
+runtest_prio(sp, scan_keycur_not_exists) {
+    const char *argv[] = {"KEYCUR", "not-exists"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, scan_keycur_exists) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    const char *argv[] = {"KEYCUR", "key4"};
+    return zdb_command_str(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, scan_kscan_invalid) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    const char *argv[] = {"KSCAN"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, scan_kscan_switch_default) {
+    const char *argv[] = {"SELECT", "default"};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, scan_kscan) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    const char *argv[] = {"KSCAN", "h"};
+    redisReply *reply = zdb_response_scan(test, argvsz(argv), argv);
+
+    if(reply) {
+        freeReplyObject(reply);
+        return TEST_SUCCESS;
+    }
+
+    return TEST_FAILED;
+}
 
