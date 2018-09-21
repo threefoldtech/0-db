@@ -64,6 +64,36 @@ int zdb_set(test_t *test, char *key, char *value) {
     return zdb_result(reply, TEST_SUCCESS);
 }
 
+int zdb_set_seq(test_t *test, uint32_t key, char *value, uint32_t *response) {
+    if(test->mode == USERKEY)
+        return TEST_SKIPPED;
+
+    redisReply *reply;
+
+    if(key == SEQNEW) {
+        if(!(reply = redisCommand(test->zdb, "SET %b %s", NULL, 0, value)))
+            return zdb_result(reply, TEST_FAILED_FATAL);
+
+    } else {
+        if(!(reply = redisCommand(test->zdb, "SET %b %s", &key, sizeof(uint32_t), value)))
+            return zdb_result(reply, TEST_FAILED_FATAL);
+    }
+
+    if(reply->type != REDIS_REPLY_STRING) {
+        log("%s\n", reply->str);
+        return zdb_result(reply, TEST_FAILED_FATAL);
+    }
+
+    if(reply->len != sizeof(uint32_t))
+        return zdb_result(reply, TEST_FAILED_FATAL);
+
+    memcpy(response, reply->str, sizeof(uint32_t));
+    log("Key ID: %u\n", *response);
+
+    return zdb_result(reply, TEST_SUCCESS);
+}
+
+
 int zdb_bset(test_t *test, void *key, size_t keylen, void *payload, size_t paylen) {
     redisReply *reply;
 

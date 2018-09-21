@@ -55,6 +55,10 @@ runtest_prio(103, check_running_mode) {
     return TEST_SUCCESS;
 }
 
+//
+// basic GET/SET/DEL on default sey
+// user-key mode
+//
 runtest_prio(110, default_set_hello) {
     return zdb_set(test, "hello", "world");
 }
@@ -85,7 +89,7 @@ runtest_prio(110, default_get_hello_new) {
     return zdb_check(test, "hello", "world-new");
 }
 
-// keep a kep deleted
+// keep a key deleted
 runtest_prio(110, default_set_deleted) {
     return zdb_set(test, "deleted", "yep");
 }
@@ -105,6 +109,90 @@ runtest_prio(110, default_get_deleted) {
     const char *argv[] = {"GET", "deleted"};
     return zdb_command_error(test, argvsz(argv), argv);
 }
+
+//
+// basic GET/SET/DEL on default set
+// sequential mode
+//
+runtest_prio(110, default_set_hello_seq) {
+    if(test->mode == USERKEY)
+        return TEST_SKIPPED;
+
+    uint32_t key = 0;
+    int response = zdb_set_seq(test, SEQNEW, "world", &key);
+
+    if(response == TEST_SUCCESS && key == 0)
+        return TEST_SUCCESS;
+
+    return TEST_FAILED;
+}
+
+runtest_prio(110, default_set_hello_seq_overwrite) {
+    if(test->mode == USERKEY)
+        return TEST_SKIPPED;
+
+    uint32_t key = 0;
+    int response = zdb_set_seq(test, key, "worldnewdata", &key);
+
+    if(response == TEST_SUCCESS && key == 0)
+        return TEST_SUCCESS;
+
+    return TEST_FAILED;
+}
+
+
+runtest_prio(110, default_get_hello_seq) {
+    if(test->mode == USERKEY)
+        return TEST_SKIPPED;
+
+    uint32_t key = 0;
+    char *value = "world";
+
+    return zdb_bcheck(test, &key, sizeof(uint32_t), value, strlen(value));
+}
+
+runtest_prio(110, default_del_hello_seq) {
+    if(test->mode == USERKEY)
+        return TEST_SKIPPED;
+
+    redisReply *reply;
+    uint32_t key = 0;
+
+    if(!(reply = redisCommand(test->zdb, "DEL %b", &key, sizeof(key))))
+        return zdb_result(reply, TEST_FAILED_FATAL);
+
+    if(strcmp(reply->str, "OK") != 0)
+        return zdb_result(reply, TEST_FAILED);
+
+    return zdb_result(reply, TEST_SUCCESS);
+}
+
+runtest_prio(110, default_set_hello_again_seq) {
+    if(test->mode == USERKEY)
+        return TEST_SKIPPED;
+
+    uint32_t key = 0;
+    int response = zdb_set_seq(test, SEQNEW, "helloworld", &key);
+
+    if(response == TEST_SUCCESS && key == 2)
+        return TEST_SUCCESS;
+
+    return TEST_FAILED;
+}
+
+runtest_prio(110, default_get_hello_new_seq) {
+    if(test->mode == USERKEY)
+        return TEST_SKIPPED;
+
+    uint32_t key = 2;
+    char *value = "helloworld";
+
+    return zdb_bcheck(test, &key, sizeof(uint32_t), value, strlen(value));
+}
+
+//
+// other basic stuff
+//
 
 // not existing command
 runtest_prio(110, default_unknown_command) {

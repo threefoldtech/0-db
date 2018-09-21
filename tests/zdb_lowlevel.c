@@ -207,4 +207,16 @@ runtest_prio(sp, lowlevel_open_many_connection) {
     return response;
 }
 
+runtest_prio(sp, lowlevel_mirror) {
+    const char *argv[] = {"MIRROR"};
+    int value = zdb_command(test, argvsz(argv), argv);
+
+    if(value != TEST_SUCCESS)
+        return value;
+
+    // reopen the connection
+    initialize_tcp(test);
+    return TEST_SUCCESS;
+}
+
 
