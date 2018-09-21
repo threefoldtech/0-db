@@ -110,7 +110,7 @@ index_item_t *index_item_from_set(index_root_t *root, index_set_t *set) {
     index_transition->offset = entry->offset;
     index_transition->length = entry->length;
     index_transition->flags = entry->flags;
-    index_transition->dataid = entry->dataid;
+    index_transition->dataid = root->indexid;
     index_transition->timestamp = entry->timestamp;
     index_transition->previous = root->previous;
     index_transition->parentid = entry->parentid;
