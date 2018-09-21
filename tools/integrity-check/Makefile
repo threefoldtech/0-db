@@ -3,7 +3,7 @@ SRC=$(wildcard *.c)
 OBJ=$(SRC:.c=.o)
 
 CFLAGS=-g -std=gnu99 -W -Wall -O2 -msse4.2 -I../../src
-LDFLAGS=-rdynamic 
+LDFLAGS=-rdynamic -lcrypto
 
 all: $(EXEC)
 
