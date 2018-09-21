@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include "tests_user.h"
 #include "zdb_utils.h"
 #include "tests.h"
