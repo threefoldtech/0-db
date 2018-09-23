@@ -8,7 +8,9 @@
 #include <string.h>
 #include <x86intrin.h>
 #include <sys/stat.h>
+#ifdef SHADUMP
 #include <openssl/sha.h>
+#endif
 #include "zerodb.h"
 #include "data.h"
 
@@ -38,6 +40,7 @@ void hexdump(void *input, size_t length) {
     free(output);
 }
 
+#ifdef SHADUMP
 void sha256dump(char *input, size_t length) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     SHA256_CTX sha256;
@@ -48,6 +51,7 @@ void sha256dump(char *input, size_t length) {
 
     hexdump(hash, SHA256_DIGEST_LENGTH);
 }
+#endif
 
 uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
     uint64_t *input = (uint64_t *) bytes;
@@ -136,9 +140,11 @@ int data_integrity(int fd) {
             printf("[+]   data crc: match\n");
         }
 
+        #ifdef SHADUMP
         printf("[+]   data sha256: ");
         sha256dump(buffer, entry->datalength);
         printf("\n");
+        #endif
     }
 
     free(entry);
