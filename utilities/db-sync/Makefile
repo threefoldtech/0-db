@@ -1,13 +1,13 @@
 EXEC = db-sync
-SRC=$(wildcard *.c)
-OBJ=$(SRC:.c=.o)
+SRC = $(wildcard *.c)
+OBJ = $(SRC:.c=.o)
 
-CFLAGS=-g -std=gnu99 -W -Wall 
-LDFLAGS=-lhiredis
+CFLAGS += -g -std=gnu99 -W -Wall 
+LDFLAGS += -lhiredis
 
 all: $(EXEC)
 
-release: CFLAGS+=-DRELEASE
+release: CFLAGS += -DRELEASE
 release: $(EXEC)
 
 $(EXEC): $(OBJ)
