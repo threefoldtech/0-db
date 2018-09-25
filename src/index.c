@@ -422,6 +422,8 @@ int index_entry_delete_disk(index_root_t *root, index_entry_t *entry) {
         return 1;
     }
 
+    close(fd);
+
     return 0;
 }
 
