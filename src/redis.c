@@ -883,13 +883,16 @@ int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
     size_t offset = 0;
 
     // computing length of the array (original one + the 2 fields we prepend)
-    length += sprintf(temp, "*%d\r\n", source->request->argc + 2);
+    length += sprintf(temp, "*%d\r\n", source->request->argc + 3);
 
     // socket id
     length += sprintf(temp, ":%d\r\n", source->fd);
 
     // namespace
     length += snprintf(temp, sizeof(temp), "$%lu\r\n%s\r\n", strlen(source->ns->name), source->ns->name);
+
+    // instance (owner) id
+    length += sprintf(temp, ":%u\r\n", rootsettings.iid);
 
     // length contains:
     //  - header prefix (string length of the size with header)
@@ -906,9 +909,10 @@ int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
         return 1;
 
     // building buffer
-    offset += sprintf(buffer, "*%d\r\n", source->request->argc + 2);
+    offset += sprintf(buffer, "*%d\r\n", source->request->argc + 3);
     offset += sprintf(buffer + offset, ":%d\r\n", source->fd);
     offset += sprintf(buffer + offset, "$%lu\r\n%s\r\n", strlen(source->ns->name), source->ns->name);
+    offset += sprintf(buffer + offset, ":%u\r\n", rootsettings.iid);
 
     for(int i = 0; i < source->request->argc; i++) {
         offset += sprintf(buffer + offset, "$%d\r\n", source->request->argv[i]->length);

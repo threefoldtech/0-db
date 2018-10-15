@@ -253,7 +253,7 @@ int mirror(sync_t *sync) {
 
     while((length = read(sync->sourceq->fd, buffer, sizeof(buffer)))) {
         // buffer[length] = '\0';
-        // printf(">> %s\n", buffer);
+        printf(">> %s\n", buffer);
 
         redisReaderFeed(reader, buffer, length);
 
