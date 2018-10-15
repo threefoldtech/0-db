@@ -88,7 +88,22 @@ int command_stop(redis_client_t *client) {
 }
 
 int command_info(redis_client_t *client) {
-    redis_hardsend(client, "+0-db server (" REVISION ")\n");
+    char info[2048];
+
+    sprintf(info, "# server\n");
+    sprintf(info + strlen(info), "server_name: 0-db (zdb)\n");
+    sprintf(info + strlen(info), "server_revision: " REVISION "\n");
+    sprintf(info + strlen(info), "instance_id: %u\n", rootsettings.iid);
+
+    redis_bulk_t response = redis_bulk(info, strlen(info));
+    if(!response.buffer) {
+        redis_hardsend(client, "$-1");
+        return 0;
+    }
+
+    redis_reply_stack(client, response.buffer, response.length);
+    free(response.buffer);
+
     return 0;
 }
 
