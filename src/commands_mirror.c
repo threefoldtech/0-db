@@ -24,3 +24,13 @@ int command_mirror(redis_client_t *client) {
     return 0;
 }
 
+int command_master(redis_client_t *client) {
+    if(!command_admin_authorized(client))
+        return 1;
+
+    client->master = 1;
+    redis_hardsend(client, "+Hello, master");
+
+    return 0;
+}
+

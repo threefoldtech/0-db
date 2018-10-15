@@ -68,6 +68,7 @@ static command_t commands_handlers[] = {
     {.command = "*",       .handler = command_asterisk}, // special command used to match all in WAIT
     {.command = "WAIT",    .handler = command_wait},     // custom WAIT command to wait on events
     {.command = "MIRROR",  .handler = command_mirror},   // custom MIRROR command to sync full network traffic
+    {.command = "MASTER",  .handler = command_master},   // custom MASTER command to flag client as sync source
 
     // system
     {.command = "PING",    .handler = command_ping},     // default PING command

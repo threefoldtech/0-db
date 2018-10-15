@@ -775,6 +775,8 @@ redis_client_t *socket_client_new(int fd) {
 
     redis_client_t *client = NULL;
 
+    // not using calloc to ensure everything is set to
+    // default value by ourself and nothing is forget
     if(!(client = malloc(sizeof(redis_client_t)))) {
         warnp("new client malloc");
         return NULL;
@@ -786,6 +788,7 @@ redis_client_t *socket_client_new(int fd) {
     client->executed = NULL;
     client->watching = NULL;
     client->mirror = 0;
+    client->master = 0;
 
     // allocating a fixed buffer
     client->buffer = buffer_new();
