@@ -41,7 +41,7 @@ runtest_prio(sp, misc_time) {
 
 runtest_prio(sp, misc_info) {
     const char *argv[] = {"INFO"};
-    return zdb_command(test, argvsz(argv), argv);
+    return zdb_command_str(test, argvsz(argv), argv);
 }
 
 runtest_prio(sp, misc_wait_missing_args) {
