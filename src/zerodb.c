@@ -9,6 +9,7 @@
 #include <execinfo.h>
 #include <getopt.h>
 #include <ctype.h>
+#include <time.h>
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
@@ -117,6 +118,15 @@ void hexdump(void *input, size_t length) {
 
     printf("0x%s", output);
     free(output);
+}
+
+uint32_t instanceid() {
+    struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    srand((time_t) ts.tv_nsec);
+
+    return (uint32_t) rand();
 }
 
 //
@@ -469,6 +479,10 @@ int main(int argc, char *argv[]) {
         verbose("[+] system: creating indexpath: %s\n", settings->indexpath);
         dir_create(settings->indexpath);
     }
+
+    // generating instance id
+    settings->iid = instanceid();
+    verbose("[+] system: instance id: %u\n", settings->iid);
 
     // let's go
     return proceed(settings);

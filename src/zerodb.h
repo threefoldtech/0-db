@@ -61,6 +61,7 @@
         size_t maxsize;   // default namespace maximum datasize
 
         char *zdbid;      // fake 0-db id generated based on listening
+        uint32_t iid;     // 0-db random instance id generated on boot
 
         // the synctime can be useful to add basic security without killing
         // performance

@@ -40,10 +40,21 @@
 
     // represent one redis command with arguments
     typedef struct resp_request_t {
-        resp_state_t state;
-        int fillin;
-        int argc;
-        resp_object_t **argv;
+        resp_state_t state;     // current fill-in status
+        int fillin;             // reminder of progress
+        int argc;               // arguments count
+        resp_object_t **argv;   // list of arguments
+        uint32_t owner;         // source owner id
+
+        // source owner id is used mainly for replication
+        //
+        // by default, the owner is the zdb id itself (the zdb
+        // which generated the request), but when using mirroring
+        // this owner id can be replaced by original owner id (the zdb
+        // which generated the original message and started mirroring it)
+        //
+        // this id is used to stop propagating replication in a full mesh
+        // zdb topology (and basically master-master replication)
 
     } resp_request_t;
 
