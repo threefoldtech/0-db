@@ -589,9 +589,59 @@ static resp_status_t redis_handle_resp_payload(redis_client_t *client) {
     return RESP_STATUS_CONTINUE;
 }
 
+// check the owner id of the request
+// if the request was made by ourself and doesn't come from us
+// (come from a replication), returns 1 and ask parent to not proceed
+// the request
+static inline int redis_handle_resp_ownerid(redis_client_t *client) {
+    // request doesn't comes from a replication client
+    // it's a normal client, there is nothing special to do
+    // just set the owner id as our own id
+    if(!client->master) {
+        client->request->owner = rootsettings.iid;
+        return 0;
+    }
+
+    // this comes from a replication client
+    // extracting the owner id (which is the last argument)
+    // and checking if it's a replay of our own database
+    resp_object_t *ownobj = client->request->argv[client->request->argc - 1];
+    if(ownobj->length > 32) {
+        debug("[-] redis: owner check: malformed owner, id is too long, dropping\n");
+        return 1;
+    }
+
+    // moving buffer into a temporary string
+    char temp[34];
+    memcpy(ownobj->buffer, temp, ownobj->length);
+    temp[ownobj->length] = '\0';
+
+    // converting string into unsigned integer
+    uint32_t ownerid = strtoul(temp, NULL, 10);
+
+    if(ownerid == rootsettings.iid) {
+        debug("[-] redis: owner check: looks like this comes from us, dropping\n");
+        return 1;
+    }
+
+    // this is a valid replication, let's proceed it and
+    // propagate the ownerid
+    client->request->owner = ownerid;
+    return 0;
+}
+
 static resp_status_t redis_handle_resp_finished(redis_client_t *client) {
     resp_request_t *request = client->request;
     int value = 0;
+
+    // setting the request ownerid
+    if(redis_handle_resp_ownerid(client)) {
+        debug("[+] redis: ownerid requested to ignore this request\n");
+        redis_free_request(request);
+        request->state = RESP_EMPTY;
+
+        return 1;
+    }
 
     debug("[+] redis: request parsed, calling dispatcher\n");
     value = redis_dispatcher(client);
@@ -895,7 +945,7 @@ int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
     length += snprintf(temp, sizeof(temp), "$%lu\r\n%s\r\n", strlen(source->ns->name), source->ns->name);
 
     // instance (owner) id
-    length += sprintf(temp, ":%u\r\n", rootsettings.iid);
+    length += sprintf(temp, ":%u\r\n", source->request->owner);
 
     // length contains:
     //  - header prefix (string length of the size with header)
@@ -915,7 +965,7 @@ int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
     offset += sprintf(buffer, "*%d\r\n", source->request->argc + 3);
     offset += sprintf(buffer + offset, ":%d\r\n", source->fd);
     offset += sprintf(buffer + offset, "$%lu\r\n%s\r\n", strlen(source->ns->name), source->ns->name);
-    offset += sprintf(buffer + offset, ":%u\r\n", rootsettings.iid);
+    offset += sprintf(buffer + offset, ":%u\r\n", source->request->owner);
 
     for(int i = 0; i < source->request->argc; i++) {
         offset += sprintf(buffer + offset, "$%d\r\n", source->request->argv[i]->length);
