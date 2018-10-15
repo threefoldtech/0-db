@@ -613,7 +613,7 @@ static inline int redis_handle_resp_ownerid(redis_client_t *client) {
 
     // moving buffer into a temporary string
     char temp[34];
-    memcpy(ownobj->buffer, temp, ownobj->length);
+    memcpy(temp, ownobj->buffer, ownobj->length);
     temp[ownobj->length] = '\0';
 
     // converting string into unsigned integer
@@ -623,6 +623,12 @@ static inline int redis_handle_resp_ownerid(redis_client_t *client) {
         debug("[-] redis: owner check: looks like this comes from us, dropping\n");
         return 1;
     }
+
+    // okay, let's pop this request from original object
+    // so this request will looks like an original request
+    client->request->argc -= 1;
+    free(ownobj->buffer);
+    free(ownobj);
 
     // this is a valid replication, let's proceed it and
     // propagate the ownerid
@@ -636,7 +642,7 @@ static resp_status_t redis_handle_resp_finished(redis_client_t *client) {
 
     // setting the request ownerid
     if(redis_handle_resp_ownerid(client)) {
-        debug("[+] redis: ownerid requested to ignore this request\n");
+        debug("[-] redis: ownerid requested to ignore this request\n");
         redis_free_request(request);
         request->state = RESP_EMPTY;
 
