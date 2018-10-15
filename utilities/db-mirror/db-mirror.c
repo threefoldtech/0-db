@@ -233,6 +233,22 @@ int synchronize(sync_t *sync) {
 char *forwarding[] = {"SET", "DEL", "NSNEW", "NSDEL", "NSSET"};
 
 int forward(redisReply *reply, sync_t *sync) {
+    redisReply *forwarding;
+    redisReply **e = reply->element;
+    char instance[32];
+
+    sprintf(instance, "%u", (unsigned int) e[2]->integer);
+
+    if(strcasecmp("SET", reply->element[3]->str) == 0) {
+        if(!(forwarding = redisCommand(sync->target, "SET %b %b %s", e[4]->str, e[4]->len, e[5]->str, e[5]->len, instance))) {
+            printf("COULD NOT FORWARD\n");
+            return 1;
+        }
+
+    } else {
+        printf("FORWARD NOT SUPPORTED YET\n");
+    }
+
     // printf("FORWARDING [%s]: <%x>\n", reply->element[2]->str, reply->element[3]->str[0] & 0xff);
     return 0;
 }
@@ -242,7 +258,15 @@ int mirror(sync_t *sync) {
     char buffer[8192];
     ssize_t length;
 
-    printf("[+] sending MIRROR request\n");
+    printf("[+] sending MASTER request to slave\n");
+    if(!(reply = redisCommand(sync->target, "MASTER")))
+        return 1;
+
+    printf("[+] response: %s\n", reply->str);
+    freeReplyObject(reply);
+
+
+    printf("[+] sending MIRROR request to master\n");
     if(!(reply = redisCommand(sync->sourceq, "MIRROR")))
         return 1;
 
@@ -253,24 +277,24 @@ int mirror(sync_t *sync) {
 
     while((length = read(sync->sourceq->fd, buffer, sizeof(buffer)))) {
         // buffer[length] = '\0';
-        printf(">> %s\n", buffer);
+        // printf(">> %s\n", buffer);
 
         redisReaderFeed(reader, buffer, length);
 
         while(1) {
             redisReaderGetReply(reader, &reply);
-
             if(!reply)
                 break;
 
-            char *command = reply->element[2]->str;
+            char *command = reply->element[3]->str;
             int sockfd = reply->element[0]->integer;
             char *namespace = reply->element[1]->str;
+            uint32_t instance = (uint32_t) reply->element[2]->integer;
 
-            printf("[+] command: <%s> from <%d> (namespace: %s)\n", command, sockfd, namespace);
+            printf("[+] command: <%s> from <%d> (ns: %s, iid: %u)\n", command, sockfd, namespace, instance);
 
-            for(int i = 0; i < sizeof(forwarding) / sizeof(char *); i++)
-                if(strcasecmp(forwarding[i], reply->element[2]->str) == 0)
+            for(unsigned int i = 0; i < sizeof(forwarding) / sizeof(char *); i++)
+                if(strcasecmp(forwarding[i], reply->element[3]->str) == 0)
                     forward(reply, sync);
 
             freeReplyObject(reply);
