@@ -932,6 +932,7 @@ int redis_detach_clients(namespace_t *namespace) {
 int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
     char temp[256];
     char *buffer;
+    time_t timestamp = time(NULL);
 
     // the forward query is the same as the input one
     // but with two more fields: the socket id and the namespace in
@@ -945,7 +946,7 @@ int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
     length += sprintf(temp, "*%d\r\n", source->request->argc + 3);
 
     // socket id
-    length += sprintf(temp, ":%d\r\n", source->fd);
+    length += sprintf(temp, ":%ld\r\n", timestamp);
 
     // namespace
     length += snprintf(temp, sizeof(temp), "$%lu\r\n%s\r\n", strlen(source->ns->name), source->ns->name);
@@ -969,7 +970,7 @@ int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
 
     // building buffer
     offset += sprintf(buffer, "*%d\r\n", source->request->argc + 3);
-    offset += sprintf(buffer + offset, ":%d\r\n", source->fd);
+    offset += sprintf(buffer + offset, ":%ld\r\n", timestamp);
     offset += sprintf(buffer + offset, "$%lu\r\n%s\r\n", strlen(source->ns->name), source->ns->name);
     offset += sprintf(buffer + offset, ":%u\r\n", source->request->owner);
 
