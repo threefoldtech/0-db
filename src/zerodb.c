@@ -126,7 +126,8 @@ uint32_t instanceid() {
     clock_gettime(CLOCK_MONOTONIC, &ts);
     srand((time_t) ts.tv_nsec);
 
-    return (uint32_t) rand();
+    // generating random id, greater than zero
+    return (uint32_t) ((rand() % (1 << 30)) + 1);
 }
 
 //
