@@ -938,6 +938,14 @@ int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
     // but with two more fields: the socket id and the namespace in
     // which the user is attached to
 
+    // special owner id is zero, do not forward this
+    // this is used for administrative query not made to be
+    // replicated
+    if(source->request->owner == 0) {
+        debug("[-] redis: mirror: null-owner, not forwarding\n");
+        return 0;
+    }
+
     // computing the buffer size
     size_t length = 0;
     size_t offset = 0;
