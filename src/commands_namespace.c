@@ -253,7 +253,7 @@ int command_nsinfo(redis_client_t *client) {
     sprintf(info + strlen(info), "index_size_kb: %.2f\n", KB(namespace->index->indexsize));
     sprintf(info + strlen(info), "mode: %s\n", index_modename(namespace->index));
 
-    if(client->master) {
+    if(client->master && namespace->password) {
         sprintf(info + strlen(info), "password_raw: %s\n", namespace->password);
     }
 
