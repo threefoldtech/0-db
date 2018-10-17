@@ -58,6 +58,7 @@
 
     int namespace_create(char *name);
     int namespace_delete(namespace_t *namespace);
+    int namespace_flush(namespace_t *namespace);
     namespace_t *namespace_get(char *name);
     int namespace_reload(namespace_t *namespace);
 

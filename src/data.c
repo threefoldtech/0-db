@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <time.h>
 #include "zerodb.h"
+#include "filesystem.h"
 #include "data.h"
 #include "index.h" // for key max length
 
@@ -501,4 +502,9 @@ void data_emergency(data_root_t *root) {
         return;
 
     fsync(root->datafd);
+}
+
+// delete data files
+void data_delete_files(data_root_t *root) {
+    dir_clean_payload(root->datadir);
 }

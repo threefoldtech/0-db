@@ -8,6 +8,7 @@
     index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches);
 
     // gracefully clean everything
+    void index_delete_files(index_root_t *root);
     void index_destroy(index_root_t *root);
     void index_destroy_global();
 #endif

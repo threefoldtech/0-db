@@ -179,6 +179,7 @@ This mode is not possible if you don't have any data/index already available.
 - `RSCAN [optional cursor]`
 - `WAIT command | *`
 - `HISTORY key [binary-data]`
+- `FLUSH`
 
 `SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
 
@@ -329,6 +330,13 @@ To rollback in time, you can follow the history by calling again the same comman
 as extra argument the first key received (a binary string). Eg: `HISTORY mykey "\x00\x00\x1b\x00\x00\x00"`
 
 When requesting an extra argument, you'll get the previous entry. And so on...
+
+## FLUSH
+Truncate a namespace contents. This is a really destructive command, everything is deleted and no
+recovery is possible (history, etc. are deleted).
+
+This is only allowed on private and password protected namespace. You need to select the namespace
+before running the command.
 
 # Namespaces
 A namespace is a dedicated directory on index and data root directory.

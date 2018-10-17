@@ -102,6 +102,7 @@ static command_t commands_handlers[] = {
     {.command = "NSINFO",  .handler = command_nsinfo},   // custom command to get namespace information
     {.command = "SELECT",  .handler = command_select},   // default SELECT (with pwd) namespace switch
     {.command = "RELOAD",  .handler = command_reload},   // custom command to reload a namespace
+    {.command = "FLUSH",   .handler = command_flush},    // custom command to reset a namespace
 };
 
 int redis_dispatcher(redis_client_t *client) {

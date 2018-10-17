@@ -408,3 +408,20 @@ int command_reload(redis_client_t *client) {
     return 0;
 }
 
+int command_flush(redis_client_t *client) {
+    namespace_t *namespace = client->ns;
+
+    if(namespace->public == 1 || namespace->password == NULL) {
+        redis_hardsend(client, "-Flushing public namespace denied");
+        return 1;
+    }
+
+    if(namespace_flush(namespace)) {
+        redis_hardsend(client, "-Internal Server Error");
+        return 1;
+    }
+
+    redis_hardsend(client, "+OK");
+
+    return 0;
+}

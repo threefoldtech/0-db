@@ -44,16 +44,14 @@ int dir_create(char *path) {
     return mkdir(tmp, S_IRWXU);
 }
 
-int dir_remove_cb(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf) {
+static int dir_remove_cb(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf) {
     (void) sb;
     (void) ftwbuf;
-    (void) tflag;
     char *fullpath = (char *) fpath;
     int value;
 
     debug("[+] filesystem: remove: %s\n", fullpath);
 
-    // overwrite tflag to use it (lulz)
     if((value = remove(fullpath)))
         warnp(fullpath);
 
@@ -62,4 +60,27 @@ int dir_remove_cb(const char *fpath, const struct stat *sb, int tflag, struct FT
 
 int dir_remove(char *path) {
     return nftw(path, dir_remove_cb, 64, FTW_DEPTH | FTW_PHYS);
+}
+
+static int dir_clean_cb(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf) {
+    (void) sb;
+    (void) ftwbuf;
+    char *fullpath = (char *) fpath;
+    size_t length = strlen(fullpath);
+
+    if(strncmp(fullpath + length - 14, "zdb-data-", 9) == 0) {
+        debug("[+] filesystem: removing datafile: %s\n", fullpath);
+        remove(fullpath);
+    }
+
+    if(strncmp(fullpath + length - 15, "zdb-index-", 10) == 0) {
+        debug("[+] filesystem: removing indexfile: %s\n", fullpath);
+        remove(fullpath);
+    }
+
+    return tflag;
+}
+
+int dir_clean_payload(char *path) {
+    return nftw(path, dir_clean_cb, 64, FTW_DEPTH | FTW_PHYS);
 }

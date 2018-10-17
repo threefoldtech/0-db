@@ -540,6 +540,32 @@ int namespace_reload(namespace_t *namespace) {
     return 0;
 }
 
+// start a namespace flushing procees
+// when flushing a namespace, we destroy it from
+// memory and from disk (except descriptor) then reload (empty) contents
+// we don't touch to the namespace object itself (this object is linked to users)
+// we only refresh data and index pointers
+int namespace_flush(namespace_t *namespace) {
+    debug("[+] namespace: flushing: %s\n", namespace->name);
+
+    debug("[+] namespace: flushing: cleaning index\n");
+    index_clean_namespace(namespace->index, namespace);
+
+    debug("[+] namespace: flushing: removing files\n");
+    index_delete_files(namespace->index);
+    data_delete_files(namespace->data);
+
+    debug("[+] namespace: flushing: destroying objects\n");
+    index_destroy(namespace->index);
+    data_destroy(namespace->data);
+
+    debug("[+] namespace: flushing: reloading data\n");
+    namespace_load_lazy(nsroot, namespace);
+
+    return 0;
+}
+
+
 static void namespace_delete_hook(namespace_t *namespace) {
     if(!rootsettings.hook)
         return;

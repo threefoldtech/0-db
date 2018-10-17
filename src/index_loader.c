@@ -11,6 +11,7 @@
 #include <limits.h>
 #include <errno.h>
 #include "zerodb.h"
+#include "filesystem.h"
 #include "index.h"
 #include "index_seq.h"
 #include "index_loader.h"
@@ -510,4 +511,9 @@ void index_destroy_global() {
 
     free(index_reusable_entry);
     index_reusable_entry = NULL;
+}
+
+// delete index files (not the namespace descriptor)
+void index_delete_files(index_root_t *root) {
+    dir_clean_payload(root->indexdir);
 }
