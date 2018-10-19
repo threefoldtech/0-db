@@ -12,6 +12,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <limits.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <ftw.h>
 #include "filesystem.h"
 #include "zerodb.h"
@@ -83,4 +86,44 @@ static int dir_clean_cb(const char *fpath, const struct stat *sb, int tflag, str
 
 int dir_clean_payload(char *path) {
     return nftw(path, dir_clean_cb, 64, FTW_DEPTH | FTW_PHYS);
+}
+
+static void *file_dump_clean(filebuf_t *buffer, int fd, char *error) {
+    warnp(error);
+
+    free(buffer->buffer);
+    free(buffer);
+    close(fd);
+
+    return NULL;
+}
+
+filebuf_t *file_dump(char *filename, off_t offset, off_t maxlength) {
+    filebuf_t *buffer;
+    int fd;
+
+    if((fd = open(filename, O_RDONLY)) < 0) {
+        warnp(filename);
+        return NULL;
+    }
+
+    if(!(buffer = malloc(sizeof(filebuf_t))))
+        return NULL;
+
+    off_t maxoff = lseek(fd, 0, SEEK_END);
+
+    // does the file is larger than expected buffer
+    buffer->allocated = (maxoff - offset < maxlength) ? maxoff - offset : maxlength;
+    if(!(buffer->buffer = malloc(buffer->allocated)))
+        return file_dump_clean(buffer, fd, "malloc");
+
+    lseek(fd, offset, SEEK_SET);
+
+    if((buffer->length = read(fd, buffer->buffer, buffer->allocated)) < 0)
+        return file_dump_clean(buffer, fd, filename);
+
+    buffer->nextoff = offset + buffer->length;
+    close(fd);
+
+    return buffer;
 }
