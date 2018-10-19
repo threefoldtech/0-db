@@ -103,6 +103,8 @@ static command_t commands_handlers[] = {
     {.command = "SELECT",  .handler = command_select},   // default SELECT (with pwd) namespace switch
     {.command = "RELOAD",  .handler = command_reload},   // custom command to reload a namespace
     {.command = "FLUSH",   .handler = command_flush},    // custom command to reset a namespace
+    {.command = "EXPORT",  .handler = command_export},   // custom command to raw export a namespace
+    {.command = "IMPORT",  .handler = command_import},   // custom command to raw import a namespace
 };
 
 int redis_dispatcher(redis_client_t *client) {

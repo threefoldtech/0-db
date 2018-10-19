@@ -3,4 +3,6 @@
 
     int command_mirror(redis_client_t *client);
     int command_master(redis_client_t *client);
+    int command_export(redis_client_t *client);
+    int command_import(redis_client_t *client);
 #endif
