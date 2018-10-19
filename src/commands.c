@@ -19,7 +19,7 @@
 #include "commands_namespace.h"
 #include "commands_system.h"
 #include "commands_history.h"
-#include "commands_mirror.h"
+#include "commands_replicate.h"
 
 // ensure number of argument and their validity
 static int real_command_args_validate(redis_client_t *client, int expected, int nullallowed) {

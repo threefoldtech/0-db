@@ -12,7 +12,7 @@
 #include "namespace.h"
 #include "redis.h"
 #include "commands.h"
-#include "commands_mirror.h"
+#include "commands_replicate.h"
 
 int command_mirror(redis_client_t *client) {
     if(!command_admin_authorized(client))
