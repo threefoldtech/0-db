@@ -127,3 +127,24 @@ filebuf_t *file_dump(char *filename, off_t offset, off_t maxlength) {
 
     return buffer;
 }
+
+filebuf_t *file_write(char *filename, off_t offset, filebuf_t *buffer) {
+    int fd;
+
+    if((fd = open(filename, O_CREAT | O_WRONLY, 0666)) < 0) {
+        warnp(filename);
+        return NULL;
+    }
+
+    lseek(fd, offset, SEEK_SET);
+    ssize_t feed = 0;
+
+    if((feed = write(fd, buffer->buffer, buffer->length)) < 0) {
+        warnp(filename);
+        buffer = NULL;
+    }
+
+    close(fd);
+
+    return buffer;
+}

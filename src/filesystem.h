@@ -15,4 +15,5 @@
     } filebuf_t;
 
     filebuf_t *file_dump(char *filename, off_t offset, off_t maxlength);
+    filebuf_t *file_write(char *filename, off_t offset, filebuf_t *buffer);
 #endif
