@@ -141,6 +141,80 @@ int replicate_from_reply(sync_t *sync, redisReply *from, status_t *status) {
     return 0;
 }
 
+int redis_execute(redisContext *ctx, char *format, ...) {
+    redisReply *reply;
+    va_list arglist;
+
+    va_start(arglist, format);
+
+    if(!(reply = redisvCommand(ctx, format, arglist)))
+        return 1;
+
+    va_end(arglist);
+    freeReplyObject(reply);
+
+    return 0;
+}
+
+int replicate_import(sync_t *sync, namespace_t *namespace, char *type) {
+    redisReply *reply;
+
+    for(int fileid = 0; fileid < 65535; fileid++) {
+        int offset = 0;
+
+        while(1) {
+            printf("exporting %s... %d %d\n", type, fileid, offset);
+            if(!(reply = redisCommand(sync->source, "EXPORT %s %d %d 0", type, fileid, offset)))
+                return 1;
+
+            if(reply->type == REDIS_REPLY_ERROR || reply->element[0]->len == 0) {
+                printf("file done\n");
+                break;
+            }
+
+            redis_execute(sync->targets[0], "IMPORT %s %d %d %b 0", type, fileid, offset, reply->element[0]->str, reply->element[0]->len);
+            offset = reply->element[1]->integer;
+
+            freeReplyObject(reply);
+        }
+
+        if(offset == 0) {
+            printf("replicate %s done\n", type);
+            break;
+        }
+    }
+
+    freeReplyObject(reply);
+
+    return 0;
+}
+
+int replicate_namespace(sync_t *sync, namespace_t *namespace) {
+    redisReply *reply;
+
+    redis_execute(sync->targets[0], "NSDEL %s 0", namespace->name);
+    redis_execute(sync->targets[0], "NSNEW %s 0", namespace->name);
+
+    if(namespace->password) {
+        redis_execute(sync->targets[0], "SELECT %s %s 0", namespace->name, namespace->password);
+    } else {
+        redis_execute(sync->targets[0], "SELECT %s 0", namespace->name);
+    }
+
+    if(!(reply = redisCommand(sync->source, "EXPORT descriptor 0 0 0")))
+        return 1;
+
+    redis_execute(sync->targets[0], "IMPORT descriptor 0 0 %b 0", reply->element[0]->str, reply->element[0]->len);
+    freeReplyObject(reply);
+
+    replicate_import(sync, namespace, "index");
+    replicate_import(sync, namespace, "data");
+
+    redis_execute(sync->targets[0], "RELOAD %s 0", namespace->name);
+
+    return 0;
+}
+
 int replicate(sync_t *sync) {
     redisReply *reply;
     namespaces_t namespaces = {
@@ -179,14 +253,23 @@ int replicate(sync_t *sync) {
         }
     }
 
-    exit(1);
+    //
+    // replicating
+    //
+    for(unsigned int i = 0; i < namespaces.length; i++) {
+        namespace_t *namespace = &namespaces.list[i];
 
-    // printf("[+] namespace ready, %lu keys to transfert (%.2f MB)\n", status.keys, MB(status.size));
+        if(namespace->password) {
+            redis_execute(sync->source, "SELECT %s %s 0", namespace->name, namespace->password);
+        } else {
+            redis_execute(sync->source, "SELECT %s 0", namespace->name);
+        }
 
-    if(!(reply = redisCommand(sync->source, "SCAN")))
-        return 1;
-
-    // int value = replicate_from_reply(sync, reply, &status);
+        if((replicate_namespace(sync, namespace))) {
+            fprintf(stderr, "[-] could not replicate namespace: %s\n", namespace->name);
+            exit(EXIT_FAILURE);
+        }
+    }
 
     printf("\n[+] initial synchronization done\n");
     return 0;
