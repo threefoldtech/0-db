@@ -533,6 +533,7 @@ int namespace_reload(namespace_t *namespace) {
 
     debug("[+] namespace: reload: reloading data\n");
     namespace_load_lazy(nsroot, namespace);
+    namespace_descriptor_load(namespace);
 
     // hook notification
     namespace_reload_hook(namespace);
