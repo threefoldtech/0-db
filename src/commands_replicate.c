@@ -49,9 +49,12 @@ int command_master(redis_client_t *client) {
 // with full history etc. without dealing with lot of commands
 // and complexity
 
+//
+// export
+//
 static int command_export_descriptor(redis_client_t *client) {
     char response[RESPONSE_LENGTH];
-    char filename[256], temp[BUFFER_LENGTH];
+    char filename[256];
     filebuf_t *buffer;
 
     snprintf(filename, sizeof(filename), "%s/zdb-namespace", client->ns->index->indexdir);
@@ -61,38 +64,37 @@ static int command_export_descriptor(redis_client_t *client) {
         return 1;
     }
 
-    sprintf(temp, "%ld", buffer->nextoff);
     sprintf(response, "*2\r\n$%ld\r\n", buffer->length);
-
     redis_reply_stack(client, response, strlen(response));
+
     redis_reply_heap(client, buffer->buffer, buffer->length, free);
-    free(buffer);
 
-    sprintf(response, "\r\n$%lu\r\n%s\r\n", strlen(temp), temp);
+    sprintf(response, "\r\n:%lu\r\n", buffer->nextoff);
     redis_reply_stack(client, response, strlen(response));
+
+    free(buffer);
 
     return 0;
 }
 
 static int command_export_indexdata(redis_client_t *client, char *filename, off_t offset) {
     char response[RESPONSE_LENGTH];
-    char temp[BUFFER_LENGTH];
     filebuf_t *buffer;
 
-    if(!(buffer = file_dump(filename, offset, 8 * 1024 * 1024))) {
-        redis_hardsend(client, "-Internal Server Error");
+    if(!(buffer = file_dump(filename, offset, 4 * 1024 * 1024))) {
+        redis_hardsend(client, "-Unable to load file");
         return 1;
     }
 
-    sprintf(temp, "%ld", buffer->nextoff);
     sprintf(response, "*2\r\n$%ld\r\n", buffer->length);
-
     redis_reply_stack(client, response, strlen(response));
+
     redis_reply_heap(client, buffer->buffer, buffer->length, free);
-    free(buffer);
 
-    sprintf(response, "\r\n$%lu\r\n%s\r\n", strlen(temp), temp);
+    sprintf(response, "\r\n:%lu\r\n", buffer->nextoff);
     redis_reply_stack(client, response, strlen(response));
+
+    free(buffer);
 
     return 0;
 }
@@ -127,7 +129,7 @@ int command_export(redis_client_t *client) {
         return 1;
 
     // avoid overflow
-    for(int i = 0; i < 4; i++) {
+    for(int i = 1; i < 4; i++) {
         if(request->argv[i]->length >= BUFFER_LENGTH) {
             redis_hardsend(client, "-Invalid argument");
             return 1;
