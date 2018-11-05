@@ -1059,11 +1059,16 @@ int redis_posthandler_client(redis_client_t *client) {
 // classic tcp socket
 static int redis_tcp_listen(char *listenaddr, int port) {
     struct sockaddr_in addr;
+    struct hostent *hent;
     int fd;
+
+    if((hent = gethostbyname(listenaddr)) == NULL)
+        diep("gethostbyname");
+
+    memcpy(&addr.sin_addr, hent->h_addr_list[0], hent->h_length);
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = inet_addr(listenaddr);
 
     if((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
         diep("tcp socket");
