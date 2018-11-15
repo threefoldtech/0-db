@@ -20,7 +20,7 @@
 //
 // in userkey mode:
 //   on each insertion a of new key, a new entry is added on the index on disk,
-//   this entry entry contains latest up-to-date metadata
+//   this entry contains latest up-to-date metadata
 //
 //   if the inserted key is an update of an existing key, the previous entry on the
 //   index is overwritten, just to change the flag to DELETED, using this, we can

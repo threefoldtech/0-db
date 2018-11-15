@@ -44,7 +44,7 @@
 // as first argument, this will ensure the data read on the index seems legit
 // (by compating the keys)
 //
-// when you reach the end of the chain, the binary received it nil
+// when you reach the end of the chain, the binary received is nil
 
 typedef struct history_response_t {
     uint32_t timestamp;
