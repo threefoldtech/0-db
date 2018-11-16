@@ -5,6 +5,7 @@
         char *datapath;
         char *indexpath;
         char *namespace;
+        char *template;
 
     } rebuild_t;
 

@@ -152,7 +152,7 @@ size_t index_rebuild(int fd, buffer_t *buffer, uint16_t dataid) {
         idxitem->timestamp = entry.timestamp;
 
         // update buffer pointers
-        buffer->length += sizeof(index_entry_t) + entry.idlength;
+        buffer->length += sizeof(index_item_t) + entry.idlength;
         buffer->writer = buffer->buffer + buffer->length;
 
         printf("[+] entry: offset: %lu\n", offset);
@@ -218,8 +218,6 @@ int namespace_index_rebuild(rebuild_t *compaction) {
             break;
         }
 
-        printf(">> DATAFILE %s\n", filename);
-
         idxbuf = buffer_new();
         entries += index_rebuild(fd, idxbuf, fileid);
 
@@ -252,7 +250,8 @@ int main(int argc, char *argv[]) {
     rebuild_t settings = {
         .datapath = NULL,
         .indexpath = NULL,
-        .namespace = NULL
+        .namespace = NULL,
+        .template = NULL,
     };
 
     while(1) {
@@ -275,13 +274,18 @@ int main(int argc, char *argv[]) {
                 settings.namespace = optarg;
                 break;
 
+            case 't':
+                settings.template = optarg;
+                break;
+
             case 'h':
                 usage();
                 break;
 
             case '?':
             default:
-               exit(EXIT_FAILURE);
+                fprintf(stderr, "Unsupported option\n");
+                exit(EXIT_FAILURE);
         }
     }
 
