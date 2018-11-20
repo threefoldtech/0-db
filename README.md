@@ -54,6 +54,7 @@ Of course, when we have advantages, some cons comes with them:
 - You need some maintenance to keep your database not exploding
 
 Hopefuly, theses cons have their solution:
+- We always have previous data there, let's allows to walk throught it and support history out-of-box !
 - Since data are always append, you can at any time start another process reading that database
 and rewrite data somewhere else, with optimization (removed non-needed files). This is what we call
 `compaction`, and some tools are here to do so.
@@ -74,7 +75,6 @@ have the advantage to be small and load fast (can be fully populated in memory f
 On runtime, you can choose between multiple mode:
 * `user`: user-key mode
 * `seq`: sequential mode
-* `direct`: direct-position key mode
 
 **Warning**: in any case, please ensure data and index directories used by 0-db are empty, or
 contains only valid database namespaces directories.
@@ -94,15 +94,8 @@ Providing any other key will fails.
 
 The id is a little-endian integer key. All the keys are kept in memory.
 
-## Direct Key
-This mode works like the sequential mode, except that returned key contains enough information to fetch the
-data back, without using in-memory index.
-
-There is no update possible in this mode (since the key itself contains data to the real location
-and we use always append method, we can't update existing data). Providing a key has no effect and
-is ignored. Only a suppression will modify the index, to flag the entry as deleted.
-
-The key returned by the `SET` command is a binary key.
+## Direct Key (Legacy)
+There was previously a `direct mode` which works the same way as `sequential mode` now. This mode doesn't exists anymore.
 
 # Implementation
 This project doesn't rely on any dependencies, it's from scratch.
