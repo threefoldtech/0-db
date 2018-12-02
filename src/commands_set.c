@@ -78,7 +78,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
     // if we couldn't write the data, we won't add entry on the index
     // and report to the client an error
     if(offset == 0) {
-        redis_hardsend(client, "$-1");
+        redis_hardsend(client, "-Cannot write data right now");
         return 0;
     }
 
@@ -104,7 +104,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
 
     if(!index_set(index, &setter, existing)) {
         // cannot insert index (disk issue)
-        redis_hardsend(client, "$-1");
+        redis_hardsend(client, "-Cannot write index right now");
         return 0;
     }
 
@@ -182,7 +182,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
     // if we couldn't write the data, we won't add entry on the index
     // and report to the client an error
     if(offset == 0) {
-        redis_hardsend(client, "-Internal Error (data)");
+        redis_hardsend(client, "-Cannot write data right now");
         return 0;
     }
 
@@ -208,7 +208,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
 
     if(!(idxentry = index_set(index, &setter, existing))) {
         // cannot insert index (disk issue)
-        redis_hardsend(client, "$-1");
+        redis_hardsend(client, "-Cannot write index right now");
         return 0;
     }
 
