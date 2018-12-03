@@ -370,14 +370,15 @@ Current supported hooks:
 | `namespace-reloaded`  | Namespace reloaded      | Namespace name             |
 
 # Limitation
-By default, each datafile is split when bigger than 256 MB.
+By default, datafiles are split when bigger than 256 MB.
 
 The datafile id is stored on 16 bits, which makes maximum of 65536 files.
-A database can be maximum ~16 TB. Since one single 0-db is made to be used on a single dedicated disk,
-this should be good, but that's still a hard limitation. This limitation can be changed via command line
+Each namespaces have their own datafiles, one namespace can contains maximum ~16 TB of data.
+Since one single 0-db is made to be used on a single dedicated disk, this should be good out of box,
+but that's still a limitation. This limitation can be changed on startup via command line
 option `--datasize`, and provide (in bytes) the size limit of a datafile. Setting `536870912` for exemple
-(which is 512 MB) would set the database limit to ~32 TB. This limit is printed (with verbose flag) on
-the database initializing process.
+(which is 512 MB) would set the namespace limit to ~32 TB. This limit is printed (with verbose flag) on
+the initializing process.
 
 Please use always the same datasize accross multiple run, but using different size **should not** interfer.
 

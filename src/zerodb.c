@@ -465,7 +465,7 @@ int main(int argc, char *argv[]) {
     // max database size is maximum datafile size multiplied by amount of files
     uint64_t maxsize = maxfiles * settings->datasize;
 
-    verbose("[+] system: maximum database size: %.2f GB\n", GB(maxsize));
+    verbose("[+] system: maximum namespace size: %.2f GB\n", GB(maxsize));
 
     //
     // ensure default directories
