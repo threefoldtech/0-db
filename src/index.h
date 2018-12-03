@@ -1,11 +1,34 @@
 #ifndef __ZDB_INDEX_H
     #define __ZDB_INDEX_H
 
+    typedef enum index_mode_t {
+        // default key-value store
+        KEYVALUE = 0,
+
+        // auto-generated sequential id
+        SEQUENTIAL = 1,
+
+        // id is hard-fixed data position
+        DIRECTKEY = 2,
+
+        // fixed-block length
+        DIRECTBLOCK = 3,
+
+        // amount of modes available
+        ZDB_MODES
+
+    } index_mode_t;
+
+    // when adding or removing some modes
+    // don't forget to adapt correctly the handlers
+    // function pointers (basicly for GET and SET)
+
+
     // index file header
     // this file is more there for information
     // this is not really relevant but can be used
     // to validate contents and detect type with the magic
-    typedef struct index_t {
+    typedef struct index_header_t {
         char magic[4];     // four bytes magic bytes to recognize the file
         uint32_t version;  // file version, for possible upgrade compatibility
         uint64_t created;  // unix timestamp of creation time
@@ -13,17 +36,21 @@
         uint16_t fileid;   // current index file id (sync with dataid)
         uint8_t mode;      // running mode when index was created
 
-    } __attribute__((packed)) index_t;
+    } __attribute__((packed)) index_header_t;
 
     // main entry structure
     // each key will use one of this entry
     typedef struct index_item_t {
         uint8_t idlength;    // length of the id, here uint8_t limits to 256 bytes
-        uint64_t offset;     // offset on the corresponding datafile
-        uint64_t length;     // length of the payload on the datafile
-        uint8_t flags;       // flags not used yet, could provide information about deletion
+        uint32_t offset;     // offset on the corresponding datafile
+        uint32_t length;     // length of the payload on the datafile
+        uint32_t previous;   // previous entry offset
+        uint8_t flags;       // key flags (eg: deleted)
         uint16_t dataid;     // datafile id where is stored the payload
-        uint32_t timestamp;  // when did the key was created (unix timestamp)
+        uint32_t timestamp;  // when was the key created (unix timestamp)
+        uint32_t crc;        // the data payload crc32
+        uint16_t parentid;   // history parent dataid ]
+        uint32_t parentoff;  // history parent offset ]- used to keep history tracking
         unsigned char id[];  // the id accessor, dynamically loaded
 
     } __attribute__((packed)) index_item_t;
@@ -48,16 +75,21 @@
         void *namespace;
 
         uint8_t idlength;    // length of the id, here uint8_t limits to 256 bytes
-        uint64_t offset;     // offset on the corresponding datafile
-        uint64_t length;     // length of the payload on the datafile
+        uint32_t offset;     // offset on the corresponding datafile
+        uint32_t idxoffset;  // offset on the index file (index file id is the same as data file)
+        uint32_t length;     // length of the payload on the datafile
         uint8_t flags;       // keep deleted flags (should be index_flags_t type)
         uint16_t dataid;     // datafile id where is stored the payload
+        uint32_t crc;        // the data payload crc32
+        uint16_t parentid;   // parent index file id (history)
+        uint32_t parentoff;  // parent index file offset (history)
+        uint32_t timestamp;  // unix timestamp of key creation
         unsigned char id[];  // the id accessor, dynamically loaded
 
     } index_entry_t;
 
     // WARNING: this should be on index_branch.h
-    //          but we can't due to cirtucal dependencies
+    //          but we can't due to circular dependencies
     //          in order to fix this, we should put all struct in a dedicated file
     //
     // the current implementation of the index use rudimental index memory system
@@ -88,6 +120,20 @@
 
     } index_status_t;
 
+    // index sequential id mapping
+    typedef struct index_seqmap_t {
+        uint32_t seqid;
+        uint16_t fileid;
+
+    } index_seqmap_t;
+
+    typedef struct index_seqid_t {
+        uint16_t allocated;
+        uint16_t length;
+        index_seqmap_t *seqmap;
+
+    } index_seqid_t;
+
     //
     // global root memory structure of the index
     //
@@ -101,10 +147,11 @@
         int sync;           // flag to force write sync
         int synctime;       // force sync index after this amount of time
         time_t lastsync;    // keep track when the last sync was explictly made
-        db_mode_t mode;     // running mode for that index
+        index_mode_t mode;  // running mode for that index
 
         void *namespace;    // see index_entry_t, same reason
 
+        index_seqid_t *seqid;      // sequential fileid mapping
         index_branch_t **branches; // list of branches explained later
         index_status_t status;     // index health
 
@@ -112,14 +159,50 @@
         size_t indexsize;   // statistics about index in-memory size
         size_t entries;     // statistics about number of keys for this index
 
+        size_t previous;    // keep latest offset inserted to the indexfile
+
     } index_root_t;
 
     // key used by direct mode
+    // contains information about fileid and
+    // objectid, since all object are made of
+    // the same length, we can compute offset like this
     typedef struct index_dkey_t {
         uint16_t indexid;
         uint32_t objectid;
 
     } __attribute__((packed)) index_dkey_t;
+
+    // binary key
+    // this is a representation of an index key
+    // using binary fields pointing directly to
+    // it's file, but with additional information
+    // not directly needed to find the value back
+    // but useful to ensure the user won't send fake
+    // malformed or crafted illegal key
+    //
+    // eg: requesting fileid 10 and offset 57 is easy...
+    //     but requesting fileid 10 and offset 57 with
+    //     keylength and crc matching the index entry,
+    //     the probability of fake crafted user key is
+    //     quite impossible
+    typedef struct index_bkey_t {
+        uint8_t idlength;
+        uint16_t fileid;
+        uint32_t length;
+        uint32_t idxoffset;
+        uint32_t crc;
+
+    } __attribute__((packed)) index_bkey_t;
+
+    // key used to represent exact position
+    // in index file (aka: dkey resolved)
+    typedef struct index_ekey_t {
+        uint16_t indexid;
+        uint32_t offset;
+
+    } __attribute__((packed)) index_ekey_t;
+
 
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1
@@ -133,10 +216,14 @@
     index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t length);
     index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t offset, uint8_t idlength);
 
-    index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlength, size_t offset, size_t length);
-    index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags);
+    index_dkey_t *index_dkey_from_key(index_dkey_t *dkey, unsigned char *buffer, uint8_t length);
 
-    index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry);
+    index_entry_t *index_entry_insert_new(index_root_t *root, void *vid, index_entry_t *new, time_t timestamp, index_entry_t *existing);
+    index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *realid, index_entry_t *new);
+
+    int index_entry_delete(index_root_t *root, index_entry_t *entry);
+    int index_entry_delete_disk(index_root_t *root, index_entry_t *entry);
+    int index_entry_delete_memory(index_root_t *root, index_entry_t *entry);
     int index_entry_is_deleted(index_entry_t *entry);
 
     int index_clean_namespace(index_root_t *root, void *namespace);
@@ -155,4 +242,18 @@
     size_t index_next_offset(index_root_t *root);
     size_t index_offset_objectid(uint32_t idobj);
     uint16_t index_indexid(index_root_t *root);
+
+    index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset);
+    index_bkey_t index_entry_serialize(index_entry_t *entry);
+    index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key);
+
+    int index_grab_fileid(index_root_t *root, uint16_t fileid);
+    void index_release_fileid(index_root_t *root, uint16_t fileid, int fd);
+
+    void index_item_header_dump(index_item_t *item);
+
+    uint32_t index_key_hash(unsigned char *id, uint8_t idlength);
+    int index_open_file_rw(index_root_t *root, int fileid);
+
+    const char *index_modename(index_root_t *index);
 #endif

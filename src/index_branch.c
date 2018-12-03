@@ -43,11 +43,15 @@ int index_set_buckets_bits(uint8_t bits) {
 // this allows us to use lot of branch (buckets_branches) in this case)
 // without consuming all the memory if we don't need it
 //
-index_branch_t *index_branch_init(index_root_t *root, uint32_t branchid) {
+index_branch_t **index_buckets_init() {
+    return (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches);
+}
+
+index_branch_t *index_branch_init(index_branch_t **branches, uint32_t branchid) {
     // debug("[+] initializing branch id 0x%x\n", branchid);
 
-    root->branches[branchid] = malloc(sizeof(index_branch_t));
-    index_branch_t *branch = root->branches[branchid];
+    branches[branchid] = malloc(sizeof(index_branch_t));
+    index_branch_t *branch = branches[branchid];
 
     branch->length = 0;
     branch->last = NULL;
@@ -56,12 +60,12 @@ index_branch_t *index_branch_init(index_root_t *root, uint32_t branchid) {
     return branch;
 }
 
-void index_branch_free(index_root_t *root, uint32_t branchid) {
+void index_branch_free(index_branch_t **branches, uint32_t branchid) {
     // this branch was not allocated
-    if(!root->branches[branchid])
+    if(!branches[branchid])
         return;
 
-    index_entry_t *entry = root->branches[branchid]->list;
+    index_entry_t *entry = branches[branchid]->list;
     index_entry_t *next = NULL;
 
     // deleting branch content by
@@ -72,26 +76,26 @@ void index_branch_free(index_root_t *root, uint32_t branchid) {
     }
 
     // deleting branch
-    free(root->branches[branchid]);
+    free(branches[branchid]);
 }
 
 // returns branch from rootindex, if branch is not allocated yet, returns NULL
 // useful for any read on the index in memory
-index_branch_t *index_branch_get(index_root_t *root, uint32_t branchid) {
-    if(!root->branches)
+index_branch_t *index_branch_get(index_branch_t **branches, uint32_t branchid) {
+    if(!branches)
         return NULL;
 
-    return root->branches[branchid];
+    return branches[branchid];
 }
 
 // returns branch from rootindex, if branch doesn't exists, it will be allocated
 // (useful for any write in the index in memory)
-index_branch_t *index_branch_get_allocate(index_root_t *root, uint32_t branchid) {
-    if(!root->branches[branchid])
-        return index_branch_init(root, branchid);
+index_branch_t *index_branch_get_allocate(index_branch_t **branches, uint32_t branchid) {
+    if(!branches[branchid])
+        return index_branch_init(branches, branchid);
 
-    // debug("[+] branch: exists: %lu entries\n", root->branches[branchid]->length);
-    return root->branches[branchid];
+    // debug("[+] branch: exists: %lu entries\n", branches[branchid]->length);
+    return branches[branchid];
 }
 
 // append an entry (item) to the memory list
@@ -99,14 +103,14 @@ index_branch_t *index_branch_get_allocate(index_root_t *root, uint32_t branchid)
 // only occures here
 //
 // if there is no index, we just skip the appending
-index_entry_t *index_branch_append(index_root_t *root, uint32_t branchid, index_entry_t *entry) {
+index_entry_t *index_branch_append(index_branch_t **branches, uint32_t branchid, index_entry_t *entry) {
     index_branch_t *branch;
 
-    if(!root->branches)
+    if(!branches)
         return NULL;
 
     // grabbing the branch
-    branch = index_branch_get_allocate(root, branchid);
+    branch = index_branch_get_allocate(branches, branchid);
     branch->length += 1;
 
     // adding this item and pointing previous last one
@@ -147,4 +151,25 @@ index_entry_t *index_branch_remove(index_branch_t *branch, index_entry_t *entry,
     branch->length -= 1;
 
     return entry;
+}
+
+// iterate over a branch and try to find the previous entry of the given entry
+// if by mystake, the entry was not found on the branch, we returns the entry itself
+// if entry was the first entry, previous will also be NULL
+index_entry_t *index_branch_get_previous(index_branch_t *branch, index_entry_t *entry) {
+    index_entry_t *previous = NULL;
+    index_entry_t *iterator = branch->list;
+
+    while(iterator && iterator != entry) {
+        previous = iterator;
+        iterator = iterator->next;
+    }
+
+    // we reached the end of the list, without finding
+    // a matching entry, this is mostly a mistake from caller
+    // let's notify it by replying with it's own object
+    if(!iterator)
+        return entry;
+
+    return previous;
 }

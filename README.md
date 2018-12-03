@@ -1,14 +1,29 @@
-# 0-db [![Build Status](https://travis-ci.org/rivine/0-db.svg?branch=master)](https://travis-ci.org/rivine/0-db) [![codecov](https://codecov.io/gh/rivine/0-db/branch/master/graph/badge.svg)](https://codecov.io/gh/rivine/0-db)  
+# 0-db [![Build Status](https://travis-ci.org/threefoldtech/0-db.svg?branch=master)](https://travis-ci.org/threefoldtech/0-db) [![codecov](https://codecov.io/gh/threefoldtech/0-db/branch/master/graph/badge.svg)](https://codecov.io/gh/threefoldtech/0-db)  
 0-db is a super fast and efficient key-value store redis-protocol (mostly) compatible which
-makes data persistant inside an always append index/datafile, with namespaces support.
+makes data persistant inside an always append datafile, with namespaces support.
+
+Indexes are created to speedup restart/reload process, this index is always append too,
+except in direct-mode (see below for more information).
 
 We use it as backend for many of our blockchain work and might replace redis for basic
 SET and GET request.
 
+# Quick links
+1. [Build targets](#build-targets)
+2. [Build instructions](#build-instructions)
+3. [Always append](#always-append)
+4. [Running modes](#running-modes)
+5. [Implementation](#implementation)
+6. [Supported commands](#supported-commands)
+7. [Namespaces](#namespaces)
+8. [Hook system](#hook-system)
+9. [Limitation](#limitation)
+10. [Tests](#tests)
+
 # Build targets
 Currently supported system:
 * Linux (using `epoll`)
-* MacOS / FreeBSD (using `kqueue`)
+* MacOS and FreeBSD (using `kqueue`)
 
 Currently supported hardware:
 * Any processor supporting `SSE 4.2`
@@ -24,11 +39,42 @@ You can build each parts separatly by running `make` in each separated directori
 
 > By default, the code is compiled in debug mode, in order to use it in production, please use `make release`
 
+# Always append
+Data file (files which contains everything, included payload) are **in any cases** always append:
+any change will result in something appened to files. Data files are immuables. If any suppression is
+made, a new entry is added, with a special flag. This have multiple advantages:
+- Very efficient in HDD (no seek when writing batch of data)
+- More efficient for SSD, longer life, since overwrite doesn't occures
+- Easy for backup or transfert: incremental copy work out-of-box
+- Easy for manipulation: data is flat
+
+Of course, when we have advantages, some cons comes with them:
+- Any overwrite won't clean previous data
+- Deleting data won't actually delete anything in realtime
+- You need some maintenance to keep your database not exploding
+
+Hopefuly, theses cons have their solution:
+- We always have previous data there, let's allows to walk throught it and support history out-of-box !
+- Since data are always append, you can at any time start another process reading that database
+and rewrite data somewhere else, with optimization (removed non-needed files). This is what we call
+`compaction`, and some tools are here to do so.
+- As soon as you have your new files compacted, you can hot-reload the database and profit, without
+loosing your clients (small freeze-time will occures, when reloading the index).
+
+Data files are never reach directly, you need to always hit the index first.
+
+Index files are always append, except when deleting or overwriting a key. Impact are really small
+only a flag is edited, and new entries are always append anyway, but the database supports to walk
+over the keys, any update needs to invalidate the previous entry, in order to keep the chain in a
+good health. The index is there mostly to have flexibility.
+
+Otherwise, index works like data files, with more or less the same data (except payload) and
+have the advantage to be small and load fast (can be fully populated in memory for processing).
+
 # Running modes
-On the runtime, you can choose between multiple mode:
+On runtime, you can choose between multiple mode:
 * `user`: user-key mode
 * `seq`: sequential mode
-* `direct`: direct-position key mode
 
 **Warning**: in any case, please ensure data and index directories used by 0-db are empty, or
 contains only valid database namespaces directories.
@@ -48,15 +94,8 @@ Providing any other key will fails.
 
 The id is a little-endian integer key. All the keys are kept in memory.
 
-## Direct Key
-This mode works like the sequential mode, except that returned key contains enough information to fetch the
-data back, without using in-memory index.
-
-There is no update possible in this mode (since the key itself contains data to the real location
-and we use always append method, we can't update existing data). Providing a key has no effect and
-is ignored.
-
-The key returned by the `SET` command is a binary key.
+## Direct Key (Legacy)
+There was previously a `direct mode` which works the same way as `sequential mode` now. This mode doesn't exists anymore.
 
 # Implementation
 This project doesn't rely on any dependencies, it's from scratch.
@@ -67,8 +106,9 @@ Each index files contains a 27 bytes headers containing a magic 4 bytes identifi
 a version, creation and last opened date and it's own file-sequential-id. In addition it contains
 the mode used when it was created (to avoid mixing mode on different run).
 
-For each entries on the index, 36 bytes (28 bytes + pointer for linked list) 
-plus the key itself (limited to 256 bytes) will be consumed.
+For each entries on the index, on disk, an entry of 30 bytes + the id will be written.
+In memory, 42 bytes (34 bytes + pointer for linked list) plus the key itself (limited to 256 bytes)
+will be consumed.
 
 The data (value) files contains a 26 bytes headers, mostly the same as the index one
 and each entries consumes 18 bytes (1 byte for key length, 4 bytes for payload length, 4 bytes crc,
@@ -81,11 +121,13 @@ Whenever the key already exists, it's appended to disk and entry in memory is re
 
 Each time the server starts, it loads (basicly replay) the index in memory. The index is kept in memory 
 **all the time** and only this in-memory index is reached to fetch a key, index files are
-never read again except during startup (except for 'direct-key mode', where the index is not in memory)
-or in direct-mode where key is the location on the index.
+never read again except during startup, reload or slow query (slow queries mean, doing some SCAN/RSCAN/HISTORY requests).
+
+In direct-mode, key is the location on the index, no memory usage is needed, but lot of disk access are needed.
 
 When a key-delete is requested, the key is kept in memory and is flagged as deleted. A new entry is added
 to the index file, with the according flags. When the server restart, the latest state of the entry is used.
+In direct mode, the flag is overwritten in place on the index.
 
 ## Index
 The current index in memory is a really simple implementation (to be improved).
@@ -108,12 +150,13 @@ This mode is not possible if you don't have any data/index already available.
 
 # Supported commands
 - `PING`
-- `SET key value`
+- `SET key value [timestamp]`
 - `GET key`
 - `DEL key`
 - `STOP` (used only for debugging, to check memory leaks)
 - `EXISTS key`
 - `CHECK key`
+- `KEYCUR key`
 - `INFO`
 - `NSNEW namespace`
 - `NSDEL namespace`
@@ -124,12 +167,25 @@ This mode is not possible if you don't have any data/index already available.
 - `DBSIZE`
 - `TIME`
 - `AUTH password`
-- `SCAN [optional key]`
-- `RSCAN [optional key]`
+- `SCAN [optional cursor]`
+- `SCANX [optional cursor]` (this is just an alias for `SCAN`)
+- `RSCAN [optional cursor]`
+- `WAIT command | *`
+- `HISTORY key [binary-data]`
+- `FLUSH`
 
 `SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
 
 > Compared to real redis protocol, during a `SET`, the key is returned as response.
+
+## SET
+This is the basic `SET key value` command, key can be binary.
+
+This command returns the key if SET was done properly or `(nil)` if you
+try to update a key without modification (avoid inserting already existing data).
+
+**Note:** admin user can specify an extra argument, timestamp, which will set the timestamp of the key
+to the specified timestamp and not the current timestamp. This is needed when doing replication.
 
 ## EXISTS
 Returns 1 or 0 if the key exists
@@ -138,21 +194,54 @@ Returns 1 or 0 if the key exists
 Check internally if the data is corrupted or not. A CRC check is done internally.
 Returns 1 if integrity is validated, 0 otherwise.
 
+## KEYCUR
+Returns a cursor from a key name. This cursor **should** be valid for life-time.
+You can provide this cursor to SCAN family command in order to start walking from a specific
+key. Even if that key was updated or deleted, the cursor contains enough data to know from
+where to start looking and you won't miss any new stuff.
+
+This cursor is a binary key.
+
 ## SCAN
 Walk forward over a dataset (namespace).
 
-- If `SCAN` is called without argument, it returns the first key (first in time) available in the dataset.
-- If `SCAN` is called with an argument, it returns the next key after the argument.
+- If `SCAN` is called without argument, it starts from first key (first in time) available in the dataset.
+- If `SCAN` is called with an argument, it starts from provided key cursor.
 
 If the dataset is empty, or you reach the end of the chain, `-No more data` is returned.
 
-If you provide a non-existing (or deleted) key as argument, `-Invalid index` is returned.
+If you provide an invalid cursor as argument, `-Invalid key format` is returned.
 
-Otherwise, an array (like redis `SCAN`) is returned. Only the first item is relevant, and it's the next
-key expected.
+Otherwise, an array (a little bit like original redis `SCAN`) is returned.
+The first item of the array is the next id (cursor) you need to set to SCAN in order to continue walking.
+
+The second element of the array is another array which contains one or more entries (keys). Each entries
+contains 3 fields: the key, the size of the payload and the creation timestamp.
+
+**Note:** the amount of keys returned is not predictable, it returns as much as possible keys
+in a certain limited amount of time, to not block others clients.
+
+Example:
+```
+> SCAN
+1) "\x87\x00\x00\x00\x10\x00\x00\xcd4\x00\x00\x87E{\x88  # next key id to send as SCAN argument to go ahead
+2) 1) 1) "\x01\x02\x03"
+      2) (integer) 16                 # size of payload in byte
+      3) (integer) 1535361488         # unix timestamp of creation time
+   2) 1) "\xa4\x87\xd4}\xbe\x84\x1a\xba"
+      2) (integer) 6                  # size of payload in byte
+      3) (integer) 1535361485         # unix timestamp of creation time
+```
 
 By calling `SCAN` with each time the key responded on the previous call, you can walk forward a complete
 dataset.
+
+There is a special alias `SCANX` command which does exacly the same, but with another name.
+Some redis client library (like python) expect integer response and not binary response. Using `SCANX` avoid
+this issue.
+
+In order to start scanning from a specific key, you need to get a cursor from that key first,
+see `KEYCUR` command
 
 ## RSCAN
 Same as scan, but backward (last-to-first key)
@@ -171,6 +260,20 @@ Warning:
 
 ## NSINFO
 Returns basic informations about a namespace
+
+```
+# namespace
+name: default          # namespace name
+entries: 0             # amount of entries
+public: yes            # public writable (yes/no)
+password: no           # password protected (yes/no)
+data_size_bytes: 0     # total data payload in bytes
+data_size_mb: 0.00     # total data payload in MB
+data_limits_bytes: 0   # namespace size limit (0 for unlimited)
+index_size_bytes: 0    # index size in bytes (thanks captain obvious)
+index_size_kb: 0.00    # index size in KB
+mode: userkey          # running mode (userkey/sequential)
+```
 
 ## NSLIST
 Returns an array of all available namespaces.
@@ -191,12 +294,56 @@ any password, the namespace will be accessible in read-only.
 ## AUTH
 If an admin account is set, use `AUTH` command to authentificate yourself as `ADMIN`.
 
+## WAIT
+Blocking wait on command execution by someone else. This allows you to wait somebody else
+doing some commands. This can be useful to avoid polling the server if you want to do periodic
+queries (like waiting for a `SET`).
+
+Wait takes one argument: a command name to wait for. The event will only be triggered for clients
+on the same namespace as you (same `SELECT`), the special command '`*`' can be used to wait on any commands.
+
+This is the only blocking function right now. In server side, your connection is set `pending` and
+you won't receive anything until someone executed the expected command.
+
+When the command is triggered by someone else, you receive `+COMMAND_NAME` as response.
+
+## HISTORY
+This command allows you to go back in time, when your overwrite a key.
+
+You always need to set the expected key as first argument: `HISTORY mykey`
+
+Without more argument, you'll get information about the current state of the key.
+The returned value are always the same format, an array made like this:
+
+1. A binary string which can be used to go deeper on the history
+2. The timestamp (unix) when the key was created
+3. The payload of the data at that time
+
+To rollback in time, you can follow the history by calling again the same command, with
+as extra argument the first key received (a binary string). Eg: `HISTORY mykey "\x00\x00\x1b\x00\x00\x00"`
+
+When requesting an extra argument, you'll get the previous entry. And so on...
+
+## FLUSH
+Truncate a namespace contents. This is a really destructive command, everything is deleted and no
+recovery is possible (history, etc. are deleted).
+
+This is only allowed on private and password protected namespace. You need to select the namespace
+before running the command.
+
 # Namespaces
 A namespace is a dedicated directory on index and data root directory.
 A namespace is a complete set of key/data. Each namespace can be optionally protected by a password
 and size limited.
 
 You are always attached to a namespace, by default, it's namespace `default`.
+
+## Protected mode
+If you start the server using `--protect` flag, your `default` namespace will be set in read-only
+by default, and protected by the **Admin Password**.
+
+If you're running protected mode, in order to do changes on default namespace, you need to explicitly
+`SELECT default [password]` to switch into read-write mode.
 
 # Hook System
 You can request 0-db to call an external program/script, as hook-system. This allows the host
@@ -221,6 +368,19 @@ Current supported hooks:
 | `namespace-created`   | New namespace created   | Namespace name             |
 | `namespace-deleted`   | Namespace removed       | Namespace name             |
 | `namespace-reloaded`  | Namespace reloaded      | Namespace name             |
+
+# Limitation
+By default, datafiles are split when bigger than 256 MB.
+
+The datafile id is stored on 16 bits, which makes maximum of 65536 files.
+Each namespaces have their own datafiles, one namespace can contains maximum ~16 TB of data.
+Since one single 0-db is made to be used on a single dedicated disk, this should be good out of box,
+but that's still a limitation. This limitation can be changed on startup via command line
+option `--datasize`, and provide (in bytes) the size limit of a datafile. Setting `536870912` for exemple
+(which is 512 MB) would set the namespace limit to ~32 TB. This limit is printed (with verbose flag) on
+the initializing process.
+
+Please use always the same datasize accross multiple run, but using different size **should not** interfer.
 
 # Tests
 You can run a sets of test on a running 0-db instance.

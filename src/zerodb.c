@@ -8,6 +8,8 @@
 #include <signal.h>
 #include <execinfo.h>
 #include <getopt.h>
+#include <ctype.h>
+#include <time.h>
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
@@ -35,6 +37,9 @@ settings_t rootsettings = {
     .logfile = NULL,
     .hook = NULL,
     .zdbid = NULL,
+    .datasize = ZDB_DEFAULT_DATA_MAXSIZE,
+    .protect = 0,
+    .maxsize = 0,
 };
 
 static struct option long_options[] = {
@@ -52,6 +57,9 @@ static struct option long_options[] = {
     {"logfile",    required_argument, 0, 'o'},
     {"admin",      required_argument, 0, 'a'},
     {"hook",       required_argument, 0, 'k'},
+    {"datasize",   required_argument, 0, 'D'},
+    {"maxsize",    required_argument, 0, 'M'},
+    {"protect",    no_argument,       0, 'P'},
     {"help",       no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
@@ -65,6 +73,38 @@ static char *modes[] = {
 
 // debug tools
 static char __hex[] = "0123456789abcdef";
+
+void fulldump(void *_data, size_t len) {
+    uint8_t *data = _data;
+    unsigned int i, j;
+
+    printf("[*] data fulldump [%p -> %p] (%lu bytes)\n", data, data + len, len);
+    printf("[*] 0x0000: ");
+
+    for(i = 0; i < len; ) {
+        printf("%02x ", data[i++]);
+
+        if(i % 16 == 0) {
+            printf("|");
+
+            for(j = i - 16; j < i; j++)
+                printf("%c", ((isprint(data[j]) ? data[j] : '.')));
+
+            printf("|\n[*] 0x%04x: ", i);
+        }
+    }
+
+    if(i % 16) {
+        printf("%-*s |", 5 * (16 - (i % 16)), " ");
+
+        for(j = i - (i % 16); j < len; j++)
+            printf("%c", ((isprint(data[j]) ? data[j] : '.')));
+
+        printf("%-*s|\n", 16 - ((int) len % 16), " ");
+    }
+
+    printf("\n");
+}
 
 void hexdump(void *input, size_t length) {
     unsigned char *buffer = (unsigned char *) input;
@@ -80,12 +120,34 @@ void hexdump(void *input, size_t length) {
     free(output);
 }
 
+uint32_t instanceid() {
+    struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    srand((time_t) ts.tv_nsec);
+
+    // generating random id, greater than zero
+    return (uint32_t) ((rand() % (1 << 30)) + 1);
+}
+
 //
 // global warning and fatal message
 //
 void *warnp(char *str) {
     fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
     return NULL;
+}
+
+void verbosep(char *prefix, char *str) {
+#ifdef RELEASE
+    // only match on verbose flag if we are
+    // in release mode, otherwise do always the
+    // print, we are in debug mode anyway
+    if(!rootsettings.verbose)
+        return;
+#endif
+
+    fprintf(stderr, "[-] %s: %s: %s\n", prefix, str, strerror(errno));
 }
 
 void diep(char *str) {
@@ -120,7 +182,7 @@ static void sighandler(int signal) {
             fprintf(stderr, "[-] ----------------------------------\n");
 
             int calls = backtrace(buffer, sizeof(buffer) / sizeof(void *));
-			backtrace_symbols_fd(buffer, calls, 1);
+            backtrace_symbols_fd(buffer, calls, 1);
 
             fprintf(stderr, "[-] ----------------------------------");
 
@@ -187,6 +249,18 @@ static int proceed(struct settings_t *settings) {
     // and the destruction
     namespaces_init(settings);
 
+    // apply global protected flag to the default namespace
+    if(settings->protect) {
+        namespace_t *defns = namespace_get_default();
+        defns->password = strdup(settings->adminpwd);
+    }
+
+    // apply global maximum size for the global namespace
+    if(settings->maxsize) {
+        namespace_t *defns = namespace_get_default();
+        defns->maxsize = settings->maxsize;
+    }
+
     // main worker point (if dump not enabled)
     if(!settings->dump)
         redis_listen(settings->listen, settings->port, settings->socket);
@@ -216,7 +290,8 @@ void usage() {
     printf("                       > user: default user key-value mode\n");
     printf("                       > seq: sequential keys generated\n");
     printf("                       > direct: direct position by key\n");
-    printf("                       > block: fixed blocks length (smaller direct)\n\n");
+    printf("                       > block: fixed blocks length (smaller direct)\n");
+    printf("  --datasize <size>   maximum datafile size before split (default: %.2f MB)\n\n", MB(ZDB_DEFAULT_DATA_MAXSIZE));
 
     printf(" Network options:\n");
     printf("  --listen <addr>     listen address (default " ZDB_DEFAULT_LISTENADDR ")\n");
@@ -224,8 +299,10 @@ void usage() {
     printf("  --socket <path>     unix socket path (override listen and port)\n\n");
 
     printf(" Administrative:\n");
-    printf("  --hook  <file>      execute external hook script\n");
-    printf("  --admin <pass>      set admin password\n\n");
+    printf("  --hook     <file>   execute external hook script\n");
+    printf("  --admin    <pass>   set admin password\n");
+    printf("  --maxsize  <size>   set default namespace maximum datasize (in bytes)\n");
+    printf("  --protect           set default namespace protected by admin password\n\n");
 
     printf(" Useful tools:\n");
     printf("  --verbose           enable verbose (debug) information\n");
@@ -242,13 +319,12 @@ void usage() {
 // main entry: processing arguments
 //
 int main(int argc, char *argv[]) {
-    notice("[*] Zero-DB (0-db), revision " REVISION);
+    notice("[*] Zero-DB (0-db), v" ZDB_VERSION " (commit " REVISION ")");
 
     settings_t *settings = &rootsettings;
     int option_index = 0;
 
     while(1) {
-        // int i = getopt_long_only(argc, argv, "d:i:l:p:vxh", long_options, &option_index);
         int i = getopt_long_only(argc, argv, "", long_options, &option_index);
 
         if(i == -1)
@@ -307,6 +383,16 @@ int main(int argc, char *argv[]) {
                 verbose("[+] system: admin password set\n");
                 break;
 
+            case 'P':
+                settings->protect = 1;
+                verbose("[+] system: protected database enabled\n");
+                break;
+
+            case 'M':
+                settings->maxsize = atol(optarg);
+                verbose("[+] system: default namespace maxsize: %.2f MB\n", MB(settings->maxsize));
+                break;
+
             case 'm':
                 if(strcmp(optarg, "user") == 0) {
                     settings->mode = KEYVALUE;
@@ -315,7 +401,16 @@ int main(int argc, char *argv[]) {
                     settings->mode = SEQUENTIAL;
 
                 } else if(strcmp(optarg, "direct") == 0) {
-                    settings->mode = DIRECTKEY;
+                    // settings->mode = DIRECTKEY;
+                    settings->mode = SEQUENTIAL;
+
+                    warning("[!] WARNING: direct mode doesn't exists anymore !");
+                    warning("[!] WARNING: this mode is replaced by 'sequential' mode");
+                    warning("[!] WARNING: which works the same way, but offers more");
+                    warning("[!] WARNING: flexibility and performance");
+                    warning("[!] WARNING: ");
+                    warning("[!] WARNING: direct mode will not be supported at all anymore");
+                    warning("[!] WARNING: in futur release");
 
                 } else if(strcmp(optarg, "block") == 0) {
                     settings->mode = DIRECTBLOCK;
@@ -332,6 +427,18 @@ int main(int argc, char *argv[]) {
                 settings->socket = optarg;
                 break;
 
+            case 'D':
+                settings->datasize = atol(optarg);
+                size_t maxsize = 0xffffffff;
+
+                // maximum 4 GB (32 bits) allowed
+                if(settings->datasize >= maxsize) {
+                    danger("[-] datasize cannot be larger than %lu bytes (%.0f MB)", maxsize, MB(maxsize));
+                    exit(EXIT_FAILURE);
+                }
+
+                break;
+
             case 'h':
                 usage();
 
@@ -341,8 +448,29 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if(settings->protect && !settings->adminpwd) {
+        danger("[-] protected mode only works with admin password");
+        exit(EXIT_FAILURE);
+    }
+
+    //
+    // print information relative to database instance
+    //
     printf("[+] system: running mode: " COLOR_GREEN "%s" COLOR_RESET "\n", modes[settings->mode]);
 
+    // max files is limited by type length of dataid, which is uint16 by default
+    // taking field size in bytes, multiplied by 8 for bits
+    size_t maxfiles = 1 << sizeof(((data_root_t *) 0)->dataid) * 8;
+
+    // max database size is maximum datafile size multiplied by amount of files
+    uint64_t maxsize = maxfiles * settings->datasize;
+
+    verbose("[+] system: maximum namespace size: %.2f GB\n", GB(maxsize));
+
+    //
+    // ensure default directories
+    // for a fresh start if this is a new instance
+    //
     if(!dir_exists(settings->datapath)) {
         verbose("[+] system: creating datapath: %s\n", settings->datapath);
         dir_create(settings->datapath);
@@ -353,5 +481,10 @@ int main(int argc, char *argv[]) {
         dir_create(settings->indexpath);
     }
 
+    // generating instance id
+    settings->iid = instanceid();
+    verbose("[+] system: instance id: %u\n", settings->iid);
+
+    // let's go
     return proceed(settings);
 }

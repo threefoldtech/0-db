@@ -2,6 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <stdint.h>
 #include "tests_user.h"
 #include "tests.h"
 #include "zdb_utils.h"
@@ -22,7 +23,7 @@ int lowlevel_send_invalid(test_t *test, char *buffer, size_t buflen) {
     if(buffer[0] == '-') {
         // connection was closed, reopen it
         // redisReconnect(test->zdb);
-        initialize_tcp();
+        initialize_tcp(test);
         return TEST_SUCCESS;
     }
 
@@ -102,6 +103,87 @@ runtest_prio(sp, lowlevel_not_string_argument) {
     return lowlevel_send_invalid(test, buffer, sizeof(buffer));
 }
 
+// testing tricky case when the payload is just
+// enough to make the final \r\n between two buffer
+// read server side (by default buffer is 8192 bytes)
+runtest_prio(sp, lowlevel_tricky_buffer_limit) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    char buffer[8195];
+    ssize_t length;
+
+    memcpy(buffer, "*3\r\n$3\r\nSET\r\n$3\r\nXXX\r\n$8164\r\n", 29);
+    memset(buffer + 29, 'K', 8193 - 29);
+    memcpy(buffer + 8193, "\r\n", 2);
+
+    if(write(test->zdb->fd, buffer, sizeof(buffer)) < 0)
+        perror("write");
+
+    if((length = read(test->zdb->fd, buffer, sizeof(buffer))) < 0)
+        perror("read");
+
+    if(memcmp(buffer, "$3\r\nXXX\r\n", 9) == 0)
+        return TEST_SUCCESS;
+
+    return TEST_FAILED;
+}
+
+// testing tricky case when the header of a field is just
+// between two buffer read server side
+// (by default buffer is 8192 bytes)
+runtest_prio(sp, lowlevel_tricky_buffer_header_limit) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    char buffer[8201];
+    ssize_t length;
+
+    memcpy(buffer, "*2\r\n$8178\r\n", 11);
+    memset(buffer + 11, 'W', 8178);
+    memcpy(buffer + 8189, "\r\n$4\r\nXXXX\r\n", 12);
+
+    if(write(test->zdb->fd, buffer, sizeof(buffer)) < 0)
+        perror("write");
+
+    if((length = read(test->zdb->fd, buffer, sizeof(buffer))) < 0)
+        perror("read");
+
+    if(memcmp(buffer, "-Command not supported", 22) == 0)
+        return TEST_SUCCESS;
+
+    return TEST_FAILED;
+}
+
+// testing tricky case when the header of a field is just
+// at the end of one packet buffer
+// (by default buffer is 8192 bytes)
+runtest_prio(sp, lowlevel_tricky_buffer_header_split) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    char buffer[8198];
+    ssize_t length;
+
+    memcpy(buffer, "*2\r\n$8175\r\n", 11);
+    memset(buffer + 11, 'W', 8175);
+    memcpy(buffer + 8186, "\r\n$4\r\nXXXX\r\n", 12);
+
+    if(write(test->zdb->fd, buffer, sizeof(buffer)) < 0)
+        perror("write");
+
+    if((length = read(test->zdb->fd, buffer, sizeof(buffer))) < 0)
+        perror("read");
+
+    if(memcmp(buffer, "-Command not supported", 22) == 0)
+        return TEST_SUCCESS;
+
+    return TEST_FAILED;
+}
+
+
+
+
 #define MAX_CONNECTIONS  128
 runtest_prio(sp, lowlevel_open_many_connection) {
     redisContext *ctx[MAX_CONNECTIONS] = {NULL};
@@ -125,4 +207,17 @@ runtest_prio(sp, lowlevel_open_many_connection) {
 
     return response;
 }
+
+runtest_prio(sp, lowlevel_mirror) {
+    const char *argv[] = {"MIRROR"};
+    int value = zdb_command(test, argvsz(argv), argv);
+
+    if(value != TEST_SUCCESS)
+        return value;
+
+    // reopen the connection
+    initialize_tcp(test);
+    return TEST_SUCCESS;
+}
+
 

@@ -27,7 +27,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
         // epoll issue
         // discarding this client
         if((ev->events & EPOLLERR) || (ev->events & EPOLLHUP)) {
-            warnp("epoll");
+            verbosep("socket_event", "epoll");
             socket_client_free(ev->data.fd);
             continue;
         }
@@ -38,7 +38,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             int clientfd;
 
             if((clientfd = accept(redis->mainfd, NULL, NULL)) == -1) {
-                warnp("accept");
+                verbosep("socket_event", "accept");
                 continue;
             }
 
@@ -55,8 +55,12 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             event.data.fd = clientfd;
             event.events = EPOLLIN | EPOLLOUT | EPOLLET;
 
+            // we use edge-level because of how the
+            // upload works (need to be notified when client
+            // is ready to receive data, only one time)
+
             if(epoll_ctl(redis->evfd, EPOLL_CTL_ADD, clientfd, &event) < 0) {
-                warnp("epoll_ctl");
+                verbosep("socket_event", "epoll_ctl");
                 continue;
             }
 

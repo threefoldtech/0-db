@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include "zerodb.h"
 #include "index.h"
+#include "index_get.h"
 #include "data.h"
 #include "namespace.h"
 #include "redis.h"
@@ -30,7 +31,8 @@ int command_exists(redis_client_t *client) {
     debughex(request->argv[1]->buffer, request->argv[1]->length);
     debug("\n");
 
-    index_entry_t *entry = redis_get_handlers[rootsettings.mode](client);
+    index_root_t *index = client->ns->index;
+    index_entry_t *entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length);
 
     debug("[+] command: exists: entry found: %s\n", (entry ? "yes" : "no"));
 
@@ -66,7 +68,8 @@ int command_check(redis_client_t *client) {
     debughex(request->argv[1]->buffer, request->argv[1]->length);
     debug("\n");
 
-    index_entry_t *entry = redis_get_handlers[rootsettings.mode](client);
+    index_root_t *index = client->ns->index;
+    index_entry_t *entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length);
 
     // key not found at all
     if(!entry) {
@@ -83,8 +86,8 @@ int command_check(redis_client_t *client) {
     }
 
     // key found and valid, let's checking the contents
-    debug("[+] command: get: entry found, flags: %x, data length: %" PRIu64 "\n", entry->flags, entry->length);
-    debug("[+] command: get: data file: %d, data offset: %" PRIu64 "\n", entry->dataid, entry->offset);
+    debug("[+] command: get: entry found, flags: %x, data length: %" PRIu32 "\n", entry->flags, entry->length);
+    debug("[+] command: get: data file: %d, data offset: %" PRIu32 "\n", entry->dataid, entry->offset);
 
     data_root_t *data = client->ns->data;
     int status = data_check(data, entry->offset, entry->dataid);
@@ -120,7 +123,7 @@ int command_del(redis_client_t *client) {
     index_entry_t *entry;
 
     // grabbing original entry
-    if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
+    if(!(entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length))) {
         debug("[-] command: del: key not found\n");
         redis_hardsend(client, "-Key not found");
         return 1;
@@ -133,16 +136,16 @@ int command_del(redis_client_t *client) {
         return 1;
     }
 
-    // add a new entry containing new flag
-    if(!index_entry_delete(index, entry)) {
-        debug("[-] command: del: index delete flag failed\n");
+    // update data file, flag entry deleted
+    if(!data_delete(data, entry->id, entry->idlength)) {
+        debug("[-] command: del: deleting data failed\n");
         redis_hardsend(client, "-Cannot delete key");
         return 0;
     }
 
-    // deleting data part
-    if(!data_delete(data, entry->offset, entry->dataid)) {
-        debug("[-] command: del: deleting data failed\n");
+    // mark index entry as deleted
+    if(index_entry_delete(index, entry)) {
+        debug("[-] command: del: index delete flag failed\n");
         redis_hardsend(client, "-Cannot delete key");
         return 0;
     }

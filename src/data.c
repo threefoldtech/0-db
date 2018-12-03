@@ -12,9 +12,11 @@
 #include <errno.h>
 #include <time.h>
 #include "zerodb.h"
+#include "filesystem.h"
 #include "data.h"
 #include "index.h" // for key max length
 
+#if 0
 // dump a data entry
 static void data_entry_header_dump(data_entry_header_t *entry) {
 #ifdef RELEASE
@@ -28,6 +30,7 @@ static void data_entry_header_dump(data_entry_header_t *entry) {
     debug("[+] data: entry dump: timestamp  : %u\n", entry->timestamp);
 #endif
 }
+#endif
 
 // force to sync data buffer into the underlaying device
 static inline int data_sync(data_root_t *root, int fd) {
@@ -89,7 +92,7 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
 // this function open the data file in read only and should
 // not be used to edit or open the current effective current file
 static int data_open_id_mode(data_root_t *root, uint16_t id, int mode) {
-    char temp[PATH_MAX];
+    char temp[ZDB_PATH_MAX];
     int fd;
 
     sprintf(temp, "%s/zdb-data-%05u", root->datadir, id);
@@ -107,11 +110,16 @@ static int data_open_id(data_root_t *root, uint16_t id) {
     return data_open_id_mode(root, id, O_RDONLY);
 }
 
+// since data are **really** always append
+// there is no more reason to keep a read-write function
+// let keep it here for history reason
+#if 0
 // special case (for deletion) where read-write is needed
 // and not in append mode
-int data_get_dataid_rw(data_root_t *root, uint16_t id) {
+static int data_get_dataid_rw(data_root_t *root, uint16_t id) {
     return data_open_id_mode(root, id, O_RDWR);
 }
+#endif
 
 
 // main function to call when you need to deal with data id
@@ -233,7 +241,7 @@ size_t data_jump_next(data_root_t *root, uint16_t newid) {
 
 // compute a crc32 of the payload
 // this function uses Intel CRC32 (SSE4.2) intrinsic
-static uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
+uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
     uint64_t *input = (uint64_t *) bytes;
     uint32_t hash = 0;
     ssize_t i = 0;
@@ -376,23 +384,24 @@ int data_check(data_root_t *root, size_t offset, uint16_t dataid) {
 
 
 // insert data on the datafile and returns it's offset
-size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength) {
-    unsigned char *id = (unsigned char *) vid;
+// size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength, uint8_t flags, uint32_t crc) {
+size_t data_insert(data_root_t *root, data_request_t *source) {
+    unsigned char *id = (unsigned char *) source->vid;
     size_t offset = lseek(root->datafd, 0, SEEK_END);
-    size_t headerlength = sizeof(data_entry_header_t) + idlength;
+    size_t headerlength = sizeof(data_entry_header_t) + source->idlength;
     data_entry_header_t *header;
 
     if(!(header = malloc(headerlength)))
         diep("malloc");
 
-    header->idlength = idlength;
-    header->datalength = datalength;
+    header->idlength = source->idlength;
+    header->datalength = source->datalength;
     header->previous = root->previous;
-    header->integrity = data_crc32(data, datalength);
-    header->flags = 0;
+    header->integrity = source->crc; // data_crc32(data, datalength);
+    header->flags = source->flags;
     header->timestamp = time(NULL);
 
-    memcpy(header->id, id, idlength);
+    memcpy(header->id, id, source->idlength);
 
     // data offset will always be >= 1 (see initializer notes)
     // we can use 0 as error detection
@@ -405,7 +414,7 @@ size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, 
 
     free(header);
 
-    if(!data_write(root->datafd, data, datalength, 1, root)) {
+    if(!data_write(root->datafd, source->data, source->datalength, 1, root)) {
         verbose("[-] data payload: write failed\n");
         return 0;
     }
@@ -430,583 +439,33 @@ int data_entry_is_deleted(data_entry_header_t *entry) {
     return (entry->flags & DATA_ENTRY_DELETED);
 }
 
-#if 0
-// this function will check for a legitime request inside the data set
-// to estimate if a request is legitimate, we assume that
-//  - if the offset provided point to a header
-//  - we can't ensure what we read is, for sure, a header
-//  - to improve probability:
-//    - if the length of the key in the header match expected key length
-//    - if the data length is not more than the maximum allowed size
-//    - if the key in the header match the key requested
-//    if all of theses conditions match, the probability of a fake request
-//    are nearly null
-//
-// if everything is good, returns the datalength from the header, 0 otherwise
-static inline size_t data_match_real(int fd, void *id, uint8_t idlength, size_t offset) {
-    data_entry_header_t header;
-    char keycheck[MAX_KEY_LENGTH];
+// add a new empty entry, flagged as deleted
+// with the id, so we know (when reading the datafile) that this key
+// was deleted
+// this is needed in order to rebuild an index from data file and
+// for compaction process
+int data_delete(data_root_t *root, void *id, uint8_t idlength) {
+    unsigned char *empty = (unsigned char *) "";
 
-    // positioning datafile to expected offset
-    lseek(fd, offset, SEEK_SET);
+    data_request_t dreq = {
+        .data = empty,
+        .datalength = 0,
+        .vid = id,
+        .idlength = idlength,
+        .flags = DATA_ENTRY_DELETED,
+        .crc = 0,
+    };
 
-    // reading the header
-    if(read(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
-        warnp("data: validator: header read");
+    debug("[+] data: delete: insert empty flagged data\n");
+    if(!(data_insert(root, &dreq)))
         return 0;
-    }
-
-    // preliminary check: does key length match
-    if(header.idlength != idlength) {
-        debug("[-] data: validator: key-length mismatch\n");
-        return 0;
-    }
-
-    if(header.flags & DATA_ENTRY_DELETED) {
-        debug("[-] data: validator: entry deleted\n");
-        return 0;
-    }
-
-    // preliminary check: does the payload fit on the file
-    if(header.datalength > DATA_MAXSIZE) {
-        debug("[-] data: validator: payload length too big\n");
-        return 0;
-    }
-
-    // comparing the key
-    if(read(fd, keycheck, idlength) != (ssize_t) idlength) {
-        warnp("data: validator: key read");
-        return 0;
-    }
-
-    if(memcmp(keycheck, id, idlength) != 0) {
-        debug("[-] data: validator: key mismatch\n");
-        return 0;
-    }
-
-    return header.datalength;
-}
-
-// wrapper for data_match_real which load the correct file id
-// this function is made to ensure the key requested is legitimate
-// we need to be careful, we cannot trust anything (file id, offset, ...)
-//
-// if the header matchs, returns the datalength, which is mostly the only
-// missing data we have in direct-key mode
-size_t data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, uint16_t dataid) {
-    int fd;
-
-    // acquire data id fd
-    if((fd = data_grab_dataid(root, dataid)) < 0) {
-        debug("[-] data: validator: could not open requested file id (%u)\n", dataid);
-        return 0;
-    }
-
-    size_t length = data_match_real(fd, id, idlength, offset);
-
-    // release dataid
-    data_release_dataid(root, dataid, fd);
-
-    return length;
-}
-#endif
-
-int data_delete_real(int fd, size_t offset) {
-    data_entry_header_t header;
-
-    // blindly move to the offset
-    lseek(fd, offset, SEEK_SET);
-
-    // read current header
-    if(read(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
-        warnp("data: delete: header read");
-        return 0;
-    }
-
-    // flag entry as deleted
-    header.flags |= DATA_ENTRY_DELETED;
-
-    // rollback to the offset
-    lseek(fd, offset, SEEK_SET);
-
-    // overwrite the header with the new flag
-    if(write(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
-        warnp("data: delete: header overwrite");
-        return 0;
-    }
 
     return 1;
-}
-
-// IMPORTANT:
-//   this function is the only one to 'break' the always append
-//   behavior, this function will overwrite existing index by
-//   seeking and rewrite headers
-//
-// when deleting some data, we mark (flag) this data as deleted which
-// allows two things
-//   - we can do compaction offline by removing theses blocks
-//   - we still can rebuild an index based on datafile only
-//
-// during runtime, this flag will be checked only using the data_match
-// function
-int data_delete(data_root_t *root, size_t offset, uint16_t dataid) {
-    int fd;
-
-    debug("[+] data: delete: opening datafile in read-write mode\n");
-
-    // acquire data id fd
-    if((fd = data_get_dataid_rw(root, dataid)) < 0) {
-        debug("[-] data: delete: could not open requested file id (%u)\n", dataid);
-        return 0;
-    }
-
-    int value = data_delete_real(fd, offset);
-
-    // release dataid
-    close(fd);
-
-    return value;
 }
 
 uint16_t data_dataid(data_root_t *root) {
     return root->dataid;
 }
-
-//
-// walk functions
-//
-static inline data_scan_t data_scan_error(data_scan_t original, data_scan_status_t error) {
-    // clean any remaning memory
-    free(original.header);
-
-    // ensure we reset everything
-    original.header = NULL;
-    original.status = error;
-
-    return original;
-}
-
-// RSCAN implementation
-static data_scan_t data_previous_header_real(data_scan_t scan) {
-    data_entry_header_t source;
-
-    // if scan.target is not set yet, we don't know the expected
-    // offset of the previous header, let's read the header
-    // of the current entry and find out which is the next one
-    if(scan.target == 0) {
-        off_t current = lseek(scan.fd, scan.original, SEEK_SET);
-
-        if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
-            warnp("data: previous-header: could not read original offset datafile");
-            return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
-        }
-
-        scan.target = source.previous;
-
-        if(source.previous > current) {
-            debug("[+] data: previous-header: previous offset in previous file\n");
-            return data_scan_error(scan, DATA_SCAN_REQUEST_PREVIOUS);
-        }
-    }
-
-    debug("[+] data: previous-header: offset: %u\n", source.previous);
-
-    // at that point, we know scan.target is set to the expected value
-    if(scan.target == 0) {
-        debug("[+] data: previous-header: zero reached, nothing to rollback\n");
-        return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
-    }
-
-    // jumping to previous object
-    lseek(scan.fd, scan.target, SEEK_SET);
-
-    // reading the fixed-length
-    if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
-        warnp("data: previous-header: could not read previous offset datafile");
-        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
-    }
-
-    // checking if entry is deleted
-    if(source.flags & DATA_ENTRY_DELETED) {
-        debug("[+] data: previous-header: data is deleted, going one further\n");
-
-        // set the 'new' original to this offset
-        scan.original = scan.target;
-
-        // reset target, so next time we come here, we will refetch previous
-        // entry and use the mechanism to check if it's the previous file and
-        // so on
-        scan.target = 0;
-
-        // let's notify source this entry was deleted and we
-        // should retrigger the fetch
-        return data_scan_error(scan, DATA_SCAN_DELETED);
-    }
-
-    if(!(scan.header = (data_entry_header_t *) malloc(sizeof(data_entry_header_t) + source.idlength))) {
-        warnp("data: previous-header: malloc");
-        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
-    }
-
-    // reading the full header to target
-    *scan.header = source;
-
-    if(read(scan.fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
-        warnp("data: previous-header: could not read id from datafile");
-        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
-    }
-
-    debug("[+] data: previous-header: entry found\n");
-    scan.status = DATA_SCAN_SUCCESS;
-
-    return scan;
-}
-
-data_scan_t data_previous_header(data_root_t *root, uint16_t dataid, size_t offset) {
-    data_scan_t scan = {
-        .fd = 0,
-        .original = offset, // offset of the 'current' key
-        .target = 0,        // offset of the 'previous' key
-        .header = NULL,     // the previous header
-        .status = DATA_SCAN_UNEXPECTED,
-    };
-
-    while(1) {
-        // acquire data id fd
-        if((scan.fd = data_grab_dataid(root, dataid)) < 0) {
-            debug("[-] data: previous-header: could not open requested file id (%u)\n", dataid);
-            return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
-        }
-
-        // trying to get entry
-        scan = data_previous_header_real(scan);
-
-        // release dataid
-        data_release_dataid(root, dataid, scan.fd);
-
-        if(scan.status == DATA_SCAN_SUCCESS)
-            return scan;
-
-        if(scan.status == DATA_SCAN_UNEXPECTED)
-            return scan;
-
-        if(scan.status == DATA_SCAN_NO_MORE_DATA)
-            return scan;
-
-        // entry was deleted, scan object is updated
-        // we need to retry fetching new data
-        if(scan.status == DATA_SCAN_DELETED)
-            continue;
-
-        if(scan.status == DATA_SCAN_REQUEST_PREVIOUS)
-            dataid -= 1;
-    }
-
-    // never reached
-}
-
-// SCAN implementation
-static data_scan_t data_next_header_real(data_scan_t scan) {
-    data_entry_header_t source;
-
-    // if scan.target is not set yet, we don't know the expected
-    // offset of the next header, let's read the header
-    // of the current entry and find out which is the next one
-    if(scan.target == 0) {
-        lseek(scan.fd, scan.original, SEEK_SET);
-
-        if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
-            warnp("data: next-header: could not read original offset datafile");
-            return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
-        }
-
-        debug("[+] data: next-header: this length: %u\n", source.datalength);
-
-        // next header is at offset + this header + payload
-        scan.target = scan.original + sizeof(data_entry_header_t);
-        scan.target += source.idlength + source.datalength;
-    }
-
-    // jumping to next object
-    lseek(scan.fd, scan.target, SEEK_SET);
-
-    // reading the fixed-length
-    if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
-        warnp("data: next-header: could not read next offset datafile");
-        // this mean the data expected is the first of the next datafile
-        scan.target = sizeof(data_header_t);
-        return data_scan_error(scan, DATA_SCAN_EOF_REACHED);
-    }
-
-    // checking if entry is deleted
-    if(source.flags & DATA_ENTRY_DELETED) {
-        debug("[+] data: next-header: data is deleted, going one further\n");
-
-        // set the 'new' original to this offset
-        scan.original = scan.target;
-
-        // reset target, so next time we come here, we will refetch previous
-        // entry and use the mechanism to check if it's the previous file and
-        // so on
-        scan.target = 0;
-
-        // let's notify source this entry was deleted and we
-        // should retrigger the fetch
-        return data_scan_error(scan, DATA_SCAN_DELETED);
-    }
-
-
-    if(!(scan.header = (data_entry_header_t *) malloc(sizeof(data_entry_header_t) + source.idlength))) {
-        warnp("data: next-header: malloc");
-        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
-    }
-
-    // reading the full header to target
-    *scan.header = source;
-
-    if(read(scan.fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
-        warnp("data: next-header: could not read id from datafile");
-        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
-    }
-
-    debug("[+] data: next-header: entry found\n");
-    scan.status = DATA_SCAN_SUCCESS;
-
-    return scan;
-}
-
-data_scan_t data_next_header(data_root_t *root, uint16_t dataid, size_t offset) {
-    data_scan_t scan = {
-        .fd = 0,
-        .original = offset, // offset of the 'current' key
-        .target = 0,        // offset of the expected next header
-        .header = NULL,     // the new header
-        .status = DATA_SCAN_UNEXPECTED,
-    };
-
-    while(1) {
-        // acquire data id fd
-        if((scan.fd = data_grab_dataid(root, dataid)) < 0) {
-            debug("[-] data: next-header: could not open requested file id (%u)\n", dataid);
-            return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
-        }
-
-        // trying to get entry
-        scan = data_next_header_real(scan);
-
-        // release dataid
-        data_release_dataid(root, dataid, scan.fd);
-
-        if(scan.status == DATA_SCAN_SUCCESS)
-            return scan;
-
-        if(scan.status == DATA_SCAN_UNEXPECTED)
-            return scan;
-
-        // entry was deleted, scan object is updated
-        // we need to retry fetching new data
-        if(scan.status == DATA_SCAN_DELETED)
-            continue;
-
-        if(scan.status == DATA_SCAN_EOF_REACHED) {
-            debug("[-] data: next-header: eof reached\n");
-            dataid += 1;
-        }
-    }
-
-    // never reached
-}
-
-static data_scan_t data_first_header_real(data_scan_t scan) {
-    data_entry_header_t source;
-
-    // jumping to next object
-    lseek(scan.fd, scan.target, SEEK_SET);
-
-    // reading the fixed-length
-    if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
-        warnp("data: first-header: could not read next offset datafile");
-        // this mean the data expected is the first of the next datafile
-        scan.target = sizeof(data_header_t);
-        return data_scan_error(scan, DATA_SCAN_EOF_REACHED);
-    }
-
-    // checking if entry is deleted
-    if(source.flags & DATA_ENTRY_DELETED) {
-        debug("[+] data: first-header: data is deleted, going one further\n");
-
-        // jump to the next entry
-        scan.target += sizeof(data_entry_header_t);
-        scan.target += source.idlength + source.datalength;
-
-        // let's notify source this entry was deleted and we
-        // should retrigger the fetch
-        return data_scan_error(scan, DATA_SCAN_DELETED);
-    }
-
-    if(!(scan.header = (data_entry_header_t *) malloc(sizeof(data_entry_header_t) + source.idlength))) {
-        warnp("data: first-header: malloc");
-        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
-    }
-
-    // reading the full header to target
-    *scan.header = source;
-
-    if(read(scan.fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
-        warnp("data: first-header: could not read id from datafile");
-        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
-    }
-
-    debug("[+] data: first-header: entry found\n");
-    scan.status = DATA_SCAN_SUCCESS;
-
-    return scan;
-}
-
-
-data_scan_t data_first_header(data_root_t *root) {
-    uint16_t dataid = 0;
-    data_scan_t scan = {
-        .fd = 0,
-        .original = sizeof(data_header_t), // offset of the first key
-        .target = sizeof(data_header_t),   // again offset of the first key
-        .header = NULL,
-        .status = DATA_SCAN_UNEXPECTED,
-    };
-
-    while(1) {
-        // acquire data id fd
-        if((scan.fd = data_grab_dataid(root, dataid)) < 0) {
-            debug("[-] data: first-header: could not open requested file id (%u)\n", dataid);
-            return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
-        }
-
-        scan = data_first_header_real(scan);
-
-        // release dataid
-        data_release_dataid(root, dataid, scan.fd);
-
-        if(scan.status == DATA_SCAN_SUCCESS)
-            return scan;
-
-        if(scan.status == DATA_SCAN_UNEXPECTED)
-            return scan;
-
-        // entry was deleted, scan object is updated
-        // we need to retry fetching new data
-        if(scan.status == DATA_SCAN_DELETED)
-            continue;
-
-        if(scan.status == DATA_SCAN_EOF_REACHED) {
-            debug("[-] data: next-header: eof reached\n");
-            dataid += 1;
-        }
-    }
-
-    // never reached
-}
-
-static data_scan_t data_last_header_real(data_scan_t scan) {
-    data_entry_header_t source;
-
-    debug("[+] data: last-header: trying previous offset: %lu\n", scan.target);
-
-    // at that point, we know scan.target is set to the expected value
-    if(scan.target == 0) {
-        debug("[+] data: last-header: zero reached, nothing to rollback\n");
-        return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
-    }
-
-    // jumping to previous object
-    lseek(scan.fd, scan.target, SEEK_SET);
-
-    // reading the fixed-length
-    if(read(scan.fd, &source, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
-        warnp("data: previous-header: could not read previous offset datafile");
-        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
-    }
-
-    data_entry_header_dump(&source);
-
-    // checking if entry is deleted
-    if(source.flags & DATA_ENTRY_DELETED) {
-        debug("[+] data: last-header: data is deleted, going one further\n");
-
-        // reset target, so next time we come here, we will refetch previous
-        // entry and use the mechanism to check if it's the previous file and
-        // so on
-        scan.target = source.previous;
-
-        // let's notify source this entry was deleted and we
-        // should retrigger the fetch
-        return data_scan_error(scan, DATA_SCAN_DELETED);
-    }
-
-    if(!(scan.header = (data_entry_header_t *) malloc(sizeof(data_entry_header_t) + source.idlength))) {
-        warnp("data: last-header: malloc");
-        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
-    }
-
-    // reading the full header to target
-    *scan.header = source;
-
-    if(read(scan.fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
-        warnp("data: last-header: could not read id from datafile");
-        return data_scan_error(scan, DATA_SCAN_UNEXPECTED);
-    }
-
-    debug("[+] data: last-header: entry found\n");
-    scan.status = DATA_SCAN_SUCCESS;
-
-    return scan;
-}
-
-
-data_scan_t data_last_header(data_root_t *root) {
-    uint16_t dataid = root->dataid;
-    data_scan_t scan = {
-        .fd = 0,
-        .original = root->previous, // offset of the last key
-        .target = root->previous,   // again offset of the last key
-        .header = NULL,
-        .status = DATA_SCAN_UNEXPECTED,
-    };
-
-    while(1) {
-        // acquire data id fd
-        if((scan.fd = data_grab_dataid(root, dataid)) < 0) {
-            debug("[-] data: last-header: could not open requested file id (%u)\n", dataid);
-            return data_scan_error(scan, DATA_SCAN_NO_MORE_DATA);
-        }
-
-        // trying to get entry
-        scan = data_last_header_real(scan);
-
-        // release dataid
-        data_release_dataid(root, dataid, scan.fd);
-
-        if(scan.status == DATA_SCAN_SUCCESS)
-            return scan;
-
-        if(scan.status == DATA_SCAN_UNEXPECTED)
-            return scan;
-
-        if(scan.status == DATA_SCAN_NO_MORE_DATA)
-            return scan;
-
-        // entry was deleted, scan object is updated
-        // we need to retry fetching new data
-        if(scan.status == DATA_SCAN_DELETED)
-            continue;
-
-        if(scan.status == DATA_SCAN_REQUEST_PREVIOUS)
-            dataid -= 1;
-    }
-
-    // never reached
-}
-
 
 //
 // data constructor and destructor
@@ -1020,7 +479,7 @@ data_root_t *data_init(settings_t *settings, char *datapath, uint16_t dataid) {
     data_root_t *root = (data_root_t *) malloc(sizeof(data_root_t));
 
     root->datadir = datapath;
-    root->datafile = malloc(sizeof(char) * (PATH_MAX + 1));
+    root->datafile = malloc(sizeof(char) * (ZDB_PATH_MAX + 1));
     root->dataid = dataid;
     root->sync = settings->sync;
     root->synctime = settings->synctime;
@@ -1043,4 +502,9 @@ void data_emergency(data_root_t *root) {
         return;
 
     fsync(root->datafd);
+}
+
+// delete data files
+void data_delete_files(data_root_t *root) {
+    dir_clean_payload(root->datadir);
 }

@@ -53,11 +53,11 @@ static char *index_date(uint32_t epoch, char *target, size_t length) {
 }
 
 int index_dump(int fd) {
-    index_t header;
+    index_header_t header;
     char entrydate[64];
 
     // first step, let's validate the header
-    if(read(fd, &header, sizeof(index_t)) != (size_t) sizeof(index_t)) {
+    if(read(fd, &header, sizeof(index_header_t)) != (size_t) sizeof(index_header_t)) {
         fprintf(stderr, "[-] cannot read index header\n");
         return 1;
     }
@@ -100,12 +100,16 @@ int index_dump(int fd) {
         index_date(entry->timestamp, entrydate, sizeof(entrydate));
 
         printf("[+] index entry: %lu, offset: %lu\n", entrycount, curoff);
-        printf("[+]   id length  : %d\n", entry->idlength);
-        printf("[+]   data length: %" PRIu64 "\n", entry->length);
-        printf("[+]   data offset: %" PRIu64 "\n", entry->offset);
-        printf("[+]   data fileid: %u\n", entry->dataid);
+        printf("[+]   id length  : %" PRIu8 "\n", entry->idlength);
+        printf("[+]   data length: %" PRIu32 "\n", entry->length);
+        printf("[+]   data offset: %" PRIu32 "\n", entry->offset);
+        printf("[+]   data fileid: %" PRIu16 "\n", entry->dataid);
         printf("[+]   entry flags: 0x%X\n", entry->flags);
         printf("[+]   entry date : %s\n", entrydate);
+        printf("[+]   previous   : %" PRIu32 "\n", entry->previous);
+        printf("[+]   data crc   : %08x\n", entry->crc);
+        printf("[+]   parent id  : %" PRIu16 "\n", entry->parentid);
+        printf("[+]   parent offs: %" PRIu32 "\n", entry->parentoff);
         printf("[+]   entry key  : ");
         hexdump(entry->id, entry->idlength);
         printf("\n");

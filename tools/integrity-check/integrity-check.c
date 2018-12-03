@@ -8,6 +8,9 @@
 #include <string.h>
 #include <x86intrin.h>
 #include <sys/stat.h>
+#ifdef SHADUMP
+#include <openssl/sha.h>
+#endif
 #include "zerodb.h"
 #include "data.h"
 
@@ -37,7 +40,20 @@ void hexdump(void *input, size_t length) {
     free(output);
 }
 
-static uint32_t data_crc32(const char *bytes, ssize_t length) {
+#ifdef SHADUMP
+void sha256dump(char *input, size_t length) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, input, length);
+    SHA256_Final(hash, &sha256);
+
+    hexdump(hash, SHA256_DIGEST_LENGTH);
+}
+#endif
+
+uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
     uint64_t *input = (uint64_t *) bytes;
     uint32_t hash = 0;
     ssize_t i = 0;
@@ -105,13 +121,16 @@ int data_integrity(int fd) {
         hexdump(entry->id, entry->idlength);
         printf("\n");
 
+        if(entry->datalength == 0)
+            continue;
+
         if(!(buffer = realloc(buffer, entry->datalength)))
             diep("realloc");
 
         if(read(fd, buffer, entry->datalength) != entry->datalength)
             diep("payload entry read failed");
 
-        uint32_t crc = data_crc32(buffer, entry->datalength);
+        uint32_t crc = data_crc32((uint8_t *) buffer, entry->datalength);
 
         if(crc != entry->integrity) {
             fprintf(stderr, "[-] integrity check failed: %08x <> %08x\n", crc, entry->integrity);
@@ -120,6 +139,12 @@ int data_integrity(int fd) {
         } else {
             printf("[+]   data crc: match\n");
         }
+
+        #ifdef SHADUMP
+        printf("[+]   data sha256: ");
+        sha256dump(buffer, entry->datalength);
+        printf("\n");
+        #endif
     }
 
     free(entry);

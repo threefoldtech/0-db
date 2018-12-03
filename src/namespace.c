@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -101,10 +102,10 @@ void namespace_descriptor_update(namespace_t *namespace, int fd) {
 }
 
 static int namespace_descriptor_open(namespace_t *namespace) {
-    char pathname[PATH_MAX];
+    char pathname[ZDB_PATH_MAX];
     int fd;
 
-    snprintf(pathname, PATH_MAX, "%s/zdb-namespace", namespace->indexpath);
+    snprintf(pathname, ZDB_PATH_MAX, "%s/zdb-namespace", namespace->indexpath);
 
     if((fd = open(pathname, O_CREAT | O_RDWR, 0600)) < 0) {
         warning("[-] cannot create or open in read-write the namespace file\n");
@@ -169,10 +170,14 @@ void namespace_commit(namespace_t *namespace) {
 }
 
 static char *namespace_path(char *prefix, char *name) {
-    char pathname[PATH_MAX];
-    snprintf(pathname, PATH_MAX, "%s/%s", prefix, name);
+    char *pathname;
 
-    return strdup(pathname);
+    if(asprintf(&pathname, "%s/%s", prefix, name) < 0) {
+        warnp("asprintf");
+        return NULL;
+    }
+
+    return pathname;
 }
 
 namespace_t *namespace_ensure(namespace_t *namespace) {
@@ -325,8 +330,11 @@ int namespace_create(char *name) {
     return 1;
 }
 
-static int namespace_valid_name(char *name) {
+int namespace_valid_name(char *name) {
     if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+        return 0;
+
+    if(strchr(name, '/'))
         return 0;
 
     // FIXME: better support (slash, coma, ...)
@@ -391,29 +399,38 @@ static int namespace_scanload(ns_root_t *root) {
 //
 // this is why it's here we take care about cleaning and emergencies, it's the only
 // place where we __knows__ what we needs to clean
-int namespaces_init(settings_t *settings) {
-    verbose("[+] namespaces: initializing\n");
+ns_root_t *namespaces_allocate(settings_t *settings) {
+    ns_root_t *root;
 
     // we start by the default namespace
-    if(!(nsroot = (ns_root_t *) malloc(sizeof(ns_root_t))))
+    if(!(root = (ns_root_t *) malloc(sizeof(ns_root_t))))
         diep("namespaces malloc");
 
-    nsroot->length = 1;             // we start with the default one, only
-    nsroot->effective = 1;          // no namespace really loaded yet
-    nsroot->settings = settings;    // keep reference to the settings, needed for paths
-    nsroot->branches = NULL;        // maybe we don't need the branches, see below
+    root->length = 1;             // we start with the default one, only
+    root->effective = 1;          // no namespace really loaded yet
+    root->settings = settings;    // keep reference to the settings, needed for paths
+    root->branches = NULL;        // maybe we don't need the branches, see below
 
-    if(!(nsroot->namespaces = (namespace_t **) malloc(sizeof(namespace_t *) * nsroot->length)))
+    if(!(root->namespaces = (namespace_t **) malloc(sizeof(namespace_t *) * root->length)))
         diep("namespace malloc");
 
     // allocating (if needed, only some modes needs it) the big (single) index branches
-    if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL) {
+    if(settings->mode == KEYVALUE) {
         debug("[+] namespaces: pre-allocating index (%d lazy branches)\n", buckets_branches);
 
         // allocating minimal branches array
-        if(!(nsroot->branches = (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches)))
-            diep("calloc");
+        if(!(root->branches = index_buckets_init()))
+            diep("buckets allocation");
     }
+
+    return root;
+}
+
+int namespaces_init(settings_t *settings) {
+    verbose("[+] namespaces: initializing\n");
+
+    // allocating global namespaces
+    nsroot = namespaces_allocate(settings);
 
     // namespace 0 will always be the default one
     if(!(nsroot->namespaces[0] = namespace_load(nsroot, NAMESPACE_DEFAULT))) {
@@ -444,7 +461,7 @@ int namespaces_destroy() {
     if(nsroot->branches) {
         debug("[+] namespaces: cleaning branches\n");
         for(uint32_t b = 0; b < buckets_branches; b++)
-            index_branch_free(nsroot->namespaces[0]->index, b);
+            index_branch_free(nsroot->namespaces[0]->index->branches, b);
 
         // freeing the big index array
         free(nsroot->branches);
@@ -522,6 +539,32 @@ int namespace_reload(namespace_t *namespace) {
 
     return 0;
 }
+
+// start a namespace flushing procees
+// when flushing a namespace, we destroy it from
+// memory and from disk (except descriptor) then reload (empty) contents
+// we don't touch to the namespace object itself (this object is linked to users)
+// we only refresh data and index pointers
+int namespace_flush(namespace_t *namespace) {
+    debug("[+] namespace: flushing: %s\n", namespace->name);
+
+    debug("[+] namespace: flushing: cleaning index\n");
+    index_clean_namespace(namespace->index, namespace);
+
+    debug("[+] namespace: flushing: removing files\n");
+    index_delete_files(namespace->index);
+    data_delete_files(namespace->data);
+
+    debug("[+] namespace: flushing: destroying objects\n");
+    index_destroy(namespace->index);
+    data_destroy(namespace->data);
+
+    debug("[+] namespace: flushing: reloading data\n");
+    namespace_load_lazy(nsroot, namespace);
+
+    return 0;
+}
+
 
 static void namespace_delete_hook(namespace_t *namespace) {
     if(!rootsettings.hook)

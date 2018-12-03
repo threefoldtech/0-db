@@ -10,6 +10,8 @@
     #define ZDB_DEFAULT_LISTENADDR  "0.0.0.0"
     #define ZDB_DEFAULT_PORT        9900
 
+    #define ZDB_PATH_MAX    4096
+
     // define here version of datafile and indexfile
     // theses version are written on header of each file created
     //
@@ -24,27 +26,20 @@
     #define ZDB_DATAFILE_VERSION    2
     #define ZDB_IDXFILE_VERSION     2
 
-    typedef enum db_mode_t {
-        // default key-value store
-        KEYVALUE = 0,
-
-        // auto-generated sequential id
-        SEQUENTIAL = 1,
-
-        // id is hard-fixed data position
-        DIRECTKEY = 2,
-
-        // fixed-block length
-        DIRECTBLOCK = 3,
-
-        // amount of modes available
-        ZDB_MODES
-
-    } db_mode_t;
-
-    // when adding or removing some modes
-    // don't forget to adapt correctly the handlers
-    // function pointers (basicly for GET and SET)
+    // define here version of 0-db itself
+    // version is made as following:
+    //
+    //   Major.Minor.Review
+    //
+    //               ^-- incremented on bug fix and small changes
+    //
+    //         ^-- incremented on important new features
+    //
+    //   ^--- will only change if data format change
+    //        and not assure retro-compatibility
+    //        (eg: files written on version 1.x.x won't works
+    //             out of box on a version 2.x.x)
+    #define ZDB_VERSION     "1.0.0"
 
     typedef struct settings_t {
         char *datapath;   // path where data files will be written
@@ -55,14 +50,18 @@
         int dump;         // ask to dump index on the load-time
         int sync;         // force to sync each write
         int synctime;     // force to sync writes after this amount of seconds
-        db_mode_t mode;   // default index running mode
+        int mode;         // default index running mode (should be index_mode_t)
         char *adminpwd;   // admin password, if NULL, all users are admin
         char *socket;     // unix socket path
         int background;   // flag to run in background
         char *logfile;    // where to redirect logs in background mode
         char *hook;       // external hook script to execute
+        size_t datasize;  // maximum datafile size before jumping to next one
+        int protect;      // flag default namespace to use admin password (for writing)
+        size_t maxsize;   // default namespace maximum datasize
 
-        char *zdbid;      // fake-0db id generated based on listening
+        char *zdbid;      // fake 0-db id generated based on listening
+        uint32_t iid;     // 0-db random instance id generated on boot
 
         // the synctime can be useful to add basic security without killing
         // performance
@@ -92,8 +91,8 @@
     } settings_t;
 
     void hexdump(void *buffer, size_t length);
+    void fulldump(void *data, size_t len);
 
-    #define verbose(...) { if(rootsettings.verbose) { printf(__VA_ARGS__); } }
 
     #define COLOR_RED    "\033[31;1m"
     #define COLOR_YELLOW "\033[33;1m"
@@ -106,10 +105,17 @@
     #define success(fmt, ...) { printf(COLOR_GREEN  fmt COLOR_RESET "\n", ##__VA_ARGS__); }
     #define notice(fmt, ...)  { printf(COLOR_CYAN   fmt COLOR_RESET "\n", ##__VA_ARGS__); }
 
+    #define KB(x)   (x / (1024.0))
+    #define MB(x)   (x / (1024 * 1024.0))
+    #define GB(x)   (x / (1024 * 1024 * 1024.0))
+    #define TB(x)   (x / (1024 * 1024 * 1024 * 1024.0))
+
     #ifndef RELEASE
+        #define verbose(...) { printf(__VA_ARGS__); }
         #define debug(...) { printf(__VA_ARGS__); }
         #define debughex(...) { hexdump(__VA_ARGS__); }
     #else
+        #define verbose(...) { if(rootsettings.verbose) { printf(__VA_ARGS__); } }
         #define debug(...) ((void)0)
         #define debughex(...) ((void)0)
     #endif
@@ -118,4 +124,5 @@
 
     void diep(char *str);
     void *warnp(char *str);
+    void verbosep(char *prefix, char *str);
 #endif

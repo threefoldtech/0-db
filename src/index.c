@@ -13,6 +13,7 @@
 #include "zerodb.h"
 #include "index.h"
 #include "index_loader.h"
+#include "index_seq.h"
 #include "index_branch.h"
 #include "data.h"
 #include "hook.h"
@@ -20,6 +21,23 @@
 // NOTE: there is no more a global variable for the index
 //       since each namespace have their own index, now
 //       we need to pass the index to each function
+
+// dump an index entry item
+void index_item_header_dump(index_item_t *item) {
+#ifdef RELEASE
+    (void) item;
+#else
+    debug("[+] index: entry dump: id length  : %" PRIu8  "\n", item->idlength);
+    debug("[+] index: entry dump: data offset: %" PRIu32 "\n", item->offset);
+    debug("[+] index: entry dump: data length: %" PRIu32 "\n", item->length);
+    debug("[+] index: entry dump: previous   : %" PRIX32 "\n", item->previous);
+    debug("[+] index: entry dump: flags      : %" PRIu8  "\n", item->flags);
+    debug("[+] index: entry dump: timestamp  : %" PRIu32 "\n", item->timestamp);
+    debug("[+] index: entry dump: parent id  : %" PRIu16 "\n", item->parentid);
+    debug("[+] index: entry dump: parent offs: %" PRIu32 "\n", item->parentoff);
+#endif
+}
+
 
 // force index to be sync'd with underlaying device
 static inline int index_sync(index_root_t *root, int fd) {
@@ -91,25 +109,76 @@ static int index_read(int fd, void *buffer, size_t length) {
     return 1;
 }
 
-
 // set global filename based on the index id
 void index_set_id(index_root_t *root) {
     sprintf(root->indexfile, "%s/zdb-index-%05u", root->indexdir, root->indexid);
 }
 
-static int index_open_file(index_root_t *root, int fileid) {
+static int index_open_file_mode(index_root_t *root, uint16_t fileid, int mode) {
     char filename[512];
     int fd;
 
     sprintf(filename, "%s/zdb-index-%05u", root->indexdir, fileid);
-    debug("[+] index: opening file: %s\n", filename);
+    debug("[+] index: opening file: %s (ro: %s)\n", filename, (mode & O_RDONLY) ? "yes" : "no");
 
-    if((fd = open(filename, O_RDONLY)) < 0) {
-        warnp(filename);
+    if((fd = open(filename, mode)) < 0) {
+        verbosep("index_open_file_mode", filename);
         return -1;
     }
 
     return fd;
+}
+
+static int index_open_file(index_root_t *root, int fileid) {
+    return index_open_file_mode(root, fileid, O_RDONLY);
+}
+
+int index_open_file_rw(index_root_t *root, int fileid) {
+    return index_open_file_mode(root, fileid, O_RDWR);
+}
+
+// main function to call when you need to deal with multiple index id
+// this function takes care to open the right file id:
+//  - if you want the current opened file id, you have thid fd
+//  - if the file is not opened yet, you'll receive a new fd
+// you need to call the index_release_dataid to be consistant about cleaning this
+// file open, if a new one was opened
+//
+// if the index id could not be opened, -1 is returned
+inline int index_grab_fileid(index_root_t *root, uint16_t fileid) {
+    int fd = root->indexfd;
+
+    if(root->indexid != fileid) {
+        // the requested datafile is not the current datafile opened
+        // we will re-open the expected datafile temporary
+        debug("[-] index: switching file: %d, requested: %d\n", root->indexid, fileid);
+        if((fd = index_open_file(root, fileid)) < 0)
+            return -1;
+    }
+
+    return fd;
+}
+
+inline void index_release_fileid(index_root_t *root, uint16_t fileid, int fd) {
+    // if the requested file id (or fd) is not the one
+    // currently used by the main structure, we close it
+    // since it was temporary
+    if(root->indexid != fileid) {
+        close(fd);
+    }
+}
+
+
+// convert a binary direct-key to a readable
+// direct-key structure
+index_dkey_t *index_dkey_from_key(index_dkey_t *dkey, unsigned char *buffer, uint8_t length) {
+    if(length != sizeof(index_dkey_t))
+        return NULL;
+
+    // binary copy buffer
+    memcpy(dkey, buffer, length);
+
+    return dkey;
 }
 
 // open the current filename set on the global struct
@@ -148,6 +217,8 @@ size_t index_jump_next(index_root_t *root) {
     // moving to the next file
     root->indexid += 1;
     root->nextid = 0;
+    root->previous = 0;
+
     index_set_id(root);
 
     index_open_final(root);
@@ -158,6 +229,9 @@ size_t index_jump_next(index_root_t *root) {
         hook_execute(hook);
         hook_free(hook);
     }
+
+    if(root->seqid)
+        index_seqid_push(root, index_next_id(root), root->indexid);
 
     return root->indexid;
 }
@@ -180,7 +254,7 @@ uint32_t index_next_objectid(index_root_t *root) {
 
 // perform the basic "hashing" (crc based) used to point to the expected branch
 // we only keep partial amount of the result to not fill the memory too fast
-static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
+uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
     uint64_t *input = (uint64_t *) id;
     uint32_t hash = 0;
     ssize_t i = 0;
@@ -197,7 +271,7 @@ static inline uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
 // main look-up function, used to get an entry from the memory index
 index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t idlength) {
     uint32_t branchkey = index_key_hash(id, idlength);
-    index_branch_t *branch = index_branch_get(root, branchkey);
+    index_branch_t *branch = index_branch_get(root->branches, branchkey);
     index_entry_t *entry;
 
     // branch not exists
@@ -223,7 +297,7 @@ index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t id
 // which means we need to know offset and id length in advance
 //
 // this is really important in direct mode to use indirection with index
-// to have benefit of compaction etc.
+// to have benefit of compaction etc. and for history support
 index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t offset, uint8_t idlength) {
     int fd;
     size_t length;
@@ -236,8 +310,10 @@ index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t o
         return NULL;
 
     // open requested file
-    if((fd = index_open_file(root, indexid)) < 0)
+    if((fd = index_open_file(root, indexid)) < 0) {
+        free(item);
         return NULL;
+    }
 
     // seek to requested offset
     lseek(fd, offset, SEEK_SET);
@@ -254,131 +330,179 @@ index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t o
     return item;
 }
 
-// insert a key, only in memory, no disk is touched
-// this function should be called externaly only when populating something
-// if we need to add something new on the index, we should write it on disk
-index_entry_t *index_entry_insert_memory(index_root_t *root, unsigned char *id, uint8_t idlength, size_t offset, size_t length, uint8_t flags) {
-    index_entry_t *exists = NULL;
-
-    // item already exists
-    if((exists = index_entry_get(root, id, idlength))) {
-        debug("[+] index: key already exists, overwriting\n");
-
-        // update statistics
-        root->datasize -= exists->length;
-        root->datasize += length;
-
-        // re-use existing entry
-        exists->length = length;
-        exists->offset = offset;
-        exists->flags = flags;
-        exists->dataid = root->indexid;
-
-        return exists;
-    }
-
-    // calloc will ensure any unset fields (eg: flags) are zero
-    size_t entrysize = sizeof(index_entry_t) + idlength;
-    index_entry_t *entry = calloc(entrysize, 1);
-
-    memcpy(entry->id, id, idlength);
-    entry->namespace = root->namespace;
-    entry->idlength = idlength;
-    entry->offset = offset;
-    entry->length = length;
-    entry->dataid = root->indexid;
-
-    uint32_t branchkey = index_key_hash(id, idlength);
-
-    // commit entry into memory
-    index_branch_append(root, branchkey, entry);
-
-    // update statistics
-    root->entries += 1;
-    root->datasize += length;
-    root->indexsize += entrysize;
-
-    // update next entry id
-    root->nextentry += 1;
-    root->nextid += 1;
-
-    return entry;
-}
-
 // this will be a global item we will allocate only once, to avoid
 // useless reallocation
 // this item will be used to move from an index_entry_t (disk) to index_item_t (memory)
 index_item_t *index_transition = NULL;
 index_entry_t *index_reusable_entry = NULL;
 
-// main function to insert anything on the index, in memory and on the disk
-// perform at first a memory insertion then disk writing
+
+// IMPORTANT:
+//   this function is the only one to 'break' the always append
+//   behavior, this function will overwrite existing index by
+//   seeking and rewrite header, **only** in direct-mode
 //
-// if the key already exists, the in memory version will be updated
-// and the on-disk version is appended anyway, when reloading the index
-// we call the same sets of function which overwrite existing key, we
-// will always have the last version in memory
-index_entry_t *index_entry_insert(index_root_t *root, void *vid, uint8_t idlength, size_t offset, size_t length) {
-    unsigned char *id = (unsigned char *) vid;
-    index_entry_t *entry = NULL;
+// when deleting some data, we mark (flag) this data as deleted which
+// allows two things
+//   - we can do compaction offline by removing theses blocks
+//   - since direct-key mode use keys which contains file location's
+//     dependant information, we can't do anything else than updating
+//     existing data
+//     we do this in the index file and not in the data file so we keep
+//     the data file really always append in any case
+int index_entry_delete_memory(index_root_t *root, index_entry_t *entry) {
+    // running in a mode without index, let's just skip this
+    if(root->branches == NULL)
+        return 0;
 
-    if(!(entry = index_entry_insert_memory(root, id, idlength, offset, length, 0)))
-        return NULL;
+    uint32_t branchkey = index_key_hash(entry->id, entry->idlength);
+    index_branch_t *branch = index_branch_get(root->branches, branchkey);
+    index_entry_t *previous = index_branch_get_previous(branch, entry);
 
-    size_t entrylength = sizeof(index_item_t) + entry->idlength;
+    debug("[+] index: delete memory: removing entry from memory\n");
 
-    memcpy(index_transition->id, entry->id, entry->idlength);
-    index_transition->idlength = entry->idlength;
-    index_transition->offset = entry->offset;
-    index_transition->length = entry->length;
-    index_transition->flags = entry->flags;
-    index_transition->dataid = entry->dataid;
-    index_transition->timestamp = (uint32_t) time(NULL);
-
-    if(!index_write(root->indexfd, index_transition, entrylength, root)) {
-        fprintf(stderr, "[-] index: cannot write index entry on disk\n");
-
-        // it's easier to flag the entry as deleted than
-        // removing it from the list
-        entry->flags |= INDEX_ENTRY_DELETED;
-
-        return NULL;
+    if(previous == entry) {
+        danger("[-] index: entry delete memory: something wrong happens");
+        danger("[-] index: entry delete memory: branches seems buggy");
+        return 1;
     }
 
-    return entry;
+    // removing entry from global branch
+    index_branch_remove(branch, entry, previous);
+
+    // updating statistics
+    root->entries -= 1;
+    root->datasize -= entry->length;
+    root->indexsize -= sizeof(index_entry_t) + entry->idlength;
+
+    // cleaning memory object
+    free(entry);
+
+    return 0;
 }
 
-index_entry_t *index_entry_delete(index_root_t *root, index_entry_t *entry) {
-    #if 0
-    index_entry_t *entry = index_entry_get(root, id, idlength);
+int index_entry_delete_disk(index_root_t *root, index_entry_t *entry) {
+    int fd;
 
-    if(!entry) {
-        verbose("[-] index: key not found\n");
-        return NULL;
-    }
-
-    if(entry->flags & INDEX_ENTRY_DELETED) {
-        verbose("[-] index: key already deleted\n");
-        return NULL;
-    }
-    #endif
-
-    // mark entry as deleted
-    entry->flags |= INDEX_ENTRY_DELETED;
-
-    // write flagged deleted entry on index file
+    // compute this object size on disk
     size_t entrylength = sizeof(index_item_t) + entry->idlength;
 
-    memcpy(index_transition->id, entry->id, entry->idlength);
-    index_transition->idlength = entry->idlength;
-    index_transition->offset = entry->offset;
-    index_transition->length = entry->length;
-    index_transition->flags = entry->flags;
-    index_transition->dataid = entry->dataid;
-    index_transition->timestamp = (uint32_t) time(NULL);
+    // mark entry as deleted
+    // this affect the memory object (runtime)
+    entry->flags |= INDEX_ENTRY_DELETED;
 
-    if(!index_write(root->indexfd, index_transition, entrylength, root))
+    // (re-)open the expected index file, in read-write mode
+    if((fd = index_open_file_rw(root, entry->dataid)) < 0)
+        return 1;
+
+    // jump to the right offset for this entry
+    debug("[+] index: delete: reading %lu bytes at offset %" PRIu32 "\n", entrylength, entry->idxoffset);
+    lseek(fd, entry->idxoffset, SEEK_SET);
+
+    // reading the exact entry from disk
+    if(read(fd, index_transition, entrylength) != (ssize_t) entrylength) {
+        warnp("index_entry_delete read");
+        close(fd);
+        return 1;
+    }
+
+    index_item_header_dump(index_transition);
+
+    // update the flags
+    index_transition->flags = entry->flags;
+
+    // rollback to point to the entry again
+    debug("[+] index: delete: overwriting key\n");
+    lseek(fd, entry->idxoffset, SEEK_SET);
+
+    // overwrite the key
+    if(write(fd, index_transition, entrylength) != (ssize_t) entrylength) {
+        warnp("index_entry_delete write");
+        close(fd);
+        return 1;
+    }
+
+    close(fd);
+
+    return 0;
+}
+
+int index_entry_delete(index_root_t *root, index_entry_t *entry) {
+    // first flag disk entry as deleted
+    if(index_entry_delete_disk(root, entry))
+        return 1;
+
+    // then remove entry from memory
+    if(index_entry_delete_memory(root, entry))
+        return 1;
+
+    return 0;
+}
+
+// serialize into binary object a deserializable
+// object identifier
+index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset) {
+    index_bkey_t key = {
+        .idlength = item->idlength,
+        .fileid = item->dataid,
+        .length = item->length,
+        .idxoffset = idxoffset,
+        .crc = item->crc
+    };
+
+    return key;
+}
+
+index_bkey_t index_entry_serialize(index_entry_t *entry) {
+    index_bkey_t key = {
+        .idlength = entry->idlength,
+        .fileid = entry->dataid,
+        .length = entry->length,
+        .idxoffset = entry->idxoffset,
+        .crc = entry->crc
+    };
+
+    return key;
+}
+
+
+// read an object from disk, based on binarykey provided
+// and ensure the key object seems legit with the requested key
+index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key) {
+    index_item_t *item;
+
+    if(!(item = index_item_get_disk(root, key->fileid, key->idxoffset, key->idlength)))
         return NULL;
+
+    debug("[+] index: deserialize: length %u <> %u\n", item->length, key->length);
+    debug("[+] index: deserialize: crc %08x <> %08x\n", item->crc, key->crc);
+
+    if(item->length != key->length || item->crc != key->crc) {
+        debug("[-] index: deserialize: invalid key requested (fields mismatch)\n");
+        free(item);
+        return NULL;
+    }
+
+    // FIXME: avoid double malloc for a single object
+    index_entry_t *entry;
+
+    if(!(entry = malloc(sizeof(index_entry_t) + item->idlength))) {
+        debug("[-] index: deserialize: cannot allocate memory\n");
+        free(item);
+        return NULL;
+    }
+
+    entry->idlength = item->idlength;
+    entry->offset = item->offset;
+    entry->dataid = item->dataid;
+    entry->flags = item->flags;
+    entry->idxoffset = key->idxoffset;
+    entry->crc = item->crc;
+    entry->length = item->length;
+    memcpy(entry->id, item->id, item->idlength);
+
+    // clean intermediate item
+    free(item);
 
     return entry;
 }
@@ -403,7 +527,7 @@ int index_entry_is_deleted(index_entry_t *entry) {
 // returns offset in the indexfile from idobject
 size_t index_offset_objectid(uint32_t objectid) {
     // skip index header
-    size_t offset = sizeof(index_t);
+    size_t offset = sizeof(index_header_t);
 
     // index is linear like this
     // [header][obj-1][obj-2][obj-3][...]
@@ -488,4 +612,16 @@ int index_emergency(index_root_t *root) {
 
     fsync(root->indexfd);
     return 1;
+}
+
+// returns a string mode name about the
+// current running mode
+const char *index_modename(index_root_t *index) {
+    if(index->mode == KEYVALUE)
+        return "userkey";
+
+    if(index->mode == SEQUENTIAL)
+        return "sequential";
+
+    return "unknown";
 }

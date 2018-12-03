@@ -33,6 +33,12 @@ int command_nsnew(redis_client_t *client) {
     // get string formatted namespace
     sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
 
+    if(!namespace_valid_name(target)) {
+        debug("[-] command: nsnew: namespace name doesn't fit critera\n");
+        redis_hardsend(client, "-This name is not allowed");
+        return 1;
+    }
+
     // deny already existing namespace
     if(namespace_get(target)) {
         debug("[-] command: nsnew: namespace already exists\n");
@@ -241,10 +247,15 @@ int command_nsinfo(redis_client_t *client) {
     sprintf(info + strlen(info), "public: %s\n", namespace->public ? "yes" : "no");
     sprintf(info + strlen(info), "password: %s\n", namespace->password ? "yes" : "no");
     sprintf(info + strlen(info), "data_size_bytes: %lu\n", namespace->index->datasize);
-    sprintf(info + strlen(info), "data_size_mb: %.2f\n", namespace->index->datasize / (1024 * 1024.0));
+    sprintf(info + strlen(info), "data_size_mb: %.2f\n", MB(namespace->index->datasize));
     sprintf(info + strlen(info), "data_limits_bytes: %lu\n", namespace->maxsize);
     sprintf(info + strlen(info), "index_size_bytes: %lu\n", namespace->index->indexsize);
-    sprintf(info + strlen(info), "index_size_kb: %.2f\n", namespace->index->indexsize / 1024.0);
+    sprintf(info + strlen(info), "index_size_kb: %.2f\n", KB(namespace->index->indexsize));
+    sprintf(info + strlen(info), "mode: %s\n", index_modename(namespace->index));
+
+    if(client->master && namespace->password) {
+        sprintf(info + strlen(info), "password_raw: %s\n", namespace->password);
+    }
 
     redis_bulk_t response = redis_bulk(info, strlen(info));
     if(!response.buffer) {
@@ -289,15 +300,15 @@ int command_nsset(redis_client_t *client) {
         return 1;
     }
 
-    sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
-    sprintf(command, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
-    sprintf(value, "%.*s", request->argv[3]->length, (char *) request->argv[3]->buffer);
-
     // limit size of the value
     if(request->argv[3]->length > 63) {
         redis_hardsend(client, "-Invalid value");
         return 1;
     }
+
+    sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
+    sprintf(command, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
+    sprintf(value, "%.*s", request->argv[3]->length, (char *) request->argv[3]->buffer);
 
     // default namespace cannot be changed
     if(strcmp(target, NAMESPACE_DEFAULT) == 0) {
@@ -397,3 +408,20 @@ int command_reload(redis_client_t *client) {
     return 0;
 }
 
+int command_flush(redis_client_t *client) {
+    namespace_t *namespace = client->ns;
+
+    if(namespace->public == 1 || namespace->password == NULL) {
+        redis_hardsend(client, "-Flushing public namespace denied");
+        return 1;
+    }
+
+    if(namespace_flush(namespace)) {
+        redis_hardsend(client, "-Internal Server Error");
+        return 1;
+    }
+
+    redis_hardsend(client, "+OK");
+
+    return 0;
+}

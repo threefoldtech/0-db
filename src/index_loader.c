@@ -11,9 +11,12 @@
 #include <limits.h>
 #include <errno.h>
 #include "zerodb.h"
+#include "filesystem.h"
 #include "index.h"
+#include "index_seq.h"
 #include "index_loader.h"
 #include "index_branch.h"
+#include "index_set.h"
 #include "data.h"
 
 //
@@ -34,7 +37,7 @@ static char *index_date(uint32_t epoch, char *target, size_t length) {
 static inline void index_dump_entry(index_entry_t *entry) {
     printf("[+] key [");
     hexdump(entry->id, entry->idlength);
-    printf("] offset %" PRIu64 ", length: %" PRIu64 "\n", entry->offset, entry->length);
+    printf("] offset %" PRIu32 ", length: %" PRIu32 "\n", entry->offset, entry->length);
 }
 
 // dumps the current index load
@@ -49,7 +52,7 @@ static void index_dump(index_root_t *root, int fulldump) {
 
     // iterating over each buckets
     for(uint32_t b = 0; b < buckets_branches; b++) {
-        index_branch_t *branch = index_branch_get(root, b);
+        index_branch_t *branch = index_branch_get(root->branches, b);
 
         // skipping empty branch
         if(!branch)
@@ -81,14 +84,14 @@ static void index_dump(index_root_t *root, int fulldump) {
     size_t overhead = (buckets_branches * sizeof(index_branch_t **)) +
                       (branches * sizeof(index_branch_t));
 
-    verbose("[+] index: memory overhead: %.2f KB (%lu bytes)\n", (overhead / 1024.0), overhead);
+    verbose("[+] index: memory overhead: %.2f KB (%lu bytes)\n", KB(overhead), overhead);
 }
 
 static void index_dump_statistics(index_root_t *root) {
     verbose("[+] index: load: %lu entries\n", root->entries);
 
-    double datamb = root->datasize / (1024.0 * 1024);
-    double indexkb = root->indexsize / 1024.0;
+    double datamb = MB(root->datasize);
+    double indexkb = KB(root->indexsize);
 
     verbose("[+] index: datasize: " COLOR_CYAN "%.2f MB" COLOR_RESET " (%lu bytes)\n", datamb, root->datasize);
     verbose("[+] index: raw usage: %.1f KB (%lu bytes)\n", indexkb, root->indexsize);
@@ -98,8 +101,8 @@ static void index_dump_statistics(index_root_t *root) {
 // initialize an index file
 // this basicly create the header and write it
 //
-index_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
-    index_t header;
+index_header_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
+    index_header_t header;
 
     memcpy(header.magic, "IDX0", 4);
     header.version = ZDB_IDXFILE_VERSION;
@@ -108,7 +111,7 @@ index_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
     header.opened = time(NULL);
     header.mode = rootsettings.mode;
 
-    if(!index_write(fd, &header, sizeof(index_t), root))
+    if(!index_write(fd, &header, sizeof(index_header_t), root))
         diep("index_initialize: write");
 
     return header;
@@ -159,7 +162,7 @@ static int index_try_rootindex(index_root_t *root) {
 // this should not create any new index (when loading we will never create
 // any new index until we don't have new data to add)
 static size_t index_load_file(index_root_t *root) {
-    index_t header;
+    index_header_t header;
     ssize_t length;
 
     verbose("[+] index: loading file: %s\n", root->indexfile);
@@ -167,7 +170,7 @@ static size_t index_load_file(index_root_t *root) {
     if(!index_try_rootindex(root))
         return 0;
 
-    if((length = read(root->indexfd, &header, sizeof(index_t))) != sizeof(index_t)) {
+    if((length = read(root->indexfd, &header, sizeof(index_header_t))) != sizeof(index_header_t)) {
         if(length < 0) {
             // read failed, probably caused by a system error
             // this is probably an unrecoverable issue, let's skip this
@@ -182,7 +185,7 @@ static size_t index_load_file(index_root_t *root) {
             // not this amount of data, which is a completly undefined behavior
             // let's just stopping here
             fprintf(stderr, "[-] index: header corrupted or incomplete\n");
-            fprintf(stderr, "[-] index: expected %lu bytes, %ld read\n", sizeof(index_t), length);
+            fprintf(stderr, "[-] index: expected %lu bytes, %ld read\n", sizeof(index_header_t), length);
             exit(EXIT_FAILURE);
         }
 
@@ -230,7 +233,7 @@ static size_t index_load_file(index_root_t *root) {
         header.opened = time(NULL);
         lseek(root->indexfd, 0, SEEK_SET);
 
-        if(!index_write(root->indexfd, &header, sizeof(index_t), root))
+        if(!index_write(root->indexfd, &header, sizeof(index_header_t), root))
             diep(root->indexfile);
     }
 
@@ -254,7 +257,7 @@ static size_t index_load_file(index_root_t *root) {
     char *filebuf;
     off_t fullsize = lseek(root->indexfd, 0, SEEK_END);
 
-    debug("[+] index: loading in memory file: %.2f MB\n", fullsize / (1024 * 1024.0));
+    debug("[+] index: loading in memory file: %.2f MB\n", MB(fullsize));
 
     if(!(filebuf = malloc(fullsize)))
         diep("index buffer: malloc");
@@ -264,7 +267,8 @@ static size_t index_load_file(index_root_t *root) {
         diep("index buffer: read");
 
     // positioning seeker to beginin of index entries
-    char *seeker = filebuf + sizeof(index_t);
+    char *initseeker = filebuf + sizeof(index_header_t);
+    char *seeker = initseeker;
 
     // reading the index, populating memory
     //
@@ -280,16 +284,57 @@ static size_t index_load_file(index_root_t *root) {
     root->nextid = 0;
 
     while(seeker < filebuf + fullsize) {
+        index_entry_t *fresh = NULL;
+
         entry = (index_item_t *) seeker;
+        off_t offset = seeker - filebuf;
+
+        // create a gateway struct to fill our index memory
+        // this is not nice (lot of copy) but make things more
+        // generic and clear
+        index_entry_t source = {
+            .idlength = entry->idlength,
+            .length = entry->length,
+            .offset = entry->offset,
+            .flags = entry->flags,
+            .idxoffset = offset,
+            .crc = entry->crc,
+        };
 
         // insert this entry like it was inserted by a user
         // this allows us to keep a generic way of inserting data and keeping a
         // single point of logic when adding data (logic for overwrite, resize bucket, ...)
-        index_entry_insert_memory(root, entry->id, entry->idlength, entry->offset, entry->length, entry->flags);
+        fresh = index_set_memory(root, entry->id, &source);
+
+        // now we added the entry (whatever it was)
+        // if this entry was flagged as deleted, let simulate a deletion
+        // like it was (we do replay here), this ensure coherence of data
+        //
+        // we can't just skip deleted entries, otherwise previously
+        // inserted data won't be flagged as deleted
+        if(index_entry_is_deleted(fresh))
+            index_entry_delete_memory(root, fresh);
+
+        // checking if we are in sequential mode
+        // and this if the first key, we need to populate
+        // our mapping with this key
+        if(root->seqid && seeker == initseeker) {
+            uint32_t thisid;
+            memcpy(&thisid, entry->id, entry->idlength);
+
+            index_seqid_push(root, thisid, root->indexid);
+            // index_seqid_dump(root);
+        }
+
+        // set the previous pointing to this entry
+        // this is the last one we added
+        root->previous = seeker - filebuf;
 
         // moving seeker to next entry in the buffer
         seeker += sizeof(index_item_t) + entry->idlength;
     }
+
+    debug("[+] index: last offset: %lu\n", root->previous);
 
     // freeing buffer memory
     free(filebuf);
@@ -305,7 +350,9 @@ static size_t index_load_file(index_root_t *root) {
 // load all the index found
 // if no index files exists, we create the original one
 static void index_load(index_root_t *root) {
-    for(root->indexid = 0; root->indexid < 65535; root->indexid++) {
+    uint64_t maxfiles = (1 << (sizeof(((index_entry_t *) 0)->dataid) * 8));
+
+    for(root->indexid = 0; root->indexid < maxfiles; root->indexid++) {
         index_set_id(root);
 
         if(index_load_file(root) == 0) {
@@ -321,6 +368,12 @@ static void index_load(index_root_t *root) {
             index_set_id(root);
             break;
         }
+    }
+
+    if(root->seqid && root->seqid->length == 0) {
+        debug("[+] index: fresh database created in sequential mode\n");
+        debug("[+] index: initializing default seqmap\n");
+        index_seqid_push(root, 0, 0);
     }
 
     if(root->status & INDEX_READ_ONLY) {
@@ -376,8 +429,24 @@ static void index_allocate_single() {
     // object now and reuse the same all the time
     //
     // this is allocated, when index mode can be different on runtime
-    if(!(index_reusable_entry = (index_entry_t *) malloc(sizeof(index_entry_t))))
+    if(!(index_reusable_entry = (index_entry_t *) malloc(sizeof(index_entry_t) + MAX_KEY_LENGTH)))
         diep("malloc");
+}
+
+index_seqid_t *index_allocate_seqid() {
+    index_seqid_t *seqid;
+
+    debug("[+] index loader: allocating sequential buffer map\n");
+    if(!(seqid = malloc(sizeof(index_seqid_t))))
+        diep("index loader: seqid: malloc");
+
+    seqid->allocated = 1024;
+    seqid->length = 0;
+
+    if(!(seqid->seqmap = malloc(seqid->allocated * sizeof(index_seqmap_t))))
+        diep("index loader: seqid: buffer malloc");
+
+    return seqid;
 }
 
 // create an index and load files
@@ -388,9 +457,10 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
 
     root->indexdir = indexdir;
     root->indexid = 0;
-    root->indexfile = malloc(sizeof(char) * (PATH_MAX + 1));
+    root->indexfile = malloc(sizeof(char) * (ZDB_PATH_MAX + 1));
     root->nextentry = 0;
     root->nextid = 0;
+    root->previous = 0;
     root->sync = settings->sync;
     root->synctime = settings->synctime;
     root->lastsync = 0;
@@ -399,6 +469,9 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
     root->namespace = namespace;
     root->mode = settings->mode;
 
+    if(settings->mode == SEQUENTIAL)
+        root->seqid = index_allocate_seqid();
+
     // since this function will be called for each namespace
     // we will not allocate all the time the reusable variables
     // but this is the 'main entry' of index loading, so doing this
@@ -406,7 +479,7 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
     index_allocate_single();
     index_load(root);
 
-    if(settings->mode == KEYVALUE || settings->mode == SEQUENTIAL)
+    if(settings->mode == KEYVALUE)
         index_dump(root, settings->dump);
 
     index_dump_statistics(root);
@@ -419,6 +492,12 @@ index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, 
 void index_destroy(index_root_t *root) {
     // delete root object
     free(root->indexfile);
+
+    if(root->seqid) {
+        free(root->seqid->seqmap);
+        free(root->seqid);
+    }
+
     free(root);
 }
 
@@ -432,4 +511,9 @@ void index_destroy_global() {
 
     free(index_reusable_entry);
     index_reusable_entry = NULL;
+}
+
+// delete index files (not the namespace descriptor)
+void index_delete_files(index_root_t *root) {
+    dir_clean_payload(root->indexdir);
 }

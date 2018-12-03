@@ -10,7 +10,7 @@
     //
     // sizeof(message) will contains the null character, to append \r\n the size will
     // just be +1
-    #define redis_hardsend(fd, message) redis_reply_stack(fd, message "\r\n", sizeof(message) + 1)
+    #define redis_hardsend(client, message) redis_reply_stack(client, message "\r\n", sizeof(message) + 1)
 
     //
     // redis protocol oriented objects
@@ -27,6 +27,7 @@
         void *buffer;
         int length;
         int filled;
+        int size;
 
     } resp_object_t;
 
@@ -39,10 +40,21 @@
 
     // represent one redis command with arguments
     typedef struct resp_request_t {
-        resp_state_t state;
-        int fillin;
-        int argc;
-        resp_object_t **argv;
+        resp_state_t state;     // current fill-in status
+        int fillin;             // reminder of progress
+        int argc;               // arguments count
+        resp_object_t **argv;   // list of arguments
+        uint32_t owner;         // source owner id
+
+        // source owner id is used mainly for replication
+        //
+        // by default, the owner is the zdb id itself (the zdb
+        // which generated the request), but when using mirroring
+        // this owner id can be replaced by original owner id (the zdb
+        // which generated the original message and started mirroring it)
+        //
+        // this id is used to stop propagating replication in a full mesh
+        // zdb topology (and basically master-master replication)
 
     } resp_request_t;
 
@@ -54,6 +66,7 @@
         RESP_STATUS_CONTINUE,
         RESP_STATUS_DONE,
         RESP_STATUS_SHUTDOWN,
+        RESP_STATUS_RESET,
 
     } resp_status_t;
 
@@ -81,17 +94,38 @@
         // the buffer
         void (*destructor)(void *target);
 
+        struct redis_response_t *next;
+
     } redis_response_t;
 
+    typedef struct command_t command_t;
+    typedef struct redis_client_t redis_client_t;
+
+    // command name and associated handler
+    struct command_t {
+        char *command;
+        int (*handler)(redis_client_t *client);
+
+    };
+
     // represent one client in memory
-    typedef struct redis_client_t {
+    struct redis_client_t {
         int fd;           // socket file descriptor
         namespace_t *ns;  // connection namespace
         time_t connected; // connection time
         size_t commands;  // request (commands) counter
         int writable;     // does the client can write on the namespace
         int admin;        // does the client is admin
+        int mirror;       // does this client needs a mirroring
+        int master;       // does this client is a 'master' (forwarder)
         buffer_t buffer;  // per-client buffer
+
+        // each client can request to wait for an event
+        // an event is basicly somebody else doing some command
+        // we keep track if a client wants to monitor some event
+        // and a pointer to the last command executed
+        command_t *watching;
+        command_t *executed;
 
         // each client will be attached to a request
         // this request will contains one-per-one commands
@@ -100,9 +134,9 @@
         // each client will have some (optional) pending
         // write, we attach a delayed async writer per
         // client
-        redis_response_t response;
-
-    } redis_client_t;
+        redis_response_t *responses;
+        redis_response_t *responsetail;
+    };
 
     // represent all clients in memory
     typedef struct redis_clients_t {
@@ -153,6 +187,9 @@
     int redis_detach_clients(namespace_t *namespace);
 
     // socket generic reply
-    int redis_reply(redis_client_t *client, void *payload, size_t length, void (*destructor)(void *target));
+    redis_response_t *redis_response_new(void *payload, size_t length, void (*destructor)(void *));
+    int redis_reply_heap(redis_client_t *client, void *payload, size_t length, void (*destructor)(void *));
     int redis_reply_stack(redis_client_t *client, void *payload, size_t length);
+
+    int redis_posthandler_client(redis_client_t *client);
 #endif

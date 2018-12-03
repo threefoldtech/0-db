@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <stdint.h>
 #include "zerodb.h"
 #include "hook.h"
 

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include "tests_user.h"
 #include "zdb_utils.h"
 #include "tests.h"
@@ -11,12 +12,17 @@
 static char *namespace_scan = "test_scan";
 
 static int scan_check(test_t *test, int argc, const char *argv[], char *expected) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     redisReply *reply;
 
     if(!(reply = zdb_response_scan(test, argc, argv)))
         return zdb_result(reply, TEST_FAILED_FATAL);
 
-    if(strcmp(reply->element[0]->str, expected) == 0)
+    redisReply *list = reply->element[1];
+
+    if(strcmp(list->element[0]->element[0]->str, expected) == 0)
         return zdb_result(reply, TEST_SUCCESS);
 
     log("%s\n", reply->str);
@@ -71,6 +77,7 @@ runtest_prio(sp, scan_get_last_key) {
     return scan_check(test, argvsz(argv), argv, "key6");
 }
 
+/*
 runtest_prio(sp, scan_get_second_key) {
     const char *argv[] = {"SCAN", "key1"};
     return scan_check(test, argvsz(argv), argv, "key2");
@@ -80,9 +87,13 @@ runtest_prio(sp, scan_get_last_minusone_key) {
     const char *argv[] = {"RSCAN", "key6"};
     return scan_check(test, argvsz(argv), argv, "key5");
 }
+*/
 
 
 runtest_prio(sp, scan_remove_first) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"DEL", "key1"};
     return zdb_command(test, argvsz(argv), argv);
 }
@@ -94,6 +105,9 @@ runtest_prio(sp, scan_get_new_first_key) {
 
 
 runtest_prio(sp, scan_remove_last) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
     const char *argv[] = {"DEL", "key6"};
     return zdb_command(test, argvsz(argv), argv);
 }
@@ -137,4 +151,44 @@ runtest_prio(sp, scan_ask_before_first) {
     return zdb_command_error(test, argvsz(argv), argv);
 }
 
+runtest_prio(sp, scan_keycur_not_exists) {
+    const char *argv[] = {"KEYCUR", "not-exists"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, scan_keycur_exists) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    const char *argv[] = {"KEYCUR", "key4"};
+    return zdb_command_str(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, scan_kscan_invalid) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    const char *argv[] = {"KSCAN"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, scan_kscan_switch_default) {
+    const char *argv[] = {"SELECT", "default"};
+    return zdb_command(test, argvsz(argv), argv);
+}
+
+runtest_prio(sp, scan_kscan) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    const char *argv[] = {"KSCAN", "h"};
+    redisReply *reply = zdb_response_scan(test, argvsz(argv), argv);
+
+    if(reply) {
+        freeReplyObject(reply);
+        return TEST_SUCCESS;
+    }
+
+    return TEST_FAILED;
+}
 

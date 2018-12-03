@@ -2,7 +2,7 @@
     #define __ZDB_DATA_H
 
     // split datafile after 256 MB
-    #define DATA_MAXSIZE  256 * 1024 * 1024
+    #define ZDB_DEFAULT_DATA_MAXSIZE  256 * 1024 * 1024
 
     // root point of the memory handler
     // used by the data manager
@@ -32,7 +32,8 @@
     } __attribute__((packed)) data_header_t;
 
     typedef enum data_flags_t {
-        DATA_ENTRY_DELETED = 1,  // flag entry as deleted
+        DATA_ENTRY_DELETED   = 1,       // flag entry as deleted
+        DATA_ENTRY_TRUNCATED = 1 << 1,  // used on compaction, tell entry was truncated
 
     } data_flags_t;
 
@@ -79,25 +80,43 @@
         size_t target;    // offset of the target key (read from the original)
                           // target will be 0 on the first call
                           // target will be updated if the offset is in another datafile
+
         data_entry_header_t *header;  // target header, set when found
         data_scan_status_t status;    // status code
 
     } data_scan_t;
+
+    // struct to pass to data operation
+    // in order to reduce arguments length
+    typedef struct data_request_t {
+        unsigned char *data;
+        uint32_t datalength;
+        void *vid;
+        uint8_t idlength;
+        uint8_t flags;
+        uint32_t crc;
+        time_t timestamp;
+
+    } data_request_t;
 
     data_root_t *data_init(settings_t *settings, char *datapath, uint16_t dataid);
     void data_destroy(data_root_t *root);
     size_t data_jump_next(data_root_t *root, uint16_t newid);
     void data_emergency(data_root_t *root);
     uint16_t data_dataid(data_root_t *root);
+    void data_delete_files(data_root_t *root);
+
+    uint32_t data_crc32(const uint8_t *bytes, ssize_t length);
 
     data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_t dataid, uint8_t idlength);
     int data_check(data_root_t *root, size_t offset, uint16_t dataid);
 
     // size_t data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, uint16_t dataid);
 
-    int data_delete(data_root_t *root, size_t offset, uint16_t dataid);
+    int data_delete(data_root_t *root, void *id, uint8_t idlength);
 
-    size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength);
+    // size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength, uint8_t flags);
+    size_t data_insert(data_root_t *root, data_request_t *source);
     size_t data_next_offset(data_root_t *root);
 
     data_scan_t data_previous_header(data_root_t *root, uint16_t dataid, size_t offset);
