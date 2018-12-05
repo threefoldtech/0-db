@@ -116,15 +116,15 @@ mkdir /tmp/zdbro
 
 # starting with read-only directory and nothing inside
 mount -t tmpfs none /tmp/zdbro -o size=128M,ro
-./zdb -v --data /tmp/zdbro/data --index /tmp/zdbro/index --dump || true
+./src/zdb -v --data /tmp/zdbro/data --index /tmp/zdbro/index --dump || true
 
 # starting with read-write directory, creating namespace
 mount -t tmpfs none /tmp/zdbro -o size=128M,rw,remount
-./zdb -v --data /tmp/zdbro/data --index /tmp/zdbro/index --dump
+./src/zdb -v --data /tmp/zdbro/data --index /tmp/zdbro/index --dump
 
 # reloading an existing database on a read-only disk
 mount -t tmpfs none /tmp/zdbro -o size=128M,ro,remount
-./zdb -v --data /tmp/zdbro/data --index /tmp/zdbro/index --dump
+./src/zdb -v --data /tmp/zdbro/data --index /tmp/zdbro/index --dump
 
 umount /tmp/zdbro
 
