@@ -69,9 +69,19 @@ rm -rf /tmp/zdbtest
 # open in sequential (will fails because created in another mode)
 ./src/zdb -v --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --dump --mode seq || true
 
-# truncate index
+
+# truncate index magic
+echo "XXX0" | dd of=/tmp/zdbtest-index/default/zdb-index-00000 conv=notrunc
+./src/zdb -v --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --dump || true
+
+# restore magic but truncate version
+echo "IDX0XXXX" | dd of=/tmp/zdbtest-index/default/zdb-index-00000 conv=notrunc
+./src/zdb -v --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --dump || true
+
+# make unreadable index
 echo nopenopenope > /tmp/zdbtest-index/default/zdb-index-00000
 ./src/zdb -v --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --dump || true
+
 
 # clean
 rm -rf /tmp/zdbtest-data
