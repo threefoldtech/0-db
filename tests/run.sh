@@ -111,7 +111,7 @@ rm -rf /tmp/zdbtest
 # run tests in sequential mode
 ./src/zdb --background --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq --datasize 32
 ./tests/zdbtests
-sleep 1
+while pidof zdb; do sleep 0.1; done
 
 # reload sequential database
 ./src/zdb --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq --dump
