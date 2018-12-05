@@ -106,7 +106,26 @@ rm -rf /tmp/zdbtest
 # reload sequential database
 ./src/zdb --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq --dump
 
-id
-echo $UID
+if [ $UID -ne 0 ]; then
+    echo "Not running root mode, all basic tests done."
+    exit 0
+fi
 
-echo "All tests done."
+# testing more advanced cases
+mkdir /tmp/zdbro
+
+# starting with read-only directory and nothing inside
+mount -t tmpfs none /tmp/zdbro -o size=128M,ro
+./zdb -v --data /tmp/zdbro/data --index /tmp/zdbro/index --dump || true
+
+# starting with read-write directory, creating namespace
+mount -t tmpfs none /tmp/zdbro -o size=128M,rw,remount
+./zdb -v --data /tmp/zdbro/data --index /tmp/zdbro/index --dump
+
+# reloading an existing database on a read-only disk
+mount -t tmpfs none /tmp/zdbro -o size=128M,ro,remount
+./zdb -v --data /tmp/zdbro/data --index /tmp/zdbro/index --dump
+
+umount /tmp/zdbro
+
+echo "All tests done, including advanced."
