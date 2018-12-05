@@ -19,13 +19,13 @@ before_install:
     - eval "${MATRIX_EVAL}"
 
 language: c
-sudo: false
+sudo: true
 script:
   - make COVERAGE=1
   - cd tests
   - make
   - cd ..
-  - bash tests/run.sh
+  - sudo bash tests/run.sh
 
 after_success:
   - cd src

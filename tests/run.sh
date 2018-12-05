@@ -106,4 +106,7 @@ rm -rf /tmp/zdbtest
 # reload sequential database
 ./src/zdb --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq --dump
 
+id
+echo $UID
+
 echo "All tests done."
