@@ -69,7 +69,6 @@ rm -rf /tmp/zdbtest
 # open in sequential (will fails because created in another mode)
 ./src/zdb -v --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --dump --mode seq || true
 
-
 # truncate index magic
 echo "XXX0" | dd of=/tmp/zdbtest-index/default/zdb-index-00000 conv=notrunc
 ./src/zdb -v --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --dump || true
@@ -110,7 +109,7 @@ rm -rf /tmp/zdbtest
 rm -rf /tmp/zdbtest
 
 # run tests in sequential mode
-./src/zdb --background --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq
+./src/zdb --background --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq --datasize 32
 ./tests/zdbtests
 
 # reload sequential database

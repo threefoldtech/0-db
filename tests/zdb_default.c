@@ -57,7 +57,7 @@ runtest_prio(103, check_running_mode) {
 }
 
 //
-// basic GET/SET/DEL on default sey
+// basic GET/SET/DEL on default set
 // user-key mode
 //
 runtest_prio(110, default_set_hello) {
@@ -119,13 +119,15 @@ runtest_prio(110, default_set_hello_seq) {
     if(test->mode == USERKEY)
         return TEST_SKIPPED;
 
-    uint32_t key = 0;
-    int response = zdb_set_seq(test, SEQNEW, "world", &key);
+    for(unsigned int i = 0; i < 128; i++) {
+        uint32_t key = i;
+        int response = zdb_set_seq(test, SEQNEW, "world", &key);
 
-    if(response == TEST_SUCCESS && key == 0)
-        return TEST_SUCCESS;
+        if(response != TEST_SUCCESS || key != i)
+            return TEST_FAILED;
+    }
 
-    return TEST_FAILED;
+    return TEST_SUCCESS;
 }
 
 runtest_prio(110, default_set_hello_seq_overwrite) {
