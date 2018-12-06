@@ -208,16 +208,30 @@ runtest_prio(sp, lowlevel_open_many_connection) {
     return response;
 }
 
-#if 0
 runtest_prio(sp, lowlevel_mirror) {
+    if(test->type != CONNECTION_TYPE_TCP)
+        return TEST_SKIPPED;
+
+    // duplicating connection
+    test_t newsock;
+    initialize_tcp(&newsock);
+
+    // sending mirror to new socket
     const char *argv[] = {"MIRROR"};
-    int value = zdb_command(test, argvsz(argv), argv);
+    int value = zdb_command(&newsock, argvsz(argv), argv);
 
     if(value != TEST_SUCCESS)
         return value;
 
-    // reopen the connection
-    initialize_tcp(test);
+    // sending a ping to original socket
+    const char *pargv[] = {"PING"};
+    int pvalue = zdb_command(test, argvsz(pargv), pargv);
+
+    if(pvalue != TEST_SUCCESS)
+        return pvalue;
+
+    // closing MIRROR socket
+    redisFree(newsock.zdb);
+
     return TEST_SUCCESS;
 }
-#endif
