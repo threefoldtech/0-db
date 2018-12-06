@@ -21,11 +21,11 @@
 #include "commands.h"
 #include "hook.h"
 
-// full protocol debug
-// this produce full dump of socket payload
-// and lot of debug message about protocol parsing
-
-// #define PROTOCOL_DEBUG
+#ifdef PROTOCOL_DEBUG
+    #ifndef DEEP_DEBUG
+        #error Cannot enable PROTOCOL_DEBUG without DEEP_DEBUG
+    #endif
+#endif
 
 // -- internal static protocol debugger --
 #ifdef RELEASE

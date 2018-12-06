@@ -93,6 +93,33 @@
     void hexdump(void *buffer, size_t length);
     void fulldump(void *data, size_t len);
 
+    //
+    // deep debug
+    //
+    // here you can enable some deep debug flags
+    // theses debug should not be useful for default debug
+    // purpose, but can be useful to debug protocol and really
+    // low level stuff
+    //
+    // ------
+    // deep debug enable deep debugging feature, you can't
+    // use any deep debug feature below without this feature set
+    // #define DEEP_DEBUG
+    //
+    // ------
+    // protocol debug full print redis protocol in hex
+    // #define PROTOCOL_DEBUG
+    //
+    // ------
+    // memory debugging
+    // you can enable memory debugging which will introduce
+    // soome probability that malloc() will fails
+    //
+    // probability is in percent, you need to define
+    // both MEMORY_ERROR_SIMULATOR and MEMORY_ERROR_PROBABILITY
+    //
+    // #define MEMORY_ERROR_SIMULATOR
+    // #define MEMORY_ERROR_PROBABILITY  20
 
     #define COLOR_RED    "\033[31;1m"
     #define COLOR_YELLOW "\033[33;1m"

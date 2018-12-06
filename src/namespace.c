@@ -203,8 +203,11 @@ namespace_t *namespace_ensure(namespace_t *namespace) {
 static int namespace_load_lazy(ns_root_t *nsroot, namespace_t *namespace) {
     // now, we are sure the namespace exists, but it's maybe empty
     // let's call index and data initializer, they will take care about that
-    namespace->index = index_init(nsroot->settings, namespace->indexpath, namespace, nsroot->branches);
-    namespace->data = data_init(nsroot->settings, namespace->datapath, namespace->index->indexid);
+    if(!(namespace->index = index_init(nsroot->settings, namespace->indexpath, namespace, nsroot->branches)))
+        return 1;
+
+    if(!(namespace->data = data_init(nsroot->settings, namespace->datapath, namespace->index->indexid)))
+        return 1;
 
     return 0;
 }
@@ -246,7 +249,8 @@ namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
         return NULL;
 
     // memory populating
-    namespace_load_lazy(nsroot, namespace);
+    if(namespace_load_lazy(nsroot, namespace))
+        return NULL;
 
     return namespace;
 }

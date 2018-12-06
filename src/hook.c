@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "zerodb.h"
 #include "hook.h"
+#include "memory.h"
 
 
 hook_t *hook_new(char *name, size_t argc) {
@@ -13,8 +14,7 @@ hook_t *hook_new(char *name, size_t argc) {
 
     debug("[+] hook: creating hook <%s>\n", name);
 
-    if(!(hook = malloc(sizeof(hook_t))))
-        diep("hook: malloc");
+    hook = malloc_fatal(sizeof(hook_t));
 
     // we add +3 to args:
     //  - first is the script name (convention)

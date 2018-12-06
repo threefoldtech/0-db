@@ -12,6 +12,7 @@
 #include "zerodb.h"
 #include "index.h"
 #include "index_scan.h"
+#include "memory.h"
 
 //
 // walk functions
@@ -84,7 +85,7 @@ static index_scan_t index_previous_header_real(index_scan_t scan) {
         return index_scan_error(scan, INDEX_SCAN_DELETED);
     }
 
-    if(!(scan.header = (index_item_t *) malloc(sizeof(index_item_t) + source.idlength))) {
+    if(!(scan.header = (index_item_t *) malloc_survive(sizeof(index_item_t) + source.idlength))) {
         warnp("data: previous-header: malloc");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
@@ -197,7 +198,7 @@ static index_scan_t index_next_header_real(index_scan_t scan) {
     }
 
 
-    if(!(scan.header = (index_item_t *) malloc(sizeof(index_item_t) + source.idlength))) {
+    if(!(scan.header = (index_item_t *) malloc_survive(sizeof(index_item_t) + source.idlength))) {
         warnp("index scan: next-header: malloc");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
@@ -421,6 +422,8 @@ index_scan_t index_last_header(index_root_t *root) {
         .header = NULL,
         .status = INDEX_SCAN_UNEXPECTED,
     };
+
+    emergency_backtrace();
 
     while(1) {
         // acquire data id fd

@@ -51,8 +51,7 @@ int command_get(redis_client_t *client) {
 
     if(!payload.buffer) {
         printf("[-] command: get: cannot read payload\n");
-        redis_hardsend(client, "-Internal Error");
-        free(payload.buffer);
+        redis_hardsend(client, "-Resource temporarily unavailable");
         return 0;
     }
 

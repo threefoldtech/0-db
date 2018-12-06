@@ -6,7 +6,6 @@
 #include <stdint.h>
 #include <errno.h>
 #include <signal.h>
-#include <execinfo.h>
 #include <getopt.h>
 #include <ctype.h>
 #include <time.h>
@@ -17,6 +16,7 @@
 #include "redis.h"
 #include "filesystem.h"
 #include "hook.h"
+#include "memory.h"
 
 //
 // global system settings
@@ -74,6 +74,7 @@ static char *modes[] = {
 // debug tools
 static char __hex[] = "0123456789abcdef";
 
+#ifdef DEEP_DEBUG
 void fulldump(void *_data, size_t len) {
     uint8_t *data = _data;
     unsigned int i, j;
@@ -105,6 +106,7 @@ void fulldump(void *_data, size_t len) {
 
     printf("\n");
 }
+#endif
 
 void hexdump(void *input, size_t length) {
     unsigned char *buffer = (unsigned char *) input;
@@ -174,17 +176,11 @@ static int signal_intercept(int signal, void (*function)(int)) {
 // for exemple, on segmentation fault, we will try to flush
 // and closes descriptor anyway to avoid loosing data
 static void sighandler(int signal) {
-    void *buffer[1024];
 
     switch(signal) {
         case SIGSEGV:
             fprintf(stderr, "[-] fatal: segmentation fault\n");
-            fprintf(stderr, "[-] ----------------------------------\n");
-
-            int calls = backtrace(buffer, sizeof(buffer) / sizeof(void *));
-            backtrace_symbols_fd(buffer, calls, 1);
-
-            fprintf(stderr, "[-] ----------------------------------");
+            emergency_backtrace();
 
             if(rootsettings.hook) {
                 hook_t *hook = hook_new("crash", 1);

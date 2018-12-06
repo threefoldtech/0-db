@@ -15,6 +15,7 @@
 #include "filesystem.h"
 #include "data.h"
 #include "index.h" // for key max length
+#include "memory.h"
 
 #if 0
 // dump a data entry
@@ -293,7 +294,9 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
 
     // allocating buffer from length
     // (from index or data header, we don't care)
-    payload.buffer = malloc(length);
+    if(!(payload.buffer = malloc_survive(length)))
+        return payload;
+
     payload.length = length;
 
     if(read(fd, payload.buffer, length) != (ssize_t) length) {
@@ -346,7 +349,8 @@ static inline int data_check_real(int fd, size_t offset) {
     lseek(fd, header.idlength, SEEK_CUR);
 
     // allocating buffer from header's length
-    buffer = malloc(header.datalength);
+    if(!(buffer = malloc_survive(header.datalength)))
+        return -1;
 
     if(read(fd, buffer, header.datalength) != (ssize_t) header.datalength) {
         warnp("data: checker: payload read");
@@ -391,8 +395,8 @@ size_t data_insert(data_root_t *root, data_request_t *source) {
     size_t headerlength = sizeof(data_entry_header_t) + source->idlength;
     data_entry_header_t *header;
 
-    if(!(header = malloc(headerlength)))
-        diep("malloc");
+    if(!(header = malloc_survive(headerlength)))
+        return 0;
 
     header->idlength = source->idlength;
     header->datalength = source->datalength;
@@ -476,10 +480,17 @@ void data_destroy(data_root_t *root) {
 }
 
 data_root_t *data_init(settings_t *settings, char *datapath, uint16_t dataid) {
-    data_root_t *root = (data_root_t *) malloc(sizeof(data_root_t));
+    data_root_t *root = (data_root_t *) malloc_fatal(sizeof(data_root_t));
+
+    if(!root)
+        return NULL;
+
+    if(!(root->datafile = malloc_fatal(sizeof(char) * (ZDB_PATH_MAX + 1)))) {
+        free(root);
+        return NULL;
+    }
 
     root->datadir = datapath;
-    root->datafile = malloc(sizeof(char) * (ZDB_PATH_MAX + 1));
     root->dataid = dataid;
     root->sync = settings->sync;
     root->synctime = settings->synctime;

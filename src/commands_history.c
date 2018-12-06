@@ -15,6 +15,7 @@
 #include "redis.h"
 #include "commands.h"
 #include "commands_get.h"
+#include "memory.h"
 
 // history support
 //
@@ -60,7 +61,7 @@ static int history_send_array(redis_client_t *client, history_response_t *histor
 
     // computing the full length expected
     size_t fullsize = history->payload.length + 256;
-    if(!(response = malloc(fullsize))) {
+    if(!(response = malloc_survive(fullsize))) {
         warnp("history send array: malloc");
         redis_hardsend(client, "-Internal Error");
         return 1;
