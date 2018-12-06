@@ -6,6 +6,10 @@ if [ ! -d src ]; then
     exit 1
 fi
 
+waitzdb() {
+    while pidof zdb; do sleep 0.1; done
+}
+
 rm -rf /tmp/zdbtest
 
 # test arguments
@@ -20,7 +24,7 @@ rm -rf /tmp/zdbtest
 # first real test suite
 ./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/false --datasize $((128 * 1024 * 1024))
 ./tests/zdbtests
-sleep 1
+waitzdb
 
 # reopen existing data
 ./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --dump
@@ -28,12 +32,12 @@ sleep 1
 # simulate a segmentation fault
 ./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/false
 pkill -SEGV zdb
-sleep 1
+waitzdb
 
 # simulate a SIGINT (ctrl+c)
 ./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/false
 pkill -INT zdb
-sleep 1
+waitzdb
 
 # cleaning stuff
 rm -rf /tmp/zdbtest
@@ -41,7 +45,7 @@ rm -rf /tmp/zdbtest
 # starting test suite with small datasize, generating lot of file jump
 ./src/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/false --datasize 32
 ./tests/zdbtests
-sleep 1
+waitzdb
 
 # cleaning stuff again
 rm -rf /tmp/zdbtest
@@ -53,7 +57,7 @@ rm -rf /tmp/zdbtest
     --mode user
 
 ./tests/zdbtests
-sleep 1
+waitzdb
 
 rm -rf /tmp/zdbtest
 
@@ -111,7 +115,7 @@ rm -rf /tmp/zdbtest
 # run tests in sequential mode
 ./src/zdb --background --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq --datasize 32
 ./tests/zdbtests
-while pidof zdb; do sleep 0.1; done
+waitzdb
 
 # reload sequential database
 ./src/zdb --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq --dump
