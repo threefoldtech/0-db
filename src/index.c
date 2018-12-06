@@ -217,7 +217,10 @@ size_t index_jump_next(index_root_t *root) {
     // moving to the next file
     root->indexid += 1;
     root->nextid = 0;
-    root->previous = 0;
+
+    // do not reset root->previous
+    // since we need it to keep track of previous
+    // entry for RSCAN support
 
     index_set_id(root);
 
