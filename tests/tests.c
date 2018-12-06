@@ -136,5 +136,5 @@ int main(int argc, char *argv[]) {
     printf("[+]   " GREY("skipped") ": %u\n", tests.skipped);
     printf("[+]\n");
 
-    return 0;
+    return tests.failed_fatal ? 1 : 0;
 }
