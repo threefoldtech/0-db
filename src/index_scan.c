@@ -44,7 +44,7 @@ static index_scan_t index_previous_header_real(index_scan_t scan) {
 
         scan.target = source.previous;
 
-        if(source.previous > current) {
+        if(source.previous >= current) {
             debug("[+] index scan: previous-header: previous offset in previous file\n");
             return index_scan_error(scan, INDEX_SCAN_REQUEST_PREVIOUS);
         }
@@ -373,12 +373,19 @@ static index_scan_t index_last_header_real(index_scan_t scan) {
 
     // checking if entry is deleted
     if(source.flags & INDEX_ENTRY_DELETED) {
-        debug("[+] index scan: last-header: data is deleted, going one further\n");
+        off_t current = scan.target;
+
+        debug("[+] index scan: last-header: data is deleted, going one previous\n");
 
         // reset target, so next time we come here, we will refetch previous
         // entry and use the mechanism to check if it's the previous file and
         // so on
         scan.target = source.previous;
+
+        if(source.previous >= current) {
+            debug("[+] index scan: last-header: previous offset in previous file\n");
+            return index_scan_error(scan, INDEX_SCAN_REQUEST_PREVIOUS);
+        }
 
         // let's notify source this entry was deleted and we
         // should retrigger the fetch
