@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <string.h>
 #include <x86intrin.h>
+#include <ctype.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <sys/stat.h>
@@ -37,6 +38,18 @@ void hexdump(void *input, size_t length) {
     }
 
     printf("0x%s", output);
+    free(output);
+}
+
+void strdump(void *input, size_t length) {
+    char *buffer = input;
+    char *output = calloc(length + 1, 1);
+    char *writer = output;
+
+    for(unsigned int i = 0; i < length; i++)
+        *writer++ = isprint(buffer[i]) ? buffer[i] : '.';
+
+    printf("%s", output);
     free(output);
 }
 
@@ -112,7 +125,9 @@ int index_dump(int fd) {
         printf("[+]   parent offs: %" PRIu32 "\n", entry->parentoff);
         printf("[+]   entry key  : ");
         hexdump(entry->id, entry->idlength);
-        printf("\n");
+        printf(" [");
+        strdump(entry->id, entry->idlength);
+        printf("]\n");
     }
 
     printf("[+] ---------------------------\n");

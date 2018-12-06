@@ -30,7 +30,7 @@ void index_item_header_dump(index_item_t *item) {
     debug("[+] index: entry dump: id length  : %" PRIu8  "\n", item->idlength);
     debug("[+] index: entry dump: data offset: %" PRIu32 "\n", item->offset);
     debug("[+] index: entry dump: data length: %" PRIu32 "\n", item->length);
-    debug("[+] index: entry dump: previous   : %" PRIX32 "\n", item->previous);
+    debug("[+] index: entry dump: previous   : %" PRIu32 "\n", item->previous);
     debug("[+] index: entry dump: flags      : %" PRIu8  "\n", item->flags);
     debug("[+] index: entry dump: timestamp  : %" PRIu32 "\n", item->timestamp);
     debug("[+] index: entry dump: parent id  : %" PRIu16 "\n", item->parentid);

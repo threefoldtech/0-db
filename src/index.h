@@ -56,7 +56,10 @@
     } __attribute__((packed)) index_item_t;
 
     typedef enum index_flags_t {
-        INDEX_ENTRY_DELETED = 1,  // we keep entry in memory and flag it as deleted
+        INDEX_ENTRY_DELETED = 1,         // we keep entry in memory and flag it as deleted
+        INDEX_ENTRY_TRUNCATED = 1 << 1,  // used on compaction, tell entry was truncated
+        INDEX_NOW_TRUNCATED = 1 << 2,    // from that entry, all next entries are truncated
+                                         // this is useful to know to not scan the file for nothing
 
     } index_flags_t;
 

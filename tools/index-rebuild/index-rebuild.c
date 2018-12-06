@@ -114,7 +114,7 @@ int index_rebuild_commit(index_root_t *root, buffer_t *buffer, uint16_t fileid) 
     return 0;
 }
 
-size_t index_rebuild(int fd, buffer_t *buffer, uint16_t dataid) {
+size_t index_rebuild(int fd, buffer_t *buffer, uint16_t dataid, index_root_t *root) {
     data_header_t header;
 
     // reading static header
@@ -150,6 +150,11 @@ size_t index_rebuild(int fd, buffer_t *buffer, uint16_t dataid) {
         idxitem->flags = entry.flags;
         idxitem->dataid = dataid;
         idxitem->timestamp = entry.timestamp;
+        idxitem->crc = entry.integrity;
+        idxitem->previous = root->previous;
+
+        // update previous pointer
+        root->previous = buffer->writer - buffer->buffer + sizeof(index_header_t);
 
         // update buffer pointers
         buffer->length += sizeof(index_item_t) + entry.idlength;
@@ -161,6 +166,21 @@ size_t index_rebuild(int fd, buffer_t *buffer, uint16_t dataid) {
         // computing next offset
         offset = lseek(fd, entry.datalength, SEEK_CUR);
         entries += 1;
+    }
+
+    // reading backward to check if we can flag some entries
+    // to speed up scan, by adding the fully truncated flag
+    index_item_t *idxitem = (index_item_t *) (buffer->buffer + root->previous - sizeof(index_header_t));
+    while(idxitem > buffer->buffer) {
+        printf("flag: %d, prev: %lu\n", idxitem->flags, idxitem->previous);
+
+        if(!(idxitem->flags & DATA_ENTRY_TRUNCATED)) {
+            idxitem = 0;
+            continue;
+        }
+
+        idxitem->flags |= INDEX_NOW_TRUNCATED;
+        idxitem = buffer->buffer + idxitem->previous - sizeof(index_header_t);
     }
 
     printf("[+] index size: %.2f KB\n", KB(buffer->length));
@@ -219,7 +239,7 @@ int namespace_index_rebuild(rebuild_t *compaction) {
         }
 
         idxbuf = buffer_new();
-        entries += index_rebuild(fd, idxbuf, fileid);
+        entries += index_rebuild(fd, idxbuf, fileid, namespace->index);
 
         index_rebuild_commit(namespace->index, idxbuf, fileid);
 
