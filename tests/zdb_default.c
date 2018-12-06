@@ -177,7 +177,7 @@ runtest_prio(110, default_set_hello_again_seq) {
     uint32_t key = 0;
     int response = zdb_set_seq(test, SEQNEW, "helloworld", &key);
 
-    if(response == TEST_SUCCESS && key == 2)
+    if(response == TEST_SUCCESS && key == 129)
         return TEST_SUCCESS;
 
     return TEST_FAILED;
@@ -187,7 +187,7 @@ runtest_prio(110, default_get_hello_new_seq) {
     if(test->mode == USERKEY)
         return TEST_SKIPPED;
 
-    uint32_t key = 2;
+    uint32_t key = 129;
     char *value = "helloworld";
 
     return zdb_bcheck(test, &key, sizeof(uint32_t), value, strlen(value));
