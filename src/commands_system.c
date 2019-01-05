@@ -105,28 +105,28 @@ int command_info(redis_client_t *client) {
 
 
     sprintf(info + strlen(info), "\n# stats\n");
-    sprintf(info + strlen(info), "commands_executed: %" PRIu32 "\n", stats->cmdsvalid);
-    sprintf(info + strlen(info), "commands_failed: %" PRIu32 "\n", stats->cmdsfailed);
-    sprintf(info + strlen(info), "commands_unauthorized: %" PRIu32 "\n", stats->adminfailed);
+    sprintf(info + strlen(info), "commands_executed: %" PRIu64 "\n", stats->cmdsvalid);
+    sprintf(info + strlen(info), "commands_failed: %" PRIu64 "\n", stats->cmdsfailed);
+    sprintf(info + strlen(info), "commands_unauthorized: %" PRIu64 "\n", stats->adminfailed);
 
-    sprintf(info + strlen(info), "index_disk_read_failed: %" PRIu32 "\n", stats->idxreadfailed);
-    sprintf(info + strlen(info), "index_disk_write_failed: %" PRIu32 "\n", stats->idxwritefailed);
-    sprintf(info + strlen(info), "data_disk_read_failed: %" PRIu32 "\n", stats->datareadfailed);
-    sprintf(info + strlen(info), "data_disk_write_failed: %" PRIu32 "\n", stats->datawritefailed);
+    sprintf(info + strlen(info), "index_disk_read_failed: %" PRIu64 "\n", stats->idxreadfailed);
+    sprintf(info + strlen(info), "index_disk_write_failed: %" PRIu64 "\n", stats->idxwritefailed);
+    sprintf(info + strlen(info), "data_disk_read_failed: %" PRIu64 "\n", stats->datareadfailed);
+    sprintf(info + strlen(info), "data_disk_write_failed: %" PRIu64 "\n", stats->datawritefailed);
 
-    sprintf(info + strlen(info), "index_disk_read_bytes: %" PRIu32 "\n", stats->idxdiskread);
+    sprintf(info + strlen(info), "index_disk_read_bytes: %" PRIu64 "\n", stats->idxdiskread);
     sprintf(info + strlen(info), "index_disk_read_mb: %.2f\n", stats->idxdiskread / (1024 * 1024.0));
-    sprintf(info + strlen(info), "index_disk_write_bytes: %" PRIu32 "\n", stats->idxdiskwrite);
+    sprintf(info + strlen(info), "index_disk_write_bytes: %" PRIu64 "\n", stats->idxdiskwrite);
     sprintf(info + strlen(info), "index_disk_write_mb: %.2f\n", stats->idxdiskwrite / (1024 * 1024.0));
 
-    sprintf(info + strlen(info), "data_disk_read_bytes: %" PRIu32 "\n", stats->datadiskread);
+    sprintf(info + strlen(info), "data_disk_read_bytes: %" PRIu64 "\n", stats->datadiskread);
     sprintf(info + strlen(info), "data_disk_read_mb: %.2f\n", stats->datadiskread / (1024 * 1024.0));
-    sprintf(info + strlen(info), "data_disk_write_bytes: %" PRIu32 "\n", stats->datadiskwrite);
+    sprintf(info + strlen(info), "data_disk_write_bytes: %" PRIu64 "\n", stats->datadiskwrite);
     sprintf(info + strlen(info), "data_disk_write_mb: %.2f\n", stats->datadiskwrite / (1024 * 1024.0));
 
-    sprintf(info + strlen(info), "network_rx_bytes: %" PRIu32 "\n", stats->networkrx);
+    sprintf(info + strlen(info), "network_rx_bytes: %" PRIu64 "\n", stats->networkrx);
     sprintf(info + strlen(info), "network_rx_mb: %.2f\n", stats->networkrx / (1024 * 1024.0));
-    sprintf(info + strlen(info), "network_tx_bytes: %" PRIu32 "\n", stats->networktx);
+    sprintf(info + strlen(info), "network_tx_bytes: %" PRIu64 "\n", stats->networktx);
     sprintf(info + strlen(info), "network_tx_mb: %.2f\n", stats->networktx / (1024 * 1024.0));
 
     redis_bulk_t response = redis_bulk(info, strlen(info));

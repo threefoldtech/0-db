@@ -46,25 +46,25 @@
         uint32_t clients;         // lifetime amount of clients connected
 
         // commands
-        uint32_t cmdsvalid;       // amount of commands (found) executed
-        uint32_t cmdsfailed;      // amount of commands nof found received
-        uint32_t adminfailed;     // amount of authentication failed
+        uint64_t cmdsvalid;       // amount of commands (found) executed
+        uint64_t cmdsfailed;      // amount of commands nof found received
+        uint64_t adminfailed;     // amount of authentication failed
 
         // index
-        uint32_t idxreadfailed;   // amount of index disk read failure
-        uint32_t idxwritefailed;  // amount of index disk write failure
-        uint32_t idxdiskread;     // amount of index bytes read on disk (except index loader)
-        uint32_t idxdiskwrite;    // amount of index bytes written on disk (except namespace creation)
+        uint64_t idxreadfailed;   // amount of index disk read failure
+        uint64_t idxwritefailed;  // amount of index disk write failure
+        uint64_t idxdiskread;     // amount of index bytes read on disk (except index loader)
+        uint64_t idxdiskwrite;    // amount of index bytes written on disk (except namespace creation)
 
         // data
-        uint32_t datareadfailed;  // amount of data payload disk read failure
-        uint32_t datawritefailed; // amount of data payload disk write failure
-        uint32_t datadiskread;    // amount of data bytes read on disk (except index loader)
-        uint32_t datadiskwrite;   // amount of data bytes written on disk (except namespace creation)
+        uint64_t datareadfailed;  // amount of data payload disk read failure
+        uint64_t datawritefailed; // amount of data payload disk write failure
+        uint64_t datadiskread;    // amount of data bytes read on disk (except index loader)
+        uint64_t datadiskwrite;   // amount of data bytes written on disk (except namespace creation)
 
         // network
-        uint32_t networkrx;       // amount of bytes received over the network
-        uint32_t networktx;       // amount of bytes transmitted over the network
+        uint64_t networkrx;       // amount of bytes received over the network
+        uint64_t networktx;       // amount of bytes transmitted over the network
 
     } zstats_t;
 
