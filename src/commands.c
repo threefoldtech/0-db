@@ -53,6 +53,9 @@ int command_args_validate(redis_client_t *client, int expected) {
 
 int command_admin_authorized(redis_client_t *client) {
     if(!client->admin) {
+        // update failed statistics
+        rootsettings.stats.adminfailed += 1;
+
         redis_hardsend(client, "-Permission denied");
         return 0;
     }
@@ -133,13 +136,20 @@ int redis_dispatcher(redis_client_t *client) {
 
     for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
         if(strncasecmp(key->buffer, commands_handlers[i].command, key->length) == 0) {
+            // save last command executed
             client->executed = &commands_handlers[i];
+
+            // update statistics
+            rootsettings.stats.cmdsvalid += 1;
+
+            // execute handler
             return commands_handlers[i].handler(client);
         }
     }
 
     // unknown command
     printf("[-] command: unsupported redis command\n");
+    rootsettings.stats.cmdsfailed += 1;
 
     // reset executed flag, this was a non-existing command
     client->executed = NULL;

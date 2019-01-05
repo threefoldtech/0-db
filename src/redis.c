@@ -189,6 +189,9 @@ redis_response_t *redis_send_response(redis_client_t *client, redis_response_t *
             return response;
         }
 
+        // updating statistics
+        rootsettings.stats.networktx += sent;
+
         response->reader += sent;
         response->length -= sent;
     }
@@ -707,6 +710,9 @@ go_again:
         return RESP_STATUS_DISCONNECTED;
     }
 
+    // updating statistics
+    rootsettings.stats.networkrx += length;
+
     buffer->writer += length;
     buffer->length += length;
     buffer->remain -= length;
@@ -880,6 +886,9 @@ redis_client_t *socket_client_new(int fd) {
 
     // set client to the list
     clients.list[fd] = client;
+
+    // update statistics
+    rootsettings.stats.clients += 1;
 
     return client;
 }

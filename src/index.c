@@ -74,6 +74,9 @@ int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
     ssize_t response;
 
     if((response = write(fd, buffer, length)) < 0) {
+        // update statistics
+        rootsettings.stats.idxwritefailed += 1;
+
         warnp("index write");
         return 0;
     }
@@ -83,6 +86,10 @@ int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
         return 0;
     }
 
+    // update statistics
+    rootsettings.stats.idxdiskwrite += length;
+
+    // flush disk if needed
     index_sync_check(root, fd);
 
     return 1;
@@ -92,6 +99,9 @@ static int index_read(int fd, void *buffer, size_t length) {
     ssize_t response;
 
     if((response = read(fd, buffer, length)) < 0) {
+        // update statistics
+        rootsettings.stats.idxreadfailed += 1;
+
         warnp("index read");
         return 0;
     }
@@ -105,6 +115,9 @@ static int index_read(int fd, void *buffer, size_t length) {
         fprintf(stderr, "[-] index read: partial read\n");
         return 0;
     }
+
+    // update statistics
+    rootsettings.stats.idxdiskread += length;
 
     return 1;
 }

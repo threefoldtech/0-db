@@ -41,6 +41,33 @@
     //             out of box on a version 2.x.x)
     #define ZDB_VERSION     "1.0.0"
 
+    typedef struct zstats_t {
+        time_t boottime;          // timestamp when zdb started (used for uptime)
+        uint32_t clients;         // lifetime amount of clients connected
+
+        // commands
+        uint32_t cmdsvalid;       // amount of commands (found) executed
+        uint32_t cmdsfailed;      // amount of commands nof found received
+        uint32_t adminfailed;     // amount of authentication failed
+
+        // index
+        uint32_t idxreadfailed;   // amount of index disk read failure
+        uint32_t idxwritefailed;  // amount of index disk write failure
+        uint32_t idxdiskread;     // amount of index bytes read on disk (except index loader)
+        uint32_t idxdiskwrite;    // amount of index bytes written on disk (except namespace creation)
+
+        // data
+        uint32_t datareadfailed;  // amount of data payload disk read failure
+        uint32_t datawritefailed; // amount of data payload disk write failure
+        uint32_t datadiskread;    // amount of data bytes read on disk (except index loader)
+        uint32_t datadiskwrite;   // amount of data bytes written on disk (except namespace creation)
+
+        // network
+        uint32_t networkrx;       // amount of bytes received over the network
+        uint32_t networktx;       // amount of bytes transmitted over the network
+
+    } zstats_t;
+
     typedef struct settings_t {
         char *datapath;   // path where data files will be written
         char *indexpath;  // path where index files will be written
@@ -62,6 +89,8 @@
 
         char *zdbid;      // fake 0-db id generated based on listening
         uint32_t iid;     // 0-db random instance id generated on boot
+
+        zstats_t stats;   // global 0-db statistics
 
         // the synctime can be useful to add basic security without killing
         // performance
