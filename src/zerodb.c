@@ -485,6 +485,10 @@ int main(int argc, char *argv[]) {
     settings->iid = instanceid();
     verbose("[+] system: instance id: %u\n", settings->iid);
 
+    // initialize statistics
+    memset(&settings->stats, 0x00, sizeof(zstats_t));
+    settings->stats.boottime = time(NULL);
+
     // let's go
     return proceed(settings);
 }
