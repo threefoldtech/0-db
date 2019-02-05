@@ -172,6 +172,7 @@
     resp_status_t redis_delayed_write(int fd);
 
     void socket_nonblock(int fd);
+    void socket_keepalive(int fd);
     void socket_block(int fd);
 
     void redis_bulk_append(redis_bulk_t *bulk, void *data, size_t length);
