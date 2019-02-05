@@ -813,6 +813,13 @@ void socket_nonblock(int fd) {
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
+void socket_keepalive(int fd) {
+    int optval = 1;
+
+    if(setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)) < 0)
+        warnp("setsockopt: keepalive");
+}
+
 // allocate a new client for a new file descriptor
 // used to keep session-life information about clients
 redis_client_t *socket_client_new(int fd) {

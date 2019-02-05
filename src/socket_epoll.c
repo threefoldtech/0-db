@@ -43,6 +43,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             }
 
             socket_nonblock(clientfd);
+            socket_keepalive(clientfd);
             socket_client_new(clientfd);
 
             verbose("[+] incoming connection (socket %d)\n", clientfd);

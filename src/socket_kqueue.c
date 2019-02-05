@@ -43,6 +43,7 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
             }
 
             socket_nonblock(clientfd);
+            socket_keepalive(clientfd);
             socket_client_new(clientfd);
 
             verbose("[+] incoming connection (socket %d)\n", clientfd);
