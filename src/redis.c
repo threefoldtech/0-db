@@ -859,6 +859,9 @@ redis_client_t *socket_client_new(int fd) {
     client->mirror = 0;
     client->master = 0;
 
+    // initialize wait timeout
+    memset(&client->watchtime, 0, sizeof(struct timespec));
+
     // allocating a fixed buffer
     client->buffer = buffer_new();
     if(!client->buffer.buffer) {
@@ -1014,6 +1017,71 @@ int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
     return 0;
 }
 
+// set needed flags to enable a client to wait on a command
+void redis_client_set_watcher(redis_client_t *client, command_t *handler, size_t timeoutms) {
+    debug("[+] redis: set watcher: command %s, timeout: %lu ms\n", handler->command, timeoutms);
+
+    // nothing to send to client, he is waiting now
+    // we set the command pointer to that client waiting flag
+    // and as soon as someone else on the same namespace will
+    // request this command, this client will be notified
+    client->watching = handler;
+
+    // set initial waiting time and timeout
+    clock_gettime(CLOCK_MONOTONIC, &client->watchtime);
+    client->watchtimeout = timeoutms;
+}
+
+// unset needed flags to set client not watching command anymore
+void redis_client_unset_watcher(redis_client_t *client) {
+    // trigger done, discarding watcher
+    client->watching = NULL;
+
+    // reset timeout
+    client->watchtimeout = 0;
+    memset(&client->watchtime, 0, sizeof(client->watchtime));
+}
+
+uint64_t timespec_delta_ms(struct timespec *begin, struct timespec *end) {
+    uint64_t deltams = (end->tv_sec - begin->tv_sec) * 1000;
+    deltams += (end->tv_nsec - begin->tv_nsec) / 1000000;
+
+    return deltams;
+}
+
+// recurring or periodic actions we can do
+// when the server is in idle state (no clients action
+// for a certain amount of time)
+void redis_idle_process() {
+    struct timespec timecheck;
+    char response[64];
+
+    for(size_t i = 0; i < clients.length; i++) {
+        if(!clients.list[i])
+            continue;
+
+        // shortcut
+        redis_client_t *checking = clients.list[i];
+
+        // checking if watching timeout is reached
+        if(checking->watching) {
+            clock_gettime(CLOCK_MONOTONIC, &timecheck);
+
+            uint64_t deltams = timespec_delta_ms(&checking->watchtime, &timecheck);
+            if(deltams > checking->watchtimeout) {
+                debug("[+] redis: trigger: client %d waiting timeout\n", checking->fd);
+
+                // not watching anymore
+                redis_client_unset_watcher(checking);
+
+                // sending notification
+                snprintf(response, sizeof(response), "-Timeout\r\n");
+                redis_reply_stack(checking, response, strlen(response));
+            }
+        }
+    }
+}
+
 // handler executed after each command executed
 // basicly for now, walk over all the clients, if they are
 // on the same namespace as the current client, checking if
@@ -1056,8 +1124,8 @@ int redis_posthandler_client(redis_client_t *client) {
             debug("[+] redis: trigger: client %d waits on <%s>, trigger <%s>\n", checking->fd, waiting, matching);
             #endif
 
-            // trigger done, discarding watcher
-            checking->watching = NULL;
+            // not watching anymore
+            redis_client_unset_watcher(checking);
 
             // sending notification
             snprintf(response, sizeof(response), "+%s\r\n", matching);
