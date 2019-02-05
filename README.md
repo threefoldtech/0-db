@@ -393,3 +393,6 @@ To run the tests, run `./zdbtests` in the `tests` directory.
 Warning: for now, only a local 0-db using `/tmp/zdb.sock` unix socket is supported.
 
 Warning 2: please use an empty database, otherwise tests may fails as false-positive issue.
+
+# Repository Owner
+- [Maxime Daniel](https://github.com/maxux), Telegram: [@maxux](http://t.me/maxux)
