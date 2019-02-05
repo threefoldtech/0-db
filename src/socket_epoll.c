@@ -17,6 +17,7 @@
 #include "redis.h"
 
 #define MAXEVENTS 64
+#define EVTIMEOUT 200
 
 static int socket_event(struct epoll_event *events, int notified, redis_handler_t *redis) {
     struct epoll_event *ev;
@@ -123,7 +124,15 @@ int socket_handler(redis_handler_t *handler) {
     // allows multiple client to be connected
 
     while(1) {
-        int n = epoll_wait(handler->evfd, events, MAXEVENTS, -1);
+        int n = epoll_wait(handler->evfd, events, MAXEVENTS, EVTIMEOUT);
+
+        if(n == 0) {
+            // timeout reached, checking for background
+            // or pending recurring task to do
+            redis_idle_process();
+            continue;
+        }
+
         if(socket_event(events, n, handler) == 1) {
             free(events);
             return 1;

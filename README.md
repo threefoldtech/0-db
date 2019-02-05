@@ -170,7 +170,7 @@ This mode is not possible if you don't have any data/index already available.
 - `SCAN [optional cursor]`
 - `SCANX [optional cursor]` (this is just an alias for `SCAN`)
 - `RSCAN [optional cursor]`
-- `WAIT command | *`
+- `WAIT command | * [timeout-ms]`
 - `HISTORY key [binary-data]`
 - `FLUSH`
 
@@ -299,13 +299,19 @@ Blocking wait on command execution by someone else. This allows you to wait some
 doing some commands. This can be useful to avoid polling the server if you want to do periodic
 queries (like waiting for a `SET`).
 
-Wait takes one argument: a command name to wait for. The event will only be triggered for clients
-on the same namespace as you (same `SELECT`), the special command '`*`' can be used to wait on any commands.
+Wait takes one or two arguments: a command name to wait for and an optional timeout.
+The event will only be triggered for clients on the same namespace as you (same `SELECT`),
+the special command '`*`' can be used to wait on any commands.
+
+The optional timeout argument is in milliseconds, by default, timeout is set to 5 seconds if no
+timeout is provided. Timeout range can be set from 100ms to 30 minutes. Timeout precision is not
+always exact and can be slightly different than expected, depending on server load.
 
 This is the only blocking function right now. In server side, your connection is set `pending` and
-you won't receive anything until someone executed the expected command.
+you won't receive anything until someone executed the expected command or timeout occures.
 
-When the command is triggered by someone else, you receive `+COMMAND_NAME` as response.
+When the command is triggered by someone else, you receive `+COMMAND_NAME` as response. If your reached
+the timeout, you receive `-Timeout` error.
 
 ## HISTORY
 This command allows you to go back in time, when your overwrite a key.

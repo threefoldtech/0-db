@@ -17,6 +17,7 @@
 #include "redis.h"
 
 #define MAXEVENTS 64
+#define EVTIMEOUT 150
 struct kevent evset;
 
 static int socket_event(struct kevent *events, int notified, redis_handler_t *redis) {
@@ -92,6 +93,10 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
 
 int socket_handler(redis_handler_t *handler) {
     struct kevent evlist[MAXEVENTS];
+    struct timespec timeout = {
+        .tv_sec = 0,
+        .tv_nsec = EVTIMEOUT * 1000000
+    };
 
     // initialize empty struct
     EV_SET(&evset, handler->mainfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
@@ -108,7 +113,15 @@ int socket_handler(redis_handler_t *handler) {
     // allows multiple client to be connected
 
     while(1) {
-        int n = kevent(handler->evfd, NULL, 0, evlist, MAXEVENTS, NULL);
+        int n = kevent(handler->evfd, NULL, 0, evlist, MAXEVENTS, &timeout);
+
+        if(n == 0) {
+            // timeout reached, checking for background
+            // or pending recurring task to do
+            redis_idle_process();
+            continue;
+        }
+
         if(socket_event(evlist, n, handler) == 1)
             return 1;
     }

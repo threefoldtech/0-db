@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <inttypes.h>
+#include <time.h>
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
@@ -20,6 +21,8 @@
 #include "commands_system.h"
 #include "commands_history.h"
 #include "commands_replicate.h"
+
+#define WAIT_MAX_TIMEOUT_MS   30 * 60 * 1000  // 30 min
 
 // ensure number of argument and their validity
 static int real_command_args_validate(redis_client_t *client, int expected, int nullallowed) {
@@ -163,8 +166,10 @@ int command_wait(redis_client_t *client) {
     resp_request_t *request = client->request;
     command_t *handler = NULL;
 
-    if(!command_args_validate(client, 2))
+    if(client->request->argc != 2 && client->request->argc != 3) {
+        redis_hardsend(client, "-Invalid arguments");
         return 1;
+    }
 
     // extract argument
     resp_object_t *key = request->argv[1];
@@ -182,11 +187,28 @@ int command_wait(redis_client_t *client) {
         return 0;
     }
 
-    // nothing to send to client, he is waiting now
-    // we set the command pointer to that client waiting flag
-    // and as soon as someone else on the same namespace will
-    // request this command, this client will be notified
-    client->watching = handler;
+    size_t timeout = 5000;
+
+    if(client->request->argc == 3) {
+        char buffer[20];
+
+        if(client->request->argv[2]->length > 16) {
+            redis_hardsend(client, "-Invalid timeout");
+            return 1;
+        }
+
+        memset(buffer, 0, sizeof(buffer));
+        strncpy(buffer, client->request->argv[2]->buffer, client->request->argv[2]->length);
+
+        timeout = strtoull(buffer, NULL, 10);
+        if(timeout < 100 || timeout > WAIT_MAX_TIMEOUT_MS) {
+            redis_hardsend(client, "-Invalid timeout");
+            return 1;
+        }
+    }
+
+    // set watching flag
+    redis_client_set_watcher(client, handler, timeout);
 
     return 1;
 }

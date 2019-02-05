@@ -124,6 +124,8 @@
         // an event is basicly somebody else doing some command
         // we keep track if a client wants to monitor some event
         // and a pointer to the last command executed
+        size_t watchtimeout;          // watch command timeout
+        struct timespec watchtime;    // tracker for timeout
         command_t *watching;
         command_t *executed;
 
@@ -175,6 +177,10 @@
     void socket_keepalive(int fd);
     void socket_block(int fd);
 
+    // wait command helpers
+    void redis_client_set_watcher(redis_client_t *client, command_t *handler, size_t timeoutms);
+    void redis_client_unset_watcher(redis_client_t *client);
+
     void redis_bulk_append(redis_bulk_t *bulk, void *data, size_t length);
     redis_bulk_t redis_bulk(void *payload, size_t length);
 
@@ -193,4 +199,5 @@
     int redis_reply_stack(redis_client_t *client, void *payload, size_t length);
 
     int redis_posthandler_client(redis_client_t *client);
+    void redis_idle_process();
 #endif
