@@ -229,7 +229,7 @@ int command_scan(redis_client_t *client) {
     uint64_t basetime = ustime();
 
     while(ustime() - basetime < SCAN_TIMESLICE_US) {
-        debug("[+] scan: elapsed time: %lu us\n", ustime() - basetime);
+        debug("[+] scan: elapsed time: %" PRIu64 " us\n", ustime() - basetime);
 
         // reading entry and appending it
         scan = index_next_header(client->ns->index, info.dataid, info.idxoffset);
@@ -244,7 +244,7 @@ int command_scan(redis_client_t *client) {
         scaninfo_from_scan(&info, &scan);
     }
 
-    debug("[+] scan: retreived %lu entries in %lu us\n", scanlist.length, ustime() - basetime);
+    debug("[+] scan: retreived %lu entries in %" PRIu64 " us\n", scanlist.length, ustime() - basetime);
 
     if(command_scan_send_scanlist(&scanlist, client))
         redis_hardsend(client, "-Internal Error");
@@ -282,7 +282,7 @@ int command_rscan(redis_client_t *client) {
     uint64_t basetime = ustime();
 
     while(ustime() - basetime < SCAN_TIMESLICE_US) {
-        debug("[+] scan: elapsed time: %lu us\n", ustime() - basetime);
+        debug("[+] scan: elapsed time: %" PRIu64 " us\n", ustime() - basetime);
 
         // reading entry and appending it
         scan = index_previous_header(client->ns->index, info.dataid, info.idxoffset);
@@ -297,7 +297,7 @@ int command_rscan(redis_client_t *client) {
         scaninfo_from_scan(&info, &scan);
     }
 
-    debug("[+] scan: retreived %lu entries in %lu us\n", scanlist.length, ustime() - basetime);
+    debug("[+] scan: retreived %lu entries in %" PRIu64 " us\n", scanlist.length, ustime() - basetime);
 
     if(command_scan_send_scanlist(&scanlist, client))
         redis_hardsend(client, "-Internal Error");
