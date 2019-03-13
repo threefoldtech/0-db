@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <inttypes.h>
+#include <sys/statvfs.h>
 #include "zerodb.h"
 #include "index.h"
 #include "data.h"
@@ -219,7 +220,7 @@ int command_nslist(redis_client_t *client) {
 //   NSINFO [namespace]
 int command_nsinfo(redis_client_t *client) {
     resp_request_t *request = client->request;
-    char info[1024];
+    char info[2048];
     char target[COMMAND_MAXLEN];
     namespace_t *namespace;
 
@@ -253,6 +254,34 @@ int command_nsinfo(redis_client_t *client) {
     sprintf(info + strlen(info), "index_size_kb: %.2f\n", KB(namespace->index->indexsize));
     sprintf(info + strlen(info), "mode: %s\n", index_modename(namespace->index));
 
+    // underneath disk free space
+    struct statvfs buf;
+    size_t sfree;
+
+    // index path
+    if(statvfs(namespace->indexpath, &buf) == 0) {
+        sfree = buf.f_bsize * buf.f_bavail;
+
+        sprintf(info + strlen(info), "index_disk_freespace_bytes: %lu\n", sfree);
+        sprintf(info + strlen(info), "index_disk_freespace_mb: %.2f\n", MB(sfree));
+
+    } else {
+        warnp(namespace->indexpath);
+    }
+
+    // data path
+    if(statvfs(namespace->datapath, &buf) == 0) {
+        sfree = buf.f_bsize * buf.f_bavail;
+
+        sprintf(info + strlen(info), "data_disk_freespace_bytes: %lu\n", sfree);
+        sprintf(info + strlen(info), "data_disk_freespace_mb: %.2f\n", MB(sfree));
+
+    } else {
+        warnp(namespace->datapath);
+    }
+
+
+    // master client response
     if(client->master && namespace->password) {
         sprintf(info + strlen(info), "password_raw: %s\n", namespace->password);
     }
