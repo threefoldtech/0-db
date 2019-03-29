@@ -382,7 +382,7 @@ The datafile id is stored on 16 bits, which makes maximum of 65536 files.
 Each namespaces have their own datafiles, one namespace can contains maximum ~16 TB of data.
 Since one single 0-db is made to be used on a single dedicated disk, this should be good out of box,
 but that's still a limitation. This limitation can be changed on startup via command line
-option `--datasize`, and provide (in bytes) the size limit of a datafile. Setting `536870912` for exemple
+option `--datasize`, and provide (in bytes) the size limit of a datafile. Setting `536870912` for example
 (which is 512 MB) would set the namespace limit to ~32 TB. This limit is printed (with verbose flag) on
 the initializing process.
 
