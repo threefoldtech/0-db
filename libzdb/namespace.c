@@ -75,7 +75,7 @@ namespace_t *namespace_get(char *name) {
 void namespace_descriptor_update(namespace_t *namespace, int fd) {
     ns_header_t header;
 
-    debug("[+] namespaces: updating header\n");
+    zdb_debug("[+] namespaces: updating header\n");
 
     header.namelength = strlen(namespace->name);
     header.passlength = namespace->password ? strlen(namespace->password) : 0;
@@ -86,14 +86,14 @@ void namespace_descriptor_update(namespace_t *namespace, int fd) {
         header.flags |= NS_FLAGS_PUBLIC;
 
     if(write(fd, &header, sizeof(ns_header_t)) != sizeof(ns_header_t))
-        warnp("namespace header write");
+        zdb_warnp("namespace header write");
 
     if(write(fd, namespace->name, header.namelength) != (ssize_t) header.namelength)
-        warnp("namespace header name write");
+        zdb_warnp("namespace header name write");
 
     if(namespace->password) {
         if(write(fd, namespace->password, header.passlength) != (ssize_t) header.passlength)
-            warnp("namespace header pass write");
+            zdb_warnp("namespace header pass write");
     }
 
     // ensure metadata are written
@@ -107,7 +107,7 @@ static int namespace_descriptor_open(namespace_t *namespace) {
     snprintf(pathname, ZDB_PATH_MAX, "%s/zdb-namespace", namespace->indexpath);
 
     if((fd = open(pathname, O_CREAT | O_RDWR, 0600)) < 0) {
-        warning("[-] cannot create or open in read-write the namespace file\n");
+        zdb_warning("[-] cannot create or open in read-write the namespace file\n");
         return -1;
     }
 
@@ -136,7 +136,7 @@ static void namespace_descriptor_load(namespace_t *namespace) {
 
     if(header.passlength) {
         if(!(namespace->password = calloc(sizeof(char), header.passlength + 1))) {
-            warnp("namespace password malloc");
+            zdb_warnp("namespace password malloc");
             return;
         }
 
@@ -144,12 +144,12 @@ static void namespace_descriptor_load(namespace_t *namespace) {
         lseek(fd, header.namelength, SEEK_CUR);
 
         if(read(fd, namespace->password, header.passlength) != (ssize_t) header.passlength)
-            warnp("namespace password read");
+            zdb_warnp("namespace password read");
     }
 
-    debug("[+] namespace '%s': maxsize: %lu\n", namespace->name, namespace->maxsize);
-    debug("[+] -> password protection: %s\n", namespace->password ? "yes" : "no");
-    debug("[+] -> public access: %s\n", namespace->public ? "yes" : "no");
+    zdb_debug("[+] namespace '%s': maxsize: %lu\n", namespace->name, namespace->maxsize);
+    zdb_debug("[+] -> password protection: %s\n", namespace->password ? "yes" : "no");
+    zdb_debug("[+] -> public access: %s\n", namespace->public ? "yes" : "no");
 
     close(fd);
 }
@@ -172,7 +172,7 @@ static char *namespace_path(char *prefix, char *name) {
     char *pathname;
 
     if(asprintf(&pathname, "%s/%s", prefix, name) < 0) {
-        warnp("asprintf");
+        zdb_warnp("asprintf");
         return NULL;
     }
 
@@ -180,16 +180,16 @@ static char *namespace_path(char *prefix, char *name) {
 }
 
 namespace_t *namespace_ensure(namespace_t *namespace) {
-    debug("[+] namespaces: checking index [%s]\n", namespace->indexpath);
+    zdb_debug("[+] namespaces: checking index [%s]\n", namespace->indexpath);
     if(!dir_exists(namespace->indexpath)) {
         if(dir_create(namespace->indexpath) < 0)
-            return warnp("index dir_create");
+            return zdb_warnp("index dir_create");
     }
 
-    debug("[+] namespaces: checking data [%s]\n", namespace->datapath);
+    zdb_debug("[+] namespaces: checking data [%s]\n", namespace->datapath);
     if(!dir_exists(namespace->datapath)) {
         if(dir_create(namespace->datapath) < 0)
-            return warnp("data dir_create");
+            return zdb_warnp("data dir_create");
     }
 
     return namespace;
@@ -213,10 +213,10 @@ static int namespace_load_lazy(ns_root_t *nsroot, namespace_t *namespace) {
 namespace_t *namespace_load_light(ns_root_t *nsroot, char *name) {
     namespace_t *namespace;
 
-    debug("[+] namespaces: loading '%s'\n", name);
+    zdb_debug("[+] namespaces: loading '%s'\n", name);
 
     if(!(namespace = malloc(sizeof(namespace_t)))) {
-        warnp("namespace malloc");
+        zdb_warnp("namespace malloc");
         return NULL;
     }
 
@@ -263,7 +263,7 @@ static namespace_t *namespace_push(ns_root_t *root, namespace_t *namespace) {
         if(root->namespaces[i])
             continue;
 
-        debug("[+] namespace: empty slot reusable found: %lu\n", i);
+        zdb_debug("[+] namespace: empty slot reusable found: %lu\n", i);
 
         // empty slot found, updating
         namespace->idlist = i;
@@ -273,11 +273,11 @@ static namespace_t *namespace_push(ns_root_t *root, namespace_t *namespace) {
         return namespace;
     }
 
-    debug("[+] namespace: allocating new slot\n");
+    zdb_debug("[+] namespace: allocating new slot\n");
 
     // no empty slot, allocating a new one
     if(!(newlist = realloc(root->namespaces, sizeof(namespace_t) * newlength)))
-        return warnp("realloc namespaces list");
+        return zdb_warnp("realloc namespaces list");
 
     // set list id
     namespace->idlist = root->length;
@@ -357,13 +357,13 @@ static int namespace_scanload(ns_root_t *root) {
     // it's on init-time, if the directory cannot be read
     // we should not be here at all
     if(!(dp = opendir(root->settings->indexpath)))
-        diep("opendir");
+        zdb_diep("opendir");
 
     while((ep = readdir(dp))) {
         if(!namespace_valid_name(ep->d_name))
             continue;
 
-        debug("[+] namespaces: extra found: %s\n", ep->d_name);
+        zdb_debug("[+] namespaces: extra found: %s\n", ep->d_name);
 
         // loading the namespace
         namespace_t *namespace;
@@ -377,7 +377,7 @@ static int namespace_scanload(ns_root_t *root) {
 
     closedir(dp);
 
-    verbose("[+] namespaces: %d extra namespaces loaded\n", loaded);
+    zdb_verbose("[+] namespaces: %d extra namespaces loaded\n", loaded);
 
     return loaded;
 }
@@ -398,12 +398,12 @@ static int namespace_scanload(ns_root_t *root) {
 //
 // this is why it's here we take care about cleaning and emergencies, it's the only
 // place where we __knows__ what we needs to clean
-ns_root_t *namespaces_allocate(settings_t *settings) {
+ns_root_t *namespaces_allocate(zdb_settings_t *settings) {
     ns_root_t *root;
 
     // we start by the default namespace
     if(!(root = (ns_root_t *) malloc(sizeof(ns_root_t))))
-        diep("namespaces malloc");
+        zdb_diep("namespaces malloc");
 
     root->length = 1;             // we start with the default one, only
     root->effective = 1;          // no namespace really loaded yet
@@ -411,29 +411,29 @@ ns_root_t *namespaces_allocate(settings_t *settings) {
     root->branches = NULL;        // maybe we don't need the branches, see below
 
     if(!(root->namespaces = (namespace_t **) malloc(sizeof(namespace_t *) * root->length)))
-        diep("namespace malloc");
+        zdb_diep("namespace malloc");
 
     // allocating (if needed, only some modes needs it) the big (single) index branches
     if(settings->mode == KEYVALUE) {
-        debug("[+] namespaces: pre-allocating index (%d lazy branches)\n", buckets_branches);
+        zdb_debug("[+] namespaces: pre-allocating index (%d lazy branches)\n", buckets_branches);
 
         // allocating minimal branches array
         if(!(root->branches = index_buckets_init()))
-            diep("buckets allocation");
+            zdb_diep("buckets allocation");
     }
 
     return root;
 }
 
-int namespaces_init(settings_t *settings) {
-    verbose("[+] namespaces: initializing\n");
+int namespaces_init(zdb_settings_t *settings) {
+    zdb_verbose("[+] namespaces: initializing\n");
 
     // allocating global namespaces
     nsroot = namespaces_allocate(settings);
 
     // namespace 0 will always be the default one
     if(!(nsroot->namespaces[0] = namespace_load(nsroot, NAMESPACE_DEFAULT))) {
-        danger("[-] could not load or create default namespace, this is fatal");
+        zdb_danger("[-] could not load or create default namespace, this is fatal");
         exit(EXIT_FAILURE);
     }
 
@@ -458,7 +458,7 @@ int namespaces_destroy() {
     // the first namespace (default), since they all share
     // the same buffer
     if(nsroot->branches) {
-        debug("[+] namespaces: cleaning branches\n");
+        zdb_debug("[+] namespaces: cleaning branches\n");
         for(uint32_t b = 0; b < buckets_branches; b++)
             index_branch_free(nsroot->namespaces[0]->index->branches, b);
 
@@ -467,7 +467,7 @@ int namespaces_destroy() {
     }
 
     // freeing each namespace's index and data buffers
-    debug("[+] namespaces: cleaning index and data\n");
+    zdb_debug("[+] namespaces: cleaning index and data\n");
 
     namespace_t *ns;
     for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
@@ -521,16 +521,16 @@ static void namespace_reload_hook(namespace_t *namespace) {
 // to the namespace object itself (this object is linked to users)
 // we only refresh data and index pointers
 int namespace_reload(namespace_t *namespace) {
-    debug("[+] namespace: reloading: %s\n", namespace->name);
+    zdb_debug("[+] namespace: reloading: %s\n", namespace->name);
 
-    debug("[+] namespace: reload: cleaning index\n");
+    zdb_debug("[+] namespace: reload: cleaning index\n");
     index_clean_namespace(namespace->index, namespace);
 
-    debug("[+] namespace: reload: destroying objects\n");
+    zdb_debug("[+] namespace: reload: destroying objects\n");
     index_destroy(namespace->index);
     data_destroy(namespace->data);
 
-    debug("[+] namespace: reload: reloading data\n");
+    zdb_debug("[+] namespace: reload: reloading data\n");
     namespace_load_lazy(nsroot, namespace);
 
     // hook notification
@@ -545,20 +545,20 @@ int namespace_reload(namespace_t *namespace) {
 // we don't touch to the namespace object itself (this object is linked to users)
 // we only refresh data and index pointers
 int namespace_flush(namespace_t *namespace) {
-    debug("[+] namespace: flushing: %s\n", namespace->name);
+    zdb_debug("[+] namespace: flushing: %s\n", namespace->name);
 
-    debug("[+] namespace: flushing: cleaning index\n");
+    zdb_debug("[+] namespace: flushing: cleaning index\n");
     index_clean_namespace(namespace->index, namespace);
 
-    debug("[+] namespace: flushing: removing files\n");
+    zdb_debug("[+] namespace: flushing: removing files\n");
     index_delete_files(namespace->index);
     data_delete_files(namespace->data);
 
-    debug("[+] namespace: flushing: destroying objects\n");
+    zdb_debug("[+] namespace: flushing: destroying objects\n");
     index_destroy(namespace->index);
     data_destroy(namespace->data);
 
-    debug("[+] namespace: flushing: reloading data\n");
+    zdb_debug("[+] namespace: flushing: reloading data\n");
     namespace_load_lazy(nsroot, namespace);
 
     return 0;
@@ -582,7 +582,7 @@ static void namespace_delete_hook(namespace_t *namespace) {
 // note: this function assume namespace exists, you should
 // call this by checking before if everything was okay to delete it.
 int namespace_delete(namespace_t *namespace) {
-    debug("[+] namespace: removing: %s\n", namespace->name);
+    zdb_debug("[+] namespace: removing: %s\n", namespace->name);
 
     // detach all clients attached to this namespace
     // redis_detach_clients(namespace);
@@ -598,10 +598,10 @@ int namespace_delete(namespace_t *namespace) {
     namespace_kick_slot(namespace);
 
     // removing files
-    debug("[+] namespace: removing: %s\n", namespace->indexpath);
+    zdb_debug("[+] namespace: removing: %s\n", namespace->indexpath);
     dir_remove(namespace->indexpath);
 
-    debug("[+] namespace: removing: %s\n", namespace->datapath);
+    zdb_debug("[+] namespace: removing: %s\n", namespace->datapath);
     dir_remove(namespace->datapath);
 
     // hook notification

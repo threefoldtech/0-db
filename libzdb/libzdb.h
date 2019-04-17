@@ -1,5 +1,5 @@
-#ifndef __ZDB_H
-    #define __ZDB_H
+#ifndef __LIBZDB_H
+    #define __LIBZDB_H
 
     #ifndef REVISION
         #define REVISION "(unknown)"
@@ -7,8 +7,6 @@
 
     #define ZDB_DEFAULT_DATAPATH    "./zdb-data"
     #define ZDB_DEFAULT_INDEXPATH   "./zdb-index"
-    #define ZDB_DEFAULT_LISTENADDR  "0.0.0.0"
-    #define ZDB_DEFAULT_PORT        9900
 
     #define ZDB_PATH_MAX    4096
 
@@ -41,7 +39,7 @@
     //             out of box on a version 2.x.x)
     #define ZDB_VERSION     "1.0.0"
 
-    typedef struct zstats_t {
+    typedef struct zdb_stats_t {
         time_t boottime;          // timestamp when zdb started (used for uptime)
         uint32_t clients;         // lifetime amount of clients connected
 
@@ -66,31 +64,24 @@
         uint64_t networkrx;       // amount of bytes received over the network
         uint64_t networktx;       // amount of bytes transmitted over the network
 
-    } zstats_t;
+    } zdb_stats_t;
 
-    typedef struct settings_t {
-        char *datapath;   // path where data files will be written
-        char *indexpath;  // path where index files will be written
-        char *listen;     // network listen address
-        int port;         // network listen port
-        int verbose;      // enable verbose print (function 'verbose')
-        int dump;         // ask to dump index on the load-time
-        int sync;         // force to sync each write
-        int synctime;     // force to sync writes after this amount of seconds
-        int mode;         // default index running mode (should be index_mode_t)
-        char *adminpwd;   // admin password, if NULL, all users are admin
-        char *socket;     // unix socket path
-        int background;   // flag to run in background
-        char *logfile;    // where to redirect logs in background mode
-        char *hook;       // external hook script to execute
-        size_t datasize;  // maximum datafile size before jumping to next one
-        int protect;      // flag default namespace to use admin password (for writing)
-        size_t maxsize;   // default namespace maximum datasize
+    typedef struct zdb_settings_t {
+        char *datapath;    // path where data files will be written
+        char *indexpath;   // path where index files will be written
+        int verbose;       // enable verbose print (function 'verbose')
+        int dump;          // ask to dump index on the load-time
+        int sync;          // force to sync each write
+        int synctime;      // force to sync writes after this amount of seconds
+        int mode;          // default index running mode (should be index_mode_t)
+        char *hook;        // external hook script to execute
+        size_t datasize;   // maximum datafile size before jumping to next one
+        size_t maxsize;    // default namespace maximum datasize
 
         char *zdbid;      // fake 0-db id generated based on listening
         uint32_t iid;     // 0-db random instance id generated on boot
 
-        zstats_t stats;   // global 0-db statistics
+        zdb_stats_t stats; // global 0-db statistics
 
         // the synctime can be useful to add basic security without killing
         // performance
@@ -117,11 +108,10 @@
         //          and try to do some mix between efficienty and security but this
         //          is NOT a way you can entierly trust
 
-    } settings_t;
+    } zdb_settings_t;
 
-    void hexdump(void *buffer, size_t length);
-    void fulldump(void *data, size_t len);
-
+    void zdb_hexdump(void *buffer, size_t length);
+    void zdb_fulldump(void *data, size_t len);
 
     #define COLOR_RED    "\033[31;1m"
     #define COLOR_YELLOW "\033[33;1m"
@@ -129,10 +119,10 @@
     #define COLOR_CYAN   "\033[36;1m"
     #define COLOR_RESET  "\033[0m"
 
-    #define danger(fmt, ...)  { printf(COLOR_RED    fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define warning(fmt, ...) { printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define success(fmt, ...) { printf(COLOR_GREEN  fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define notice(fmt, ...)  { printf(COLOR_CYAN   fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdb_danger(fmt, ...)  { printf(COLOR_RED    fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdb_warning(fmt, ...) { printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdb_success(fmt, ...) { printf(COLOR_GREEN  fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdb_notice(fmt, ...)  { printf(COLOR_CYAN   fmt COLOR_RESET "\n", ##__VA_ARGS__); }
 
     #define KB(x)   (x / (1024.0))
     #define MB(x)   (x / (1024 * 1024.0))
@@ -140,18 +130,18 @@
     #define TB(x)   (x / (1024 * 1024 * 1024 * 1024.0))
 
     #ifndef RELEASE
-        #define verbose(...) { printf(__VA_ARGS__); }
-        #define debug(...) { printf(__VA_ARGS__); }
-        #define debughex(...) { hexdump(__VA_ARGS__); }
+        #define zdb_verbose(...) { printf(__VA_ARGS__); }
+        #define zdb_debug(...) { printf(__VA_ARGS__); }
+        #define zdb_debughex(...) { zdb_hexdump(__VA_ARGS__); }
     #else
-        #define verbose(...) { if(rootsettings.verbose) { printf(__VA_ARGS__); } }
-        #define debug(...) ((void)0)
-        #define debughex(...) ((void)0)
+        #define zdb_verbose(...) { if(rootsettings.verbose) { printf(__VA_ARGS__); } }
+        #define zdb_debug(...) ((void)0)
+        #define zdb_debughex(...) ((void)0)
     #endif
 
-    extern settings_t rootsettings;
+    extern zdb_settings_t rootsettings;
 
-    void diep(char *str);
-    void *warnp(char *str);
-    void verbosep(char *prefix, char *str);
+    void zdb_diep(char *str);
+    void *zdb_warnp(char *str);
+    void zdb_verbosep(char *prefix, char *str);
 #endif

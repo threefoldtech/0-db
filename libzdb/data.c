@@ -22,12 +22,12 @@ static void data_entry_header_dump(data_entry_header_t *entry) {
 #ifdef RELEASE
     (void) entry;
 #else
-    debug("[+] data: entry dump: id length  : %u\n", entry->idlength);
-    debug("[+] data: entry dump: data length: %u\n", entry->datalength);
-    debug("[+] data: entry dump: previous   : %u\n", entry->previous);
-    debug("[+] data: entry dump: integrity  : %X\n", entry->integrity);
-    debug("[+] data: entry dump: flags      : %u\n", entry->flags);
-    debug("[+] data: entry dump: timestamp  : %u\n", entry->timestamp);
+    zdb_debug("[+] data: entry dump: id length  : %u\n", entry->idlength);
+    zdb_debug("[+] data: entry dump: data length: %u\n", entry->datalength);
+    zdb_debug("[+] data: entry dump: previous   : %u\n", entry->previous);
+    zdb_debug("[+] data: entry dump: integrity  : %X\n", entry->integrity);
+    zdb_debug("[+] data: entry dump: flags      : %u\n", entry->flags);
+    zdb_debug("[+] data: entry dump: timestamp  : %u\n", entry->timestamp);
 #endif
 }
 #endif
@@ -52,7 +52,7 @@ static inline int data_sync_check(data_root_t *root, int fd) {
         return 0;
 
     if((time(NULL) - root->lastsync) > root->synctime) {
-        debug("[+] data: last sync expired, force sync\n");
+        zdb_debug("[+] data: last sync expired, force sync\n");
         return data_sync(root, fd);
     }
 
@@ -73,7 +73,7 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
         // update statistics
         rootsettings.stats.datawritefailed += 1;
 
-        warnp("data write");
+        zdb_warnp("data write");
         return 0;
     }
 
@@ -104,7 +104,7 @@ static int data_open_id_mode(data_root_t *root, uint16_t id, int mode) {
     sprintf(temp, "%s/zdb-data-%05u", root->datadir, id);
 
     if((fd = open(temp, mode, 0600)) < 0) {
-        warnp(temp);
+        zdb_warnp(temp);
         return -1;
     }
 
@@ -142,7 +142,7 @@ static inline int data_grab_dataid(data_root_t *root, uint16_t dataid) {
     if(root->dataid != dataid) {
         // the requested datafile is not the current datafile opened
         // we will re-open the expected datafile temporary
-        debug("[-] data: switching file: %d, requested: %d\n", root->dataid, dataid);
+        zdb_debug("[-] data: switching file: %d, requested: %d\n", root->dataid, dataid);
         if((fd = data_open_id(root, dataid)) < 0)
             return -1;
     }
@@ -170,7 +170,7 @@ void data_initialize(char *filename, data_root_t *root) {
         if(errno == EROFS)
             return;
 
-        diep(filename);
+        zdb_diep(filename);
     }
 
     // writing initial header
@@ -183,7 +183,7 @@ void data_initialize(char *filename, data_root_t *root) {
     header.fileid = root->dataid;
 
     if(!data_write(fd, &header, sizeof(data_header_t), 1, root))
-        diep(filename);
+        zdb_diep(filename);
 
     close(fd);
 }
@@ -199,12 +199,12 @@ static void data_open_final(data_root_t *root) {
         // maybe we are on a read-only filesystem
         // let's try to open it in read-only
         if(errno != EROFS)
-            diep(root->datafile);
+            zdb_diep(root->datafile);
 
         if((root->datafd = open(root->datafile, O_RDONLY, 0600)) < 0)
-            diep(root->datafile);
+            zdb_diep(root->datafile);
 
-        debug("[+] data: file opened in read-only mode\n");
+        zdb_debug("[+] data: file opened in read-only mode\n");
     }
 
     // jumping to the first entry
@@ -214,7 +214,7 @@ static void data_open_final(data_root_t *root) {
     data_entry_header_t header;
     int entries = 0;
 
-    debug("[+] data: reading file, finding last entry\n");
+    zdb_debug("[+] data: reading file, finding last entry\n");
 
     while(read(root->datafd, &header, sizeof(data_entry_header_t)) == sizeof(data_entry_header_t)) {
         root->previous = lseek(root->datafd, 0, SEEK_CUR) - sizeof(data_entry_header_t);
@@ -223,14 +223,14 @@ static void data_open_final(data_root_t *root) {
         entries += 1;
     }
 
-    debug("[+] data: entries read: %d, last offset: %lu\n", entries, root->previous);
+    zdb_debug("[+] data: entries read: %d, last offset: %lu\n", entries, root->previous);
     printf("[+] data: active file: %s\n", root->datafile);
 }
 
 // jumping to the next id close the current data file
 // and open the next id file, it will create the new file
 size_t data_jump_next(data_root_t *root, uint16_t newid) {
-    verbose("[+] data: jumping to the next file\n");
+    zdb_verbose("[+] data: jumping to the next file\n");
 
     // closing current file descriptor
     close(root->datafd);
@@ -268,7 +268,7 @@ static size_t data_length_from_offset(int fd, size_t offset) {
     lseek(fd, offset, SEEK_SET);
 
     if(read(fd, &header, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
-        warnp("data header read");
+        zdb_warnp("data header read");
         return 0;
     }
 
@@ -285,12 +285,12 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
     // if we don't know the length in advance, we will read the
     // data header to know the payload size from it
     if(length == 0) {
-        debug("[+] data: fetching length from datafile\n");
+        zdb_debug("[+] data: fetching length from datafile\n");
 
         if((length = data_length_from_offset(fd, offset)) == 0)
             return payload;
 
-        debug("[+] data: length from datafile: %zu\n", length);
+        zdb_debug("[+] data: length from datafile: %zu\n", length);
     }
 
     // positioning datafile to expected offset
@@ -304,7 +304,7 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
 
     if(read(fd, payload.buffer, length) != (ssize_t) length) {
         rootsettings.stats.datareadfailed += 1;
-        warnp("data_get: read");
+        zdb_warnp("data_get: read");
 
         free(payload.buffer);
         payload.buffer = NULL;
@@ -348,7 +348,7 @@ static inline int data_check_real(int fd, size_t offset) {
     lseek(fd, offset, SEEK_SET);
 
     if(read(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
-        warnp("data: checker: header read");
+        zdb_warnp("data: checker: header read");
         return -1;
     }
 
@@ -362,7 +362,7 @@ static inline int data_check_real(int fd, size_t offset) {
         // update statistics
         rootsettings.stats.datareadfailed += 1;
 
-        warnp("data: checker: payload read");
+        zdb_warnp("data: checker: payload read");
         free(buffer);
         return -1;
     }
@@ -374,7 +374,7 @@ static inline int data_check_real(int fd, size_t offset) {
     uint32_t integrity = data_crc32(buffer, header.datalength);
     free(buffer);
 
-    debug("[+] data: checker: %08x <> %08x\n", integrity, header.integrity);
+    zdb_debug("[+] data: checker: %08x <> %08x\n", integrity, header.integrity);
 
     // comparing with header
     return (integrity == header.integrity);
@@ -408,7 +408,7 @@ size_t data_insert(data_root_t *root, data_request_t *source) {
     data_entry_header_t *header;
 
     if(!(header = malloc(headerlength)))
-        diep("malloc");
+        zdb_diep("malloc");
 
     header->idlength = source->idlength;
     header->datalength = source->datalength;
@@ -423,7 +423,7 @@ size_t data_insert(data_root_t *root, data_request_t *source) {
     // we can use 0 as error detection
 
     if(!data_write(root->datafd, header, headerlength, 0, root)) {
-        verbose("[-] data header: write failed\n");
+        zdb_verbose("[-] data header: write failed\n");
         free(header);
         return 0;
     }
@@ -431,7 +431,7 @@ size_t data_insert(data_root_t *root, data_request_t *source) {
     free(header);
 
     if(!data_write(root->datafd, source->data, source->datalength, 1, root)) {
-        verbose("[-] data payload: write failed\n");
+        zdb_verbose("[-] data payload: write failed\n");
         return 0;
     }
 
@@ -472,7 +472,7 @@ int data_delete(data_root_t *root, void *id, uint8_t idlength) {
         .crc = 0,
     };
 
-    debug("[+] data: delete: insert empty flagged data\n");
+    zdb_debug("[+] data: delete: insert empty flagged data\n");
     if(!(data_insert(root, &dreq)))
         return 0;
 
@@ -491,7 +491,7 @@ void data_destroy(data_root_t *root) {
     free(root);
 }
 
-data_root_t *data_init(settings_t *settings, char *datapath, uint16_t dataid) {
+data_root_t *data_init(zdb_settings_t *settings, char *datapath, uint16_t dataid) {
     data_root_t *root = (data_root_t *) malloc(sizeof(data_root_t));
 
     root->datadir = datapath;

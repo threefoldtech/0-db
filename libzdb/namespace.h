@@ -38,7 +38,7 @@
         size_t length;             // amount of namespaces allocated
         size_t effective;          // amount of namespace currently loaded
         namespace_t **namespaces;  // pointers to namespaces
-        settings_t *settings;      // global settings reminder
+        zdb_settings_t *settings;  // global settings reminder
         index_branch_t **branches; // unique global branches list
 
         // as explained on namespace.c, we keep a single big one
@@ -64,8 +64,8 @@
 
     void namespace_commit(namespace_t *namespace);
 
-    int namespaces_init(settings_t *settings);
-    ns_root_t *namespaces_allocate(settings_t *settings);
+    int namespaces_init(zdb_settings_t *settings);
+    ns_root_t *namespaces_allocate(zdb_settings_t *settings);
     int namespaces_destroy();
     int namespaces_emergency();
 

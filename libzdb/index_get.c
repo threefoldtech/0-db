@@ -17,7 +17,7 @@ static index_entry_t *index_get_handler_memkey(index_root_t *index, void *id, ui
 
 static index_entry_t *index_get_handler_sequential(index_root_t *index, void *id, uint8_t idlength) {
     if(idlength != sizeof(uint32_t)) {
-        debug("[-] index: sequential get: invalid key length (%u <> %ld)\n", idlength, sizeof(uint32_t));
+        zdb_debug("[-] index: sequential get: invalid key length (%u <> %ld)\n", idlength, sizeof(uint32_t));
         return NULL;
     }
 
@@ -66,18 +66,18 @@ static index_entry_t * (*index_get_handlers[])(index_root_t *root, void *id, uin
 index_entry_t *index_get(index_root_t *index, void *id, uint8_t idlength) {
     index_entry_t *entry;
 
-    debug("[+] index: get: lookup key: ");
-    debughex(id, idlength);
-    debug("\n");
+    zdb_debug("[+] index: get: lookup key: ");
+    zdb_debughex(id, idlength);
+    zdb_debug("\n");
 
     if(!(entry = index_get_handlers[index->mode](index, id, idlength))) {
-        debug("[-] index: get: key not found\n");
+        zdb_debug("[-] index: get: key not found\n");
         return NULL;
     }
 
     // key found but deleted
     if(entry->flags & INDEX_ENTRY_DELETED) {
-        debug("[-] index: get: key requested deleted\n");
+        zdb_debug("[-] index: get: key requested deleted\n");
         return NULL;
     }
 

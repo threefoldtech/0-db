@@ -50,10 +50,10 @@ static int dir_remove_cb(const char *fpath, const struct stat *sb, int tflag, st
     char *fullpath = (char *) fpath;
     int value;
 
-    debug("[+] filesystem: remove: %s\n", fullpath);
+    zdb_debug("[+] filesystem: remove: %s\n", fullpath);
 
     if((value = remove(fullpath)))
-        warnp(fullpath);
+        zdb_warnp(fullpath);
 
     return tflag;
 }
@@ -69,12 +69,12 @@ static int dir_clean_cb(const char *fpath, const struct stat *sb, int tflag, str
     size_t length = strlen(fullpath);
 
     if(strncmp(fullpath + length - 14, "zdb-data-", 9) == 0) {
-        debug("[+] filesystem: removing datafile: %s\n", fullpath);
+        zdb_debug("[+] filesystem: removing datafile: %s\n", fullpath);
         remove(fullpath);
     }
 
     if(strncmp(fullpath + length - 15, "zdb-index-", 10) == 0) {
-        debug("[+] filesystem: removing indexfile: %s\n", fullpath);
+        zdb_debug("[+] filesystem: removing indexfile: %s\n", fullpath);
         remove(fullpath);
     }
 

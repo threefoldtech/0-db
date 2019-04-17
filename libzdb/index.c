@@ -27,14 +27,14 @@ void index_item_header_dump(index_item_t *item) {
 #ifdef RELEASE
     (void) item;
 #else
-    debug("[+] index: entry dump: id length  : %" PRIu8  "\n", item->idlength);
-    debug("[+] index: entry dump: data offset: %" PRIu32 "\n", item->offset);
-    debug("[+] index: entry dump: data length: %" PRIu32 "\n", item->length);
-    debug("[+] index: entry dump: previous   : %" PRIX32 "\n", item->previous);
-    debug("[+] index: entry dump: flags      : %" PRIu8  "\n", item->flags);
-    debug("[+] index: entry dump: timestamp  : %" PRIu32 "\n", item->timestamp);
-    debug("[+] index: entry dump: parent id  : %" PRIu16 "\n", item->parentid);
-    debug("[+] index: entry dump: parent offs: %" PRIu32 "\n", item->parentoff);
+    zdb_debug("[+] index: entry dump: id length  : %" PRIu8  "\n", item->idlength);
+    zdb_debug("[+] index: entry dump: data offset: %" PRIu32 "\n", item->offset);
+    zdb_debug("[+] index: entry dump: data length: %" PRIu32 "\n", item->length);
+    zdb_debug("[+] index: entry dump: previous   : %" PRIX32 "\n", item->previous);
+    zdb_debug("[+] index: entry dump: flags      : %" PRIu8  "\n", item->flags);
+    zdb_debug("[+] index: entry dump: timestamp  : %" PRIu32 "\n", item->timestamp);
+    zdb_debug("[+] index: entry dump: parent id  : %" PRIu16 "\n", item->parentid);
+    zdb_debug("[+] index: entry dump: parent offs: %" PRIu32 "\n", item->parentoff);
 #endif
 }
 
@@ -59,7 +59,7 @@ static inline int index_sync_check(index_root_t *root, int fd) {
         return 0;
 
     if((time(NULL) - root->lastsync) > root->synctime) {
-        debug("[+] index: last sync expired, force sync\n");
+        zdb_debug("[+] index: last sync expired, force sync\n");
         return index_sync(root, fd);
     }
 
@@ -77,7 +77,7 @@ int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
         // update statistics
         rootsettings.stats.idxwritefailed += 1;
 
-        warnp("index write");
+        zdb_warnp("index write");
         return 0;
     }
 
@@ -102,7 +102,7 @@ static int index_read(int fd, void *buffer, size_t length) {
         // update statistics
         rootsettings.stats.idxreadfailed += 1;
 
-        warnp("index read");
+        zdb_warnp("index read");
         return 0;
     }
 
@@ -132,10 +132,10 @@ static int index_open_file_mode(index_root_t *root, uint16_t fileid, int mode) {
     int fd;
 
     sprintf(filename, "%s/zdb-index-%05u", root->indexdir, fileid);
-    debug("[+] index: opening file: %s (ro: %s)\n", filename, (mode & O_RDONLY) ? "yes" : "no");
+    zdb_debug("[+] index: opening file: %s (ro: %s)\n", filename, (mode & O_RDONLY) ? "yes" : "no");
 
     if((fd = open(filename, mode)) < 0) {
-        verbosep("index_open_file_mode", filename);
+        zdb_verbosep("index_open_file_mode", filename);
         return -1;
     }
 
@@ -164,7 +164,7 @@ inline int index_grab_fileid(index_root_t *root, uint16_t fileid) {
     if(root->indexid != fileid) {
         // the requested datafile is not the current datafile opened
         // we will re-open the expected datafile temporary
-        debug("[-] index: switching file: %d, requested: %d\n", root->indexid, fileid);
+        zdb_debug("[-] index: switching file: %d, requested: %d\n", root->indexid, fileid);
         if((fd = index_open_file(root, fileid)) < 0)
             return -1;
     }
@@ -202,7 +202,7 @@ void index_open_final(index_root_t *root) {
         flags = O_RDONLY;
 
     if((root->indexfd = open(root->indexfile, flags, 0600)) < 0) {
-        warnp(root->indexfile);
+        zdb_warnp(root->indexfile);
         fprintf(stderr, "[-] index: could not open index file\n");
         return;
     }
@@ -216,7 +216,7 @@ void index_open_final(index_root_t *root) {
 size_t index_jump_next(index_root_t *root) {
     hook_t *hook = NULL;
 
-    verbose("[+] index: jumping to the next file\n");
+    zdb_verbose("[+] index: jumping to the next file\n");
 
     if(rootsettings.hook) {
         hook = hook_new("jump", 4);
@@ -375,11 +375,11 @@ int index_entry_delete_memory(index_root_t *root, index_entry_t *entry) {
     index_branch_t *branch = index_branch_get(root->branches, branchkey);
     index_entry_t *previous = index_branch_get_previous(branch, entry);
 
-    debug("[+] index: delete memory: removing entry from memory\n");
+    zdb_debug("[+] index: delete memory: removing entry from memory\n");
 
     if(previous == entry) {
-        danger("[-] index: entry delete memory: something wrong happens");
-        danger("[-] index: entry delete memory: branches seems buggy");
+        zdb_danger("[-] index: entry delete memory: something wrong happens");
+        zdb_danger("[-] index: entry delete memory: branches seems buggy");
         return 1;
     }
 
@@ -412,12 +412,12 @@ int index_entry_delete_disk(index_root_t *root, index_entry_t *entry) {
         return 1;
 
     // jump to the right offset for this entry
-    debug("[+] index: delete: reading %lu bytes at offset %" PRIu32 "\n", entrylength, entry->idxoffset);
+    zdb_debug("[+] index: delete: reading %lu bytes at offset %" PRIu32 "\n", entrylength, entry->idxoffset);
     lseek(fd, entry->idxoffset, SEEK_SET);
 
     // reading the exact entry from disk
     if(read(fd, index_transition, entrylength) != (ssize_t) entrylength) {
-        warnp("index_entry_delete read");
+        zdb_warnp("index_entry_delete read");
         close(fd);
         return 1;
     }
@@ -428,12 +428,12 @@ int index_entry_delete_disk(index_root_t *root, index_entry_t *entry) {
     index_transition->flags = entry->flags;
 
     // rollback to point to the entry again
-    debug("[+] index: delete: overwriting key\n");
+    zdb_debug("[+] index: delete: overwriting key\n");
     lseek(fd, entry->idxoffset, SEEK_SET);
 
     // overwrite the key
     if(write(fd, index_transition, entrylength) != (ssize_t) entrylength) {
-        warnp("index_entry_delete write");
+        zdb_warnp("index_entry_delete write");
         close(fd);
         return 1;
     }
@@ -490,11 +490,11 @@ index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key) {
     if(!(item = index_item_get_disk(root, key->fileid, key->idxoffset, key->idlength)))
         return NULL;
 
-    debug("[+] index: deserialize: length %u <> %u\n", item->length, key->length);
-    debug("[+] index: deserialize: crc %08x <> %08x\n", item->crc, key->crc);
+    zdb_debug("[+] index: deserialize: length %u <> %u\n", item->length, key->length);
+    zdb_debug("[+] index: deserialize: crc %08x <> %08x\n", item->crc, key->crc);
 
     if(item->length != key->length || item->crc != key->crc) {
-        debug("[-] index: deserialize: invalid key requested (fields mismatch)\n");
+        zdb_debug("[-] index: deserialize: invalid key requested (fields mismatch)\n");
         free(item);
         return NULL;
     }
@@ -503,7 +503,7 @@ index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key) {
     index_entry_t *entry;
 
     if(!(entry = malloc(sizeof(index_entry_t) + item->idlength))) {
-        debug("[-] index: deserialize: cannot allocate memory\n");
+        zdb_debug("[-] index: deserialize: cannot allocate memory\n");
         free(item);
         return NULL;
     }
@@ -575,7 +575,7 @@ static inline size_t index_clean_namespace_branch(index_branch_t *branch, void *
 
         #ifndef RELEASE
         printf("[+] index: namespace cleaner: free: ");
-        hexdump(entry->id, entry->idlength);
+        zdb_hexdump(entry->id, entry->idlength);
         printf("\n");
         #endif
 
@@ -604,7 +604,7 @@ int index_clean_namespace(index_root_t *root, void *namespace) {
     if(!branches)
         return 0;
 
-    debug("[+] index: starting namespace cleaner\n");
+    zdb_debug("[+] index: starting namespace cleaner\n");
 
     for(uint32_t b = 0; b < buckets_branches; b++) {
         if(!branches[b])
@@ -613,7 +613,7 @@ int index_clean_namespace(index_root_t *root, void *namespace) {
         deleted += index_clean_namespace_branch(branches[b], namespace);
     }
 
-    debug("[+] index: namespace cleaner: %lu keys removed\n", deleted);
+    zdb_debug("[+] index: namespace cleaner: %lu keys removed\n", deleted);
 
     return 0;
 }

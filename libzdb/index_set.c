@@ -80,14 +80,14 @@ int index_seq_overwrite(index_root_t *root, index_set_t *set) {
         return 1;
 
     // jump to the right offset for this entry
-    debug("[+] index: sequential: overwritting at %u/%u\n", seqmap->fileid, offset);
+    zdb_debug("[+] index: sequential: overwritting at %u/%u\n", seqmap->fileid, offset);
     lseek(fd, offset, SEEK_SET);
 
     index_item_t *item = index_item_from_set(root, set);
 
     // overwrite the key
     if(write(fd, item, entrylength) != (ssize_t) entrylength) {
-        warnp("index_entry_delete write");
+        zdb_warnp("index_entry_delete write");
         close(fd);
         return 1;
     }
@@ -126,7 +126,7 @@ int index_append_entry_on_disk(index_root_t *root, index_set_t *set) {
     off_t curoffset = lseek(root->indexfd, 0, SEEK_END);
     size_t entrylength = sizeof(index_item_t) + entry->idlength;
 
-    debug("[+] index: writing entry on disk (%lu bytes)\n", entrylength);
+    zdb_debug("[+] index: writing entry on disk (%lu bytes)\n", entrylength);
 
     // updating entry with the real offset
     // we use to insert this object
@@ -138,7 +138,7 @@ int index_append_entry_on_disk(index_root_t *root, index_set_t *set) {
 
     // writing data on the disk
     if(!index_write(root->indexfd, item, entrylength, root)) {
-        verbosep("index_append_entry_on_disk", "cannot write index entry on disk");
+        zdb_verbosep("index_append_entry_on_disk", "cannot write index entry on disk");
 
         // it's easier to flag the entry as deleted than
         // removing it from the list
@@ -218,7 +218,7 @@ index_entry_t *index_insert_memory_handler_sequential(index_root_t *root, index_
 index_entry_t *index_update_memory_handler_memkey(index_root_t *root, index_set_t *set, index_entry_t *exists) {
     index_entry_t *new = set->entry;
 
-    debug("[+] index: updating current entry in memory\n");
+    zdb_debug("[+] index: updating current entry in memory\n");
 
     // update statistics
     root->datasize -= exists->length;
@@ -273,7 +273,7 @@ index_entry_t *index_update_memory_handler_sequential(index_root_t *root, index_
 
 // public disk and memory part
 index_entry_t *index_update_entry_memkey(index_root_t *root, index_set_t *set, index_entry_t *previous) {
-    debug("[+] index: flagging previous key as deleted, on disk\n");
+    zdb_debug("[+] index: flagging previous key as deleted, on disk\n");
     index_entry_delete_disk(root, previous);
 
     // update memory state
@@ -286,7 +286,7 @@ index_entry_t *index_update_entry_memkey(index_root_t *root, index_set_t *set, i
 
     // append the data on the disk
     if(index_append_entry_on_disk(root, &updated)) {
-        debug("[-] index: update entry failed: could not write on disk\n");
+        zdb_debug("[-] index: update entry failed: could not write on disk\n");
         return NULL;
     }
 
@@ -294,7 +294,7 @@ index_entry_t *index_update_entry_memkey(index_root_t *root, index_set_t *set, i
 }
 
 index_entry_t *index_update_entry_sequential(index_root_t *root, index_set_t *set, index_entry_t *previous) {
-    debug("[+] index: update on sequential keys, duplicating key flagged\n");
+    zdb_debug("[+] index: update on sequential keys, duplicating key flagged\n");
 
     // mark previous as deleted, and writing this object on the index
     // this will add a *new* entry on the index file, and we will use this
@@ -307,7 +307,7 @@ index_entry_t *index_update_entry_sequential(index_root_t *root, index_set_t *se
     };
 
     if(index_append_entry_on_disk(root, &updated)) {
-        debug("[-] index: update entry failed: could not write on disk\n");
+        zdb_debug("[-] index: update entry failed: could not write on disk\n");
         return NULL;
     }
 
@@ -340,7 +340,7 @@ index_entry_t *index_insert_entry_memkey(index_root_t *root, index_set_t *set) {
 
     // append the data on the disk
     if(index_append_entry_on_disk(root, set)) {
-        debug("[-] index: add new entry failed: could not write on disk\n");
+        zdb_debug("[-] index: add new entry failed: could not write on disk\n");
         return NULL;
     }
 
@@ -354,7 +354,7 @@ index_entry_t *index_insert_entry_sequential(index_root_t *root, index_set_t *se
 
     // append the data on the disk
     if(index_append_entry_on_disk(root, set)) {
-        debug("[-] index: add new entry failed: could not write on disk\n");
+        zdb_debug("[-] index: add new entry failed: could not write on disk\n");
         return NULL;
     }
 
@@ -382,11 +382,11 @@ static index_entry_t * (*index_insert_entry[])(index_root_t *root, index_set_t *
 //  - insert new if not existing
 index_entry_t *index_set(index_root_t *root, index_set_t *new, index_entry_t *existing) {
     if(existing) {
-        debug("[+] index: set: updating existing entry\n");
+        zdb_debug("[+] index: set: updating existing entry\n");
         return index_update_entry[root->mode](root, new, existing);
     }
 
-    debug("[+] index: set: inserting new entry\n");
+    zdb_debug("[+] index: set: inserting new entry\n");
     return index_insert_entry[root->mode](root, new);
 }
 

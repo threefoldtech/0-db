@@ -38,23 +38,23 @@ static index_scan_t index_previous_header_real(index_scan_t scan) {
         off_t current = lseek(scan.fd, scan.original, SEEK_SET);
 
         if(read(scan.fd, &source, sizeof(index_item_t)) != sizeof(index_item_t)) {
-            warnp("index scan: previous-header: could not read original offset file");
+            zdb_warnp("index scan: previous-header: could not read original offset file");
             return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
         }
 
         scan.target = source.previous;
 
         if(source.previous >= current) {
-            debug("[+] index scan: previous-header: previous offset in previous file\n");
+            zdb_debug("[+] index scan: previous-header: previous offset in previous file\n");
             return index_scan_error(scan, INDEX_SCAN_REQUEST_PREVIOUS);
         }
     }
 
-    debug("[+] index scan: previous-header: offset: %u\n", source.previous);
+    zdb_debug("[+] index scan: previous-header: offset: %u\n", source.previous);
 
     // at that point, we know scan.target is set to the expected value
     if(scan.target == 0) {
-        debug("[+] index scan: previous-header: zero reached, nothing to rollback\n");
+        zdb_debug("[+] index scan: previous-header: zero reached, nothing to rollback\n");
         return index_scan_error(scan, INDEX_SCAN_NO_MORE_DATA);
     }
 
@@ -63,13 +63,13 @@ static index_scan_t index_previous_header_real(index_scan_t scan) {
 
     // reading the fixed-length
     if(read(scan.fd, &source, sizeof(index_item_t)) != sizeof(index_item_t)) {
-        warnp("index scan: previous-header: could not read previous offset datafile");
+        zdb_warnp("index scan: previous-header: could not read previous offset datafile");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
 
     // checking if entry is deleted
     if(source.flags & INDEX_ENTRY_DELETED) {
-        debug("[+] index scan: previous-header: data is deleted, going one more before\n");
+        zdb_debug("[+] index scan: previous-header: data is deleted, going one more before\n");
 
         // set the 'new' original to this offset
         scan.original = scan.target;
@@ -85,7 +85,7 @@ static index_scan_t index_previous_header_real(index_scan_t scan) {
     }
 
     if(!(scan.header = (index_item_t *) malloc(sizeof(index_item_t) + source.idlength))) {
-        warnp("data: previous-header: malloc");
+        zdb_warnp("data: previous-header: malloc");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
 
@@ -93,11 +93,11 @@ static index_scan_t index_previous_header_real(index_scan_t scan) {
     *scan.header = source;
 
     if(read(scan.fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
-        warnp("data: previous-header: could not read id from datafile");
+        zdb_warnp("data: previous-header: could not read id from datafile");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
 
-    debug("[+] data: previous-header: entry found\n");
+    zdb_debug("[+] data: previous-header: entry found\n");
     scan.status = INDEX_SCAN_SUCCESS;
 
     return scan;
@@ -115,7 +115,7 @@ index_scan_t index_previous_header(index_root_t *root, uint16_t fileid, size_t o
     while(1) {
         // acquire file id fd
         if((scan.fd = index_grab_fileid(root, fileid)) < 0) {
-            debug("[-] index scan: previous-header: could not open requested file id (%u)\n", fileid);
+            zdb_debug("[-] index scan: previous-header: could not open requested file id (%u)\n", fileid);
             return index_scan_error(scan, INDEX_SCAN_NO_MORE_DATA);
         }
 
@@ -157,11 +157,11 @@ static index_scan_t index_next_header_real(index_scan_t scan) {
         lseek(scan.fd, scan.original, SEEK_SET);
 
         if(read(scan.fd, &source, sizeof(index_item_t)) != sizeof(index_item_t)) {
-            warnp("index scan: next-header: could not read original offset indexfile");
+            zdb_warnp("index scan: next-header: could not read original offset indexfile");
             return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
         }
 
-        debug("[+] index scan: next-header: this id length: %u\n", source.idlength);
+        zdb_debug("[+] index scan: next-header: this id length: %u\n", source.idlength);
 
         // next header is at offset + this header + payload
         scan.target = scan.original + sizeof(index_item_t);
@@ -173,7 +173,7 @@ static index_scan_t index_next_header_real(index_scan_t scan) {
 
     // reading the fixed-length
     if(read(scan.fd, &source, sizeof(index_item_t)) != sizeof(index_item_t)) {
-        // warnp("index scan: next-header: could not read next offset indexfile");
+        // zdb_warnp("index scan: next-header: could not read next offset indexfile");
         // this mean the entry expected is the first of the next indexfile
         scan.target = sizeof(index_header_t);
         return index_scan_error(scan, INDEX_SCAN_EOF_REACHED);
@@ -181,7 +181,7 @@ static index_scan_t index_next_header_real(index_scan_t scan) {
 
     // checking if entry is deleted
     if(source.flags & INDEX_ENTRY_DELETED) {
-        debug("[+] index scan: next-header: data is deleted, going one further\n");
+        zdb_debug("[+] index scan: next-header: data is deleted, going one further\n");
 
         // set the 'new' original to this offset
         scan.original = scan.target;
@@ -198,7 +198,7 @@ static index_scan_t index_next_header_real(index_scan_t scan) {
 
 
     if(!(scan.header = (index_item_t *) malloc(sizeof(index_item_t) + source.idlength))) {
-        warnp("index scan: next-header: malloc");
+        zdb_warnp("index scan: next-header: malloc");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
 
@@ -206,11 +206,11 @@ static index_scan_t index_next_header_real(index_scan_t scan) {
     *scan.header = source;
 
     if(read(scan.fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
-        warnp("index scan: next-header: could not read id from datafile");
+        zdb_warnp("index scan: next-header: could not read id from datafile");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
 
-    debug("[+] index scan: next-header: entry found\n");
+    zdb_debug("[+] index scan: next-header: entry found\n");
     scan.status = INDEX_SCAN_SUCCESS;
 
     return scan;
@@ -228,7 +228,7 @@ index_scan_t index_next_header(index_root_t *root, uint16_t fileid, size_t offse
     while(1) {
         // acquire file id fd
         if((scan.fd = index_grab_fileid(root, fileid)) < 0) {
-            debug("[-] index scan: next-header: could not open requested file id (%u)\n", fileid);
+            zdb_debug("[-] index scan: next-header: could not open requested file id (%u)\n", fileid);
             return index_scan_error(scan, INDEX_SCAN_NO_MORE_DATA);
         }
 
@@ -250,7 +250,7 @@ index_scan_t index_next_header(index_root_t *root, uint16_t fileid, size_t offse
             continue;
 
         if(scan.status == INDEX_SCAN_EOF_REACHED) {
-            debug("[-] index scan: next-header: eof reached\n");
+            zdb_debug("[-] index scan: next-header: eof reached\n");
             fileid += 1;
         }
     }
@@ -266,7 +266,7 @@ static index_scan_t index_first_header_real(index_scan_t scan) {
 
     // reading the fixed-length
     if(read(scan.fd, &source, sizeof(index_item_t)) != sizeof(index_item_t)) {
-        warnp("data: first-header: could not read next offset datafile");
+        zdb_warnp("data: first-header: could not read next offset datafile");
         // this mean the data expected is the first of the next datafile
         scan.target = sizeof(index_header_t);
         return index_scan_error(scan, INDEX_SCAN_EOF_REACHED);
@@ -276,7 +276,7 @@ static index_scan_t index_first_header_real(index_scan_t scan) {
 
     // checking if entry is deleted
     if(source.flags & INDEX_ENTRY_DELETED) {
-        debug("[+] data: first-header: data is deleted, going one further\n");
+        zdb_debug("[+] data: first-header: data is deleted, going one further\n");
 
         // jump to the next entry
         scan.target += sizeof(index_item_t);
@@ -288,7 +288,7 @@ static index_scan_t index_first_header_real(index_scan_t scan) {
     }
 
     if(!(scan.header = (index_item_t *) malloc(sizeof(index_item_t) + source.idlength))) {
-        warnp("index scan: first-header: malloc");
+        zdb_warnp("index scan: first-header: malloc");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
 
@@ -296,11 +296,11 @@ static index_scan_t index_first_header_real(index_scan_t scan) {
     *scan.header = source;
 
     if(read(scan.fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
-        warnp("index scan: first-header: could not read id from datafile");
+        zdb_warnp("index scan: first-header: could not read id from datafile");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
 
-    debug("[+] index scan: first-header: entry found\n");
+    zdb_debug("[+] index scan: first-header: entry found\n");
     scan.status = INDEX_SCAN_SUCCESS;
 
     return scan;
@@ -320,7 +320,7 @@ index_scan_t index_first_header(index_root_t *root) {
     while(1) {
         // acquire data id fd
         if((scan.fd = index_grab_fileid(root, fileid)) < 0) {
-            debug("[-] index scan: first-header: could not open requested file id (%u)\n", fileid);
+            zdb_debug("[-] index scan: first-header: could not open requested file id (%u)\n", fileid);
             return index_scan_error(scan, INDEX_SCAN_NO_MORE_DATA);
         }
 
@@ -341,7 +341,7 @@ index_scan_t index_first_header(index_root_t *root) {
             continue;
 
         if(scan.status == INDEX_SCAN_EOF_REACHED) {
-            debug("[-] index scan: next-header: eof reached\n");
+            zdb_debug("[-] index scan: next-header: eof reached\n");
             fileid += 1;
         }
     }
@@ -352,11 +352,11 @@ index_scan_t index_first_header(index_root_t *root) {
 static index_scan_t index_last_header_real(index_scan_t scan) {
     index_item_t source;
 
-    debug("[+] index scan: last-header: trying previous offset: %lu\n", scan.target);
+    zdb_debug("[+] index scan: last-header: trying previous offset: %lu\n", scan.target);
 
     // at that point, we know scan.target is set to the expected value
     if(scan.target == 0) {
-        debug("[+] index scan: last-header: zero reached, nothing to rollback\n");
+        zdb_debug("[+] index scan: last-header: zero reached, nothing to rollback\n");
         return index_scan_error(scan, INDEX_SCAN_NO_MORE_DATA);
     }
 
@@ -365,7 +365,7 @@ static index_scan_t index_last_header_real(index_scan_t scan) {
 
     // reading the fixed-length
     if(read(scan.fd, &source, sizeof(index_item_t)) != sizeof(index_item_t)) {
-        warnp("index scan: previous-header: could not read previous offset indexfile");
+        zdb_warnp("index scan: previous-header: could not read previous offset indexfile");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
 
@@ -375,7 +375,7 @@ static index_scan_t index_last_header_real(index_scan_t scan) {
     if(source.flags & INDEX_ENTRY_DELETED) {
         off_t current = scan.target;
 
-        debug("[+] index scan: last-header: data is deleted, going one previous\n");
+        zdb_debug("[+] index scan: last-header: data is deleted, going one previous\n");
 
         // reset target, so next time we come here, we will refetch previous
         // entry and use the mechanism to check if it's the previous file and
@@ -383,7 +383,7 @@ static index_scan_t index_last_header_real(index_scan_t scan) {
         scan.target = source.previous;
 
         if(source.previous >= current) {
-            debug("[+] index scan: last-header: previous offset in previous file\n");
+            zdb_debug("[+] index scan: last-header: previous offset in previous file\n");
             return index_scan_error(scan, INDEX_SCAN_REQUEST_PREVIOUS);
         }
 
@@ -393,7 +393,7 @@ static index_scan_t index_last_header_real(index_scan_t scan) {
     }
 
     if(!(scan.header = (index_item_t *) malloc(sizeof(index_item_t) + source.idlength))) {
-        warnp("data: last-header: malloc");
+        zdb_warnp("data: last-header: malloc");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
 
@@ -401,11 +401,11 @@ static index_scan_t index_last_header_real(index_scan_t scan) {
     *scan.header = source;
 
     if(read(scan.fd, scan.header->id, scan.header->idlength) != (ssize_t) scan.header->idlength) {
-        warnp("data: last-header: could not read id from datafile");
+        zdb_warnp("data: last-header: could not read id from datafile");
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
 
-    debug("[+] data: last-header: entry found\n");
+    zdb_debug("[+] data: last-header: entry found\n");
     scan.status = INDEX_SCAN_SUCCESS;
 
     return scan;
@@ -425,7 +425,7 @@ index_scan_t index_last_header(index_root_t *root) {
     while(1) {
         // acquire data id fd
         if((scan.fd = index_grab_fileid(root, fileid)) < 0) {
-            debug("[-] index scan: last-header: could not open requested file id (%u)\n", fileid);
+            zdb_debug("[-] index scan: last-header: could not open requested file id (%u)\n", fileid);
             return index_scan_error(scan, INDEX_SCAN_NO_MORE_DATA);
         }
 

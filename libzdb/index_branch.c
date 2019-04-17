@@ -48,7 +48,7 @@ index_branch_t **index_buckets_init() {
 }
 
 index_branch_t *index_branch_init(index_branch_t **branches, uint32_t branchid) {
-    // debug("[+] initializing branch id 0x%x\n", branchid);
+    // zdb_debug("[+] initializing branch id 0x%x\n", branchid);
 
     branches[branchid] = malloc(sizeof(index_branch_t));
     index_branch_t *branch = branches[branchid];
@@ -94,7 +94,7 @@ index_branch_t *index_branch_get_allocate(index_branch_t **branches, uint32_t br
     if(!branches[branchid])
         return index_branch_init(branches, branchid);
 
-    // debug("[+] branch: exists: %lu entries\n", branches[branchid]->length);
+    // zdb_debug("[+] branch: exists: %lu entries\n", branches[branchid]->length);
     return branches[branchid];
 }
 

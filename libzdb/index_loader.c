@@ -36,7 +36,7 @@ static char *index_date(uint32_t epoch, char *target, size_t length) {
 
 static inline void index_dump_entry(index_entry_t *entry) {
     printf("[+] key [");
-    hexdump(entry->id, entry->idlength);
+    zdb_hexdump(entry->id, entry->idlength);
     printf("] offset %" PRIu32 ", length: %" PRIu32 "\n", entry->offset, entry->length);
 }
 
@@ -76,7 +76,7 @@ static void index_dump(index_root_t *root, int fulldump) {
         printf("[+] ===========================\n");
     }
 
-    verbose("[+] index: uses: %lu branches\n", branches);
+    zdb_verbose("[+] index: uses: %lu branches\n", branches);
 
     // overhead contains:
     // - the buffer allocated to hold each (futur) branches pointer
@@ -84,17 +84,17 @@ static void index_dump(index_root_t *root, int fulldump) {
     size_t overhead = (buckets_branches * sizeof(index_branch_t **)) +
                       (branches * sizeof(index_branch_t));
 
-    verbose("[+] index: memory overhead: %.2f KB (%lu bytes)\n", KB(overhead), overhead);
+    zdb_verbose("[+] index: memory overhead: %.2f KB (%lu bytes)\n", KB(overhead), overhead);
 }
 
 static void index_dump_statistics(index_root_t *root) {
-    verbose("[+] index: load: %lu entries\n", root->entries);
+    zdb_verbose("[+] index: load: %lu entries\n", root->entries);
 
     double datamb = MB(root->datasize);
     double indexkb = KB(root->indexsize);
 
-    verbose("[+] index: datasize: " COLOR_CYAN "%.2f MB" COLOR_RESET " (%lu bytes)\n", datamb, root->datasize);
-    verbose("[+] index: raw usage: %.1f KB (%lu bytes)\n", indexkb, root->indexsize);
+    zdb_verbose("[+] index: datasize: " COLOR_CYAN "%.2f MB" COLOR_RESET " (%lu bytes)\n", datamb, root->datasize);
+    zdb_verbose("[+] index: raw usage: %.1f KB (%lu bytes)\n", indexkb, root->indexsize);
 }
 
 //
@@ -112,7 +112,7 @@ index_header_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
     header.mode = rootsettings.mode;
 
     if(!index_write(fd, &header, sizeof(index_header_t), root))
-        diep("index_initialize: write");
+        zdb_diep("index_initialize: write");
 
     return header;
 }
@@ -125,9 +125,9 @@ static int index_try_rootindex(index_root_t *root) {
         // the only case we support is if the filesystem is in
         // read only, otherwise we just crash, this should not happen
         if(errno != EROFS)
-            diep(root->indexfile);
+            zdb_diep(root->indexfile);
 
-        debug("[-] warning: read-only index filesystem\n");
+        zdb_debug("[-] warning: read-only index filesystem\n");
 
         // okay, it looks like the index filesystem is in readonly
         // this can happen by choice or because the disk is unstable
@@ -143,7 +143,7 @@ static int index_try_rootindex(index_root_t *root) {
 
             // if we are here, we can't read the indexfile for another reason
             // this is not supported, let's crash
-            diep(root->indexfile);
+            zdb_diep(root->indexfile);
         }
 
         // we keep track that we are on a readonly filesystem
@@ -165,7 +165,7 @@ static size_t index_load_file(index_root_t *root) {
     index_header_t header;
     ssize_t length;
 
-    verbose("[+] index: loading file: %s\n", root->indexfile);
+    zdb_verbose("[+] index: loading file: %s\n", root->indexfile);
 
     if(!index_try_rootindex(root))
         return 0;
@@ -175,7 +175,7 @@ static size_t index_load_file(index_root_t *root) {
             // read failed, probably caused by a system error
             // this is probably an unrecoverable issue, let's skip this
             // index file (this could break consistancy)
-            warnp("index: header read");
+            zdb_warnp("index: header read");
             root->status |= INDEX_DEGRADED;
             return 1;
         }
@@ -196,7 +196,7 @@ static size_t index_load_file(index_root_t *root) {
         // a new file not expected, otherwise if index is zero,
         // this is the initial index file we need to create
         if(root->indexid > 0) {
-            verbose("[+] index: discarding file\n");
+            zdb_verbose("[+] index: discarding file\n");
             close(root->indexfd);
             return 0;
         }
@@ -216,13 +216,13 @@ static size_t index_load_file(index_root_t *root) {
     }
 
     if(memcmp(header.magic, "IDX0", 4)) {
-        danger("[-] %s: invalid header, wrong magic", root->indexfile);
+        zdb_danger("[-] %s: invalid header, wrong magic", root->indexfile);
         exit(EXIT_FAILURE);
     }
 
     if(header.version != ZDB_IDXFILE_VERSION) {
-        danger("[-] %s: unsupported version detected", root->indexfile);
-        danger("[-] file version: %d, supported version: %d", header.version, ZDB_IDXFILE_VERSION);
+        zdb_danger("[-] %s: unsupported version detected", root->indexfile);
+        zdb_danger("[-] file version: %d, supported version: %d", header.version, ZDB_IDXFILE_VERSION);
         exit(EXIT_FAILURE);
     }
 
@@ -234,18 +234,18 @@ static size_t index_load_file(index_root_t *root) {
         lseek(root->indexfd, 0, SEEK_SET);
 
         if(!index_write(root->indexfd, &header, sizeof(index_header_t), root))
-            diep(root->indexfile);
+            zdb_diep(root->indexfile);
     }
 
     char date[256];
-    verbose("[+] index: created at: %s\n", index_date(header.created, date, sizeof(date)));
-    verbose("[+] index: last open: %s\n", index_date(header.opened, date, sizeof(date)));
+    zdb_verbose("[+] index: created at: %s\n", index_date(header.created, date, sizeof(date)));
+    zdb_verbose("[+] index: last open: %s\n", index_date(header.opened, date, sizeof(date)));
 
     if(header.mode != rootsettings.mode) {
-        danger("[!] ========================================================");
-        danger("[!] DANGER: index created in another mode than running mode");
-        danger("[!] DANGER: stopping here, to ensure no data loss");
-        danger("[!] ========================================================");
+        zdb_danger("[!] ========================================================");
+        zdb_danger("[!] DANGER: index created in another mode than running mode");
+        zdb_danger("[!] DANGER: stopping here, to ensure no data loss");
+        zdb_danger("[!] ========================================================");
 
         exit(EXIT_FAILURE);
     }
@@ -257,14 +257,14 @@ static size_t index_load_file(index_root_t *root) {
     char *filebuf;
     off_t fullsize = lseek(root->indexfd, 0, SEEK_END);
 
-    debug("[+] index: loading in memory file: %.2f MB\n", MB(fullsize));
+    zdb_debug("[+] index: loading in memory file: %.2f MB\n", MB(fullsize));
 
     if(!(filebuf = malloc(fullsize)))
-        diep("index buffer: malloc");
+        zdb_diep("index buffer: malloc");
 
     lseek(root->indexfd, 0, SEEK_SET);
     if(read(root->indexfd, filebuf, fullsize) != fullsize)
-        diep("index buffer: read");
+        zdb_diep("index buffer: read");
 
     // positioning seeker to beginin of index entries
     char *initseeker = filebuf + sizeof(index_header_t);
@@ -334,7 +334,7 @@ static size_t index_load_file(index_root_t *root) {
         seeker += sizeof(index_item_t) + entry->idlength;
     }
 
-    debug("[+] index: last offset: %lu\n", root->previous);
+    zdb_debug("[+] index: last offset: %lu\n", root->previous);
 
     // freeing buffer memory
     free(filebuf);
@@ -371,26 +371,26 @@ static void index_load(index_root_t *root) {
     }
 
     if(root->seqid && root->seqid->length == 0) {
-        debug("[+] index: fresh database created in sequential mode\n");
-        debug("[+] index: initializing default seqmap\n");
+        zdb_debug("[+] index: fresh database created in sequential mode\n");
+        zdb_debug("[+] index: initializing default seqmap\n");
         index_seqid_push(root, 0, 0);
     }
 
     if(root->status & INDEX_READ_ONLY) {
-        warning("[-] ========================================================");
-        warning("[-] WARNING: running in read-only mode");
-        warning("[-] WARNING: index filesystem is not writable");
-        warning("[-] ========================================================");
+        zdb_warning("[-] ========================================================");
+        zdb_warning("[-] WARNING: running in read-only mode");
+        zdb_warning("[-] WARNING: index filesystem is not writable");
+        zdb_warning("[-] ========================================================");
     }
 
     if(root->status & INDEX_DEGRADED) {
-        warning("[-] ========================================================");
-        warning("[-] WARNING: index degraded (read errors)");
-        warning("[-] ========================================================");
+        zdb_warning("[-] ========================================================");
+        zdb_warning("[-] WARNING: index degraded (read errors)");
+        zdb_warning("[-] ========================================================");
     }
 
     if(root->status & INDEX_HEALTHY)
-        success("[+] index: healthy");
+        zdb_success("[+] index: healthy");
 
     // setting index as loaded (removing flag)
     root->status &= ~INDEX_NOT_LOADED;
@@ -413,7 +413,7 @@ static void index_allocate_single() {
 
     // allocating transition variable, a reusable item
     if(!(index_transition = malloc(sizeof(index_item_t) + MAX_KEY_LENGTH + 1)))
-        diep("malloc");
+        zdb_diep("malloc");
 
     // avoid already allocated buffer
     if(index_reusable_entry)
@@ -430,30 +430,30 @@ static void index_allocate_single() {
     //
     // this is allocated, when index mode can be different on runtime
     if(!(index_reusable_entry = (index_entry_t *) malloc(sizeof(index_entry_t) + MAX_KEY_LENGTH)))
-        diep("malloc");
+        zdb_diep("malloc");
 }
 
 index_seqid_t *index_allocate_seqid() {
     index_seqid_t *seqid;
 
-    debug("[+] index loader: allocating sequential buffer map\n");
+    zdb_debug("[+] index loader: allocating sequential buffer map\n");
     if(!(seqid = malloc(sizeof(index_seqid_t))))
-        diep("index loader: seqid: malloc");
+        zdb_diep("index loader: seqid: malloc");
 
     seqid->allocated = 1024;
     seqid->length = 0;
 
     if(!(seqid->seqmap = malloc(seqid->allocated * sizeof(index_seqmap_t))))
-        diep("index loader: seqid: buffer malloc");
+        zdb_diep("index loader: seqid: buffer malloc");
 
     return seqid;
 }
 
 // create an index and load files
-index_root_t *index_init(settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches) {
+index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches) {
     index_root_t *root = calloc(sizeof(index_root_t), 1);
 
-    debug("[+] index: initializing\n");
+    zdb_debug("[+] index: initializing\n");
 
     root->indexdir = indexdir;
     root->indexid = 0;

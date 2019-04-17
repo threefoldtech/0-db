@@ -27,7 +27,6 @@ release: clean $(LIB).a
 
 $(LIB).a: $(OBJ)
 	$(CC) -shared -o $@ $^ $(LDFLAGS)
-	ar rcs $(LIB) $(OBJ)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<

@@ -11,23 +11,23 @@
 hook_t *hook_new(char *name, size_t argc) {
     hook_t *hook;
 
-    debug("[+] hook: creating hook <%s>\n", name);
+    zdb_debug("[+] hook: creating hook <%s>\n", name);
 
     if(!(hook = malloc(sizeof(hook_t))))
-        diep("hook: malloc");
+        zdb_diep("hook: malloc");
 
     // we add +3 to args:
     //  - first is the script name (convention)
     //  - second is the type (hook name)
     //  - third is the last element set to NULL
     if(!(hook->argv = calloc(sizeof(char *), argc + 3)))
-        diep("hook: calloc");
+        zdb_diep("hook: calloc");
 
     if(!(hook->argv[0] = strdup(rootsettings.hook)))
-        diep("hook: strdup");
+        zdb_diep("hook: strdup");
 
     if(!(hook->argv[1] = strdup(name)))
-        diep("hook: strdup");
+        zdb_diep("hook: strdup");
 
     hook->argc = argc + 3;
     hook->argidx = 2;
@@ -40,7 +40,7 @@ int hook_append(hook_t *hook, char *argument) {
         return -1;
 
     if(!(hook->argv[hook->argidx] = strdup(argument)))
-        diep("hook: append: strdup");
+        zdb_diep("hook: append: strdup");
 
     hook->argidx += 1;
 
@@ -52,16 +52,16 @@ int hook_execute(hook_t *hook) {
 
     if((pid = fork()) != 0) {
         if(pid < 0)
-            warnp("hook: fork");
+            zdb_warnp("hook: fork");
 
         return 0;
     }
 
     // child process now
-    debug("[+] hook: executing hook <%s> (%lu args)\n", hook->argv[0], hook->argc);
+    zdb_debug("[+] hook: executing hook <%s> (%lu args)\n", hook->argv[0], hook->argc);
 
     execv(rootsettings.hook, hook->argv);
-    warnp("hook: execv");
+    zdb_warnp("hook: execv");
 
     return 1;
 }

@@ -43,21 +43,21 @@ static index_seqmap_t *index_seqmap_from_seq(index_seqid_t *seqid, uint32_t id) 
 
 index_seqmap_t *index_fileid_from_seq(index_root_t *root, uint32_t seqid) {
     index_seqmap_t *seqmap = index_seqmap_from_seq(root->seqid, seqid);
-    debug("[+] index: seqmap: resolving %d -> file %u\n", seqid, seqmap->fileid);
+    zdb_debug("[+] index: seqmap: resolving %d -> file %u\n", seqid, seqmap->fileid);
 
     return seqmap;
 }
 
 void index_seqid_push(index_root_t *root, uint32_t id, uint16_t indexid) {
-    debug("[+] index seq: mapping id %u to file %u\n", id, indexid);
+    zdb_debug("[+] index seq: mapping id %u to file %u\n", id, indexid);
 
     if(root->seqid->length + 1 == root->seqid->allocated) {
         // growing up the vector
         root->seqid->allocated += 1024;
-        debug("[+] index seq: growing up vector of files (%u entries)\n", root->seqid->allocated);
+        zdb_debug("[+] index seq: growing up vector of files (%u entries)\n", root->seqid->allocated);
 
         if(!(root->seqid->seqmap = realloc(root->seqid->seqmap, sizeof(index_seqmap_t) * root->seqid->allocated)))
-            diep("index seqmap: realloc");
+            zdb_diep("index seqmap: realloc");
     }
 
     root->seqid->seqmap[root->seqid->length].fileid = indexid;
