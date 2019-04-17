@@ -10,7 +10,7 @@
 #include <time.h>
 #include <limits.h>
 #include <errno.h>
-#include "zerodb.h"
+#include "libzdb.h"
 #include "filesystem.h"
 #include "index.h"
 #include "index_seq.h"

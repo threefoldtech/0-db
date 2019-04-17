@@ -10,14 +10,13 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <time.h>
-#include "zerodb.h"
+#include "libzdb.h"
 #include "index.h"
 #include "index_branch.h"
 #include "index_loader.h"
 #include "data.h"
 #include "namespace.h"
 #include "filesystem.h"
-#include "redis.h"
 #include "hook.h"
 
 // we keep a list of namespace currently used
@@ -586,7 +585,7 @@ int namespace_delete(namespace_t *namespace) {
     debug("[+] namespace: removing: %s\n", namespace->name);
 
     // detach all clients attached to this namespace
-    redis_detach_clients(namespace);
+    // redis_detach_clients(namespace);
 
     // unallocating keys attached to this namespace
     index_clean_namespace(namespace->index, namespace);

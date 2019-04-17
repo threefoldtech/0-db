@@ -14,7 +14,7 @@
 #include <limits.h>
 #include <ftw.h>
 #include "filesystem.h"
-#include "zerodb.h"
+#include "libzdb.h"
 
 //
 // system directory management

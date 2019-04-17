@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <time.h>
-#include "zerodb.h"
+#include "libzdb.h"
 #include "index.h"
 #include "index_seq.h"
 

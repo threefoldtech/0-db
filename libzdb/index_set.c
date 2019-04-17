@@ -7,7 +7,7 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include <time.h>
-#include "zerodb.h"
+#include "libzdb.h"
 #include "index.h"
 #include "index_branch.h"
 #include "index_loader.h"

@@ -3,7 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
-#include "zerodb.h"
+#include "libzdb.h"
 #include "index.h"
 #include "index_branch.h"
 

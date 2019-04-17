@@ -13,7 +13,7 @@
 #include <inttypes.h>
 #include <errno.h>
 #include "sockets.h"
-#include "zerodb.h"
+#include "libzdb.h"
 #include "index.h"
 #include "data.h"
 #include "namespace.h"

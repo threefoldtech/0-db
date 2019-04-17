@@ -11,7 +11,7 @@
 #include <x86intrin.h>
 #include <errno.h>
 #include <time.h>
-#include "zerodb.h"
+#include "libzdb.h"
 #include "filesystem.h"
 #include "data.h"
 #include "index.h" // for key max length

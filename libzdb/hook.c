@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdint.h>
-#include "zerodb.h"
+#include "libzdb.h"
 #include "hook.h"
 
 

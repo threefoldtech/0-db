@@ -10,11 +10,10 @@
 #include <getopt.h>
 #include <ctype.h>
 #include <time.h>
-#include "zerodb.h"
+#include "libzdb.h"
 #include "index.h"
 #include "data.h"
 #include "namespace.h"
-#include "redis.h"
 #include "filesystem.h"
 #include "hook.h"
 
@@ -261,9 +260,11 @@ static int proceed(struct settings_t *settings) {
         defns->maxsize = settings->maxsize;
     }
 
+    /*
     // main worker point (if dump not enabled)
     if(!settings->dump)
         redis_listen(settings->listen, settings->port, settings->socket);
+    */
 
     // we should not reach this point in production
     // this case is handled when calling explicitly
@@ -315,6 +316,7 @@ void usage() {
     exit(EXIT_FAILURE);
 }
 
+#if 0
 //
 // main entry: processing arguments
 //
@@ -492,3 +494,4 @@ int main(int argc, char *argv[]) {
     // let's go
     return proceed(settings);
 }
+#endif

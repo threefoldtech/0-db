@@ -1,8 +1,8 @@
-EXEC = zdb
+LIB = libzdb
 SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 
-CFLAGS += -g -std=gnu99 -O0 -W -Wall -Wextra -msse4.2 -Wno-implicit-fallthrough
+CFLAGS += -g -fPIC -std=gnu99 -O0 -W -Wall -Wextra -msse4.2 -Wno-implicit-fallthrough
 LDFLAGS += -rdynamic
 
 # grab version from git, if possible
@@ -20,13 +20,14 @@ ifeq ($(COVERAGE),1)
 	LDFLAGS += -lgcov --coverage
 endif
 
-all: $(EXEC)
+all: $(LIB).a
 
 release: CFLAGS += -DRELEASE -O2
-release: clean $(EXEC)
+release: clean $(LIB).a
 
-$(EXEC): $(OBJ)
-	$(CC) -o $@ $^ $(LDFLAGS)
+$(LIB).a: $(OBJ)
+	$(CC) -shared -o $@ $^ $(LDFLAGS)
+	ar rcs $(LIB) $(OBJ)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
@@ -35,5 +36,5 @@ clean:
 	$(RM) *.o
 
 mrproper: clean
-	$(RM) $(EXEC)
+	$(RM) $(LIB).a
 	$(RM) *.gcno *.gcda *.gcov

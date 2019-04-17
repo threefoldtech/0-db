@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <inttypes.h>
-#include "zerodb.h"
+#include "libzdb.h"
 #include "index.h"
 #include "index_seq.h"
 #include "index_get.h"

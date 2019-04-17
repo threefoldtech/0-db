@@ -9,7 +9,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <limits.h>
-#include "zerodb.h"
+#include "libzdb.h"
 #include "index.h"
 #include "index_scan.h"
 
