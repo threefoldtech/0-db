@@ -9,7 +9,6 @@
 #include <execinfo.h>
 #include <getopt.h>
 #include <ctype.h>
-#include <time.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
 
@@ -29,12 +28,6 @@ zdb_settings_t zdb_rootsettings = {
     .maxsize = 0,
 };
 
-char *zdb_modes[] = {
-    "default key-value",
-    "sequential keys",
-    "direct key position",
-    "direct key fixed block length",
-};
 
 // debug tools
 static char __hex[] = "0123456789abcdef";
@@ -83,16 +76,6 @@ void zdb_hexdump(void *input, size_t length) {
 
     printf("0x%s", output);
     free(output);
-}
-
-static uint32_t instanceid() {
-    struct timespec ts;
-
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    srand((time_t) ts.tv_nsec);
-
-    // generating random id, greater than zero
-    return (uint32_t) ((rand() % (1 << 30)) + 1);
 }
 
 //

@@ -88,12 +88,13 @@ int command_stop(redis_client_t *client) {
 
 int command_info(redis_client_t *client) {
     char info[4096];
-    zdb_stats_t *stats = &zdb_rootsettings.stats;
+    zdb_settings_t *zdb_settings = zdb_settings_get();
+    zdb_stats_t *stats = &zdb_settings->stats;
 
     sprintf(info, "# server\n");
     sprintf(info + strlen(info), "server_name: 0-db (zdb)\n");
     sprintf(info + strlen(info), "server_revision: " REVISION "\n");
-    sprintf(info + strlen(info), "instance_id: %u\n", zdb_rootsettings.iid); // FIXME
+    sprintf(info + strlen(info), "instance_id: %u\n", zdb_settings->iid); // FIXME
     sprintf(info + strlen(info), "boot_time: %ld\n", stats->boottime);
     sprintf(info + strlen(info), "uptime: %ld\n", time(NULL) - stats->boottime);
 

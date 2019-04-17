@@ -1213,13 +1213,14 @@ static void daemonize() {
 static void redis_listen_hook() {
     hook_t *hook = hook_new("ready", 1);
 
-    hook_append(hook, zdb_rootsettings.zdbid); // FIXME
+    hook_append(hook, zdb_id());
 
     hook_execute(hook);
     hook_free(hook);
 }
 
 int redis_listen(char *listenaddr, int port, char *socket) {
+    zdb_settings_t *zdb_settings = zdb_settings_get();
     redis_handler_t redis;
 
     // allocating space for clients
@@ -1240,13 +1241,13 @@ int redis_listen(char *listenaddr, int port, char *socket) {
     if(listen(redis.mainfd, SOMAXCONN) == -1)
         zdbd_diep("listen");
 
-    zdbd_success("[+] listening on: %s", zdb_rootsettings.zdbid); // FIXME
+    zdbd_success("[+] listening on: %s", zdb_id());
 
     if(zdbd_rootsettings.background)
         daemonize();
 
     // notify we are ready
-    if(zdb_rootsettings.hook) // FIXME
+    if(zdb_settings->hook)
         redis_listen_hook();
 
     // entering the worker loop

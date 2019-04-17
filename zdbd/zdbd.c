@@ -99,16 +99,6 @@ void zdbd_hexdump(void *input, size_t length) {
     free(output);
 }
 
-static uint32_t instanceid() {
-    struct timespec ts;
-
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    srand((time_t) ts.tv_nsec);
-
-    // generating random id, greater than zero
-    return (uint32_t) ((rand() % (1 << 30)) + 1);
-}
-
 //
 // global warning and fatal message
 //
@@ -153,6 +143,7 @@ static int signal_intercept(int signal, void (*function)(int)) {
 // for exemple, on segmentation fault, we will try to flush
 // and closes descriptor anyway to avoid loosing data
 static void sighandler(int signal) {
+    zdb_settings_t *zdb_settings = zdb_settings_get();
     void *buffer[1024];
 
     switch(signal) {
@@ -165,9 +156,9 @@ static void sighandler(int signal) {
 
             fprintf(stderr, "[-] ----------------------------------");
 
-            if(zdb_rootsettings.hook) { // FIXME
+            if(zdb_settings->hook) {
                 hook_t *hook = hook_new("crash", 1);
-                hook_append(hook, zdb_rootsettings.zdbid ? zdb_rootsettings.zdbid : "unknown-id"); // FIXME
+                hook_append(hook, zdb_id());
                 hook_execute(hook);
                 hook_free(hook);
             }
@@ -181,9 +172,9 @@ static void sighandler(int signal) {
         case SIGTERM:
             printf("\n[+] signal: request cleaning\n");
 
-            if(zdb_rootsettings.hook) {
+            if(zdb_settings->hook) {
                 hook_t *hook = hook_new("close", 1);
-                hook_append(hook, zdb_rootsettings.zdbid ? zdb_rootsettings.zdbid : "unknown-id"); // FIXME
+                hook_append(hook, zdb_id());
                 hook_execute(hook);
                 hook_free(hook);
             }
@@ -196,20 +187,6 @@ static void sighandler(int signal) {
     exit(128 + signal);
 }
 
-static void zdbid_set(char *listenaddr, int port, char *socket) {
-    if(socket) {
-        // unix socket
-        if(asprintf(&zdb_rootsettings.zdbid, "unix://%s", socket) < 0) // FIXME
-            zdbd_diep("asprintf");
-
-        return;
-    }
-
-    // default tcp
-    if(asprintf(&zdb_rootsettings.zdbid, "tcp://%s:%d", listenaddr, port) < 0) // FIXME
-        zdbd_diep("asprintf");
-}
-
 static int proceed(zdb_settings_t *zdb_settings, zdbd_settings_t *zdbd_settings) {
     zdbd_verbose("[+] system: setting up environments\n");
     signal_intercept(SIGSEGV, sighandler);
@@ -217,7 +194,7 @@ static int proceed(zdb_settings_t *zdb_settings, zdbd_settings_t *zdbd_settings)
     signal_intercept(SIGTERM, sighandler);
     signal(SIGCHLD, SIG_IGN);
 
-    zdbid_set(zdbd_settings->listen, zdbd_settings->port, zdbd_settings->socket);
+    zdb_id_set(zdbd_settings->listen, zdbd_settings->port, zdbd_settings->socket); // FIXME?
 
     // namespace is the root of the whole index/data system
     // anything related to data is always attached to at least
@@ -302,7 +279,7 @@ int main(int argc, char *argv[]) {
     zdbd_notice("[*] Zero-DB (0-db), v" ZDB_VERSION " (commit " REVISION ")");
 
 
-    zdb_settings_t *zdb_settings = &zdb_rootsettings;
+    zdb_settings_t *zdb_settings = zdb_settings_get();
     zdbd_settings_t *zdbd_settings = &zdbd_rootsettings;
 
     int option_index = 0;
@@ -440,7 +417,7 @@ int main(int argc, char *argv[]) {
     //
     // print information relative to database instance
     //
-    printf("[+] system: running mode: " COLOR_GREEN "%s" COLOR_RESET "\n", zdb_modes[zdb_settings->mode]);
+    printf("[+] system: running mode: " COLOR_GREEN "%s" COLOR_RESET "\n", zdb_running_mode(zdb_settings->mode));
 
     // max files is limited by type length of dataid, which is uint16 by default
     // taking field size in bytes, multiplied by 8 for bits
@@ -465,9 +442,9 @@ int main(int argc, char *argv[]) {
         dir_create(zdb_settings->indexpath);
     }
 
-    // generating instance id // FIXME
-    // zdb_settings->iid = instanceid();
-    // zdbd_verbose("[+] system: instance id: %u\n", settings->iid);
+    // generating instance id
+    zdb_instanceid_generate(); // FIXME
+    zdbd_verbose("[+] system: instance id: %u\n", zdb_instanceid_get());
 
     // initialize statistics // FIXME
     memset(&zdb_settings->stats, 0x00, sizeof(zdb_stats_t));

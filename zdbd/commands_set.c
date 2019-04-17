@@ -294,12 +294,14 @@ int command_set(redis_client_t *client) {
     //
     // if we do this after adding data, we could have an empty data file
     // which will fake the 'previous' offset when computing it on reload
-    if(data_next_offset(client->ns->data) + request->argv[2]->length > zdb_rootsettings.datasize) { // FIXME
+    zdb_settings_t *zdb_settings = zdb_settings_get();
+
+    if(data_next_offset(client->ns->data) + request->argv[2]->length > zdb_settings->datasize) {
         size_t newid = index_jump_next(client->ns->index);
         data_jump_next(client->ns->data, newid);
     }
 
-    size_t offset = redis_set_handlers[zdb_rootsettings.mode](client, entry);
+    size_t offset = redis_set_handlers[zdb_settings->mode](client, entry);
     if(offset == 0)
         return 0;
 

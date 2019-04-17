@@ -55,7 +55,7 @@ int command_args_validate(redis_client_t *client, int expected) {
 int command_admin_authorized(redis_client_t *client) {
     if(!client->admin) {
         // update failed statistics
-        zdb_rootsettings.stats.adminfailed += 1;
+        // zdb_rootsettings.stats.adminfailed += 1; // FIXME
 
         redis_hardsend(client, "-Permission denied");
         return 0;

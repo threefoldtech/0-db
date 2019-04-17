@@ -110,8 +110,6 @@
 
     } zdb_settings_t;
 
-    extern zdb_settings_t zdb_rootsettings;
-
     #define COLOR_RED    "\033[31;1m"
     #define COLOR_YELLOW "\033[33;1m"
     #define COLOR_GREEN  "\033[32;1m"
@@ -122,8 +120,6 @@
     #define MB(x)   (x / (1024 * 1024.0))
     #define GB(x)   (x / (1024 * 1024 * 1024.0))
     #define TB(x)   (x / (1024 * 1024 * 1024 * 1024.0))
-
-    extern char *zdb_modes[];
 
     #include "data.h"
     #include "filesystem.h"
@@ -136,4 +132,5 @@
     #include "index_seq.h"
     #include "index_set.h"
     #include "namespace.h"
+    #include "settings.h"
 #endif
