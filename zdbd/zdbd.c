@@ -279,7 +279,7 @@ int main(int argc, char *argv[]) {
     zdbd_notice("[*] 0-db engine, v%s (commit %s)", zdb_version(), zdb_revision());
     zdbd_notice("[*] 0-db server, v" ZDBD_VERSION " (commit " ZDBD_REVISION ")");
 
-    zdb_settings_t *zdb_settings = zdb_settings_get();
+    zdb_settings_t *zdb_settings = zdb_initialize();
     zdbd_settings_t *zdbd_settings = &zdbd_rootsettings;
 
     int option_index = 0;
@@ -442,13 +442,8 @@ int main(int argc, char *argv[]) {
         dir_create(zdb_settings->indexpath);
     }
 
-    // generating instance id
-    zdb_instanceid_generate(); // FIXME
+    // dump instance id
     zdbd_verbose("[+] system: instance id: %u\n", zdb_instanceid_get());
-
-    // initialize statistics // FIXME
-    memset(&zdb_settings->stats, 0x00, sizeof(zdb_stats_t));
-    zdb_settings->stats.inittime = time(NULL); // FIXME
 
     // initialize daemon statistics // FIXME
     memset(&zdbd_settings->stats, 0x00, sizeof(zdb_stats_t));
