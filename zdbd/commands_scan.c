@@ -6,7 +6,8 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <inttypes.h>
-#include "zerodb.h"
+#include "libzdb.h"
+#include "zdbd.h"
 #include "index.h"
 #include "index_scan.h"
 #include "index_get.h"
@@ -156,7 +157,7 @@ static scan_info_t *scan_initial_get(scan_info_t *info, redis_client_t *client) 
     index_bkey_t bkey;
 
     if(client->request->argv[1]->length != sizeof(index_bkey_t)) {
-        debug("[-] command: scan: requested key invalid (size mismatch)\n");
+        zdbd_debug("[-] command: scan: requested key invalid (size mismatch)\n");
         redis_hardsend(client, "-Invalid key format");
         return NULL;
     }
@@ -164,7 +165,7 @@ static scan_info_t *scan_initial_get(scan_info_t *info, redis_client_t *client) 
     memcpy(&bkey, client->request->argv[1]->buffer, sizeof(index_bkey_t));
 
     if(!(entry = index_entry_deserialize(client->ns->index, &bkey))) {
-        debug("[-] command: scan: could not fetch/validate key requested\n");
+        zdbd_debug("[-] command: scan: could not fetch/validate key requested\n");
         redis_hardsend(client, "-Invalid key format");
         return NULL;
     }
@@ -172,13 +173,13 @@ static scan_info_t *scan_initial_get(scan_info_t *info, redis_client_t *client) 
     #if 0
     // grabbing original entry
     if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
-        debug("[-] command: scan: key not found\n");
+        zdbd_debug("[-] command: scan: key not found\n");
         redis_hardsend(client, "-Invalid index");
         return NULL;
     }
 
     if(index_entry_is_deleted(entry)) {
-        verbose("[-] command: scan: key deleted\n");
+        zdbd_verbose("[-] command: scan: key deleted\n");
         redis_hardsend(client, "-Invalid index");
         return NULL;
     }
@@ -229,7 +230,7 @@ int command_scan(redis_client_t *client) {
     uint64_t basetime = ustime();
 
     while(ustime() - basetime < SCAN_TIMESLICE_US) {
-        debug("[+] scan: elapsed time: %" PRIu64 " us\n", ustime() - basetime);
+        zdbd_debug("[+] scan: elapsed time: %" PRIu64 " us\n", ustime() - basetime);
 
         // reading entry and appending it
         scan = index_next_header(client->ns->index, info.dataid, info.idxoffset);
@@ -244,7 +245,7 @@ int command_scan(redis_client_t *client) {
         scaninfo_from_scan(&info, &scan);
     }
 
-    debug("[+] scan: retreived %lu entries in %" PRIu64 " us\n", scanlist.length, ustime() - basetime);
+    zdbd_debug("[+] scan: retreived %lu entries in %" PRIu64 " us\n", scanlist.length, ustime() - basetime);
 
     if(command_scan_send_scanlist(&scanlist, client))
         redis_hardsend(client, "-Internal Error");
@@ -282,7 +283,7 @@ int command_rscan(redis_client_t *client) {
     uint64_t basetime = ustime();
 
     while(ustime() - basetime < SCAN_TIMESLICE_US) {
-        debug("[+] scan: elapsed time: %" PRIu64 " us\n", ustime() - basetime);
+        zdbd_debug("[+] scan: elapsed time: %" PRIu64 " us\n", ustime() - basetime);
 
         // reading entry and appending it
         scan = index_previous_header(client->ns->index, info.dataid, info.idxoffset);
@@ -297,7 +298,7 @@ int command_rscan(redis_client_t *client) {
         scaninfo_from_scan(&info, &scan);
     }
 
-    debug("[+] scan: retreived %lu entries in %" PRIu64 " us\n", scanlist.length, ustime() - basetime);
+    zdbd_debug("[+] scan: retreived %lu entries in %" PRIu64 " us\n", scanlist.length, ustime() - basetime);
 
     if(command_scan_send_scanlist(&scanlist, client))
         redis_hardsend(client, "-Internal Error");

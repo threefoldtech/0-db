@@ -17,7 +17,7 @@
 //
 // global system settings
 //
-zdb_settings_t rootsettings = {
+zdb_settings_t zdb_rootsettings = {
     .datapath = ZDB_DEFAULT_DATAPATH,
     .indexpath = ZDB_DEFAULT_INDEXPATH,
     .verbose = 0,
@@ -99,24 +99,24 @@ static uint32_t instanceid() {
 //
 // global warning and fatal message
 //
-void *zdb_zdb_warnp(char *str) {
+void *zdb_warnp(char *str) {
     fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
     return NULL;
 }
 
-void zdb_zdb_verbosep(char *prefix, char *str) {
+void zdb_verbosep(char *prefix, char *str) {
 #ifdef RELEASE
     // only match on verbose flag if we are
     // in release mode, otherwise do always the
     // print, we are in debug mode anyway
-    if(!rootsettings.verbose)
+    if(!zdb_rootsettings.verbose)
         return;
 #endif
 
     fprintf(stderr, "[-] %s: %s: %s\n", prefix, str, strerror(errno));
 }
 
-void zdb_zdb_diep(char *str) {
+void zdb_diep(char *str) {
     zdb_warnp(str);
     exit(EXIT_FAILURE);
 }

@@ -139,7 +139,8 @@
         #define zdb_debughex(...) ((void)0)
     #endif
 
-    extern zdb_settings_t rootsettings;
+    extern zdb_settings_t zdb_rootsettings;
+    extern char *zdb_modes[];
 
     void zdb_diep(char *str);
     void *zdb_warnp(char *str);

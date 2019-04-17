@@ -10,7 +10,8 @@
 #ifdef __linux__
 
 #include <sys/epoll.h>
-#include "zerodb.h"
+#include "libzdb.h"
+#include "zdbd.h"
 #include "index.h"
 #include "data.h"
 #include "namespace.h"
@@ -28,7 +29,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
         // epoll issue
         // discarding this client
         if((ev->events & EPOLLERR) || (ev->events & EPOLLHUP)) {
-            verbosep("socket_event", "epoll");
+            zdbd_verbosep("socket_event", "epoll");
             socket_client_free(ev->data.fd);
             continue;
         }
@@ -39,7 +40,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             int clientfd;
 
             if((clientfd = accept(redis->mainfd, NULL, NULL)) == -1) {
-                verbosep("socket_event", "accept");
+                zdbd_verbosep("socket_event", "accept");
                 continue;
             }
 
@@ -47,7 +48,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             socket_keepalive(clientfd);
             socket_client_new(clientfd);
 
-            verbose("[+] incoming connection (socket %d)\n", clientfd);
+            zdbd_verbose("[+] incoming connection (socket %d)\n", clientfd);
 
             // adding client to the epoll list
             struct epoll_event event;
@@ -62,7 +63,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             // is ready to receive data, only one time)
 
             if(epoll_ctl(redis->evfd, EPOLL_CTL_ADD, clientfd, &event) < 0) {
-                verbosep("socket_event", "epoll_ctl");
+                zdbd_verbosep("socket_event", "epoll_ctl");
                 continue;
             }
 
@@ -108,13 +109,13 @@ int socket_handler(redis_handler_t *handler) {
     memset(&event, 0, sizeof(struct epoll_event));
 
     if((handler->evfd = epoll_create1(0)) < 0)
-        diep("epoll_create1");
+        zdbd_diep("epoll_create1");
 
     event.data.fd = handler->mainfd;
     event.events = EPOLLIN;
 
     if(epoll_ctl(handler->evfd, EPOLL_CTL_ADD, handler->mainfd, &event) < 0)
-        diep("epoll_ctl");
+        zdbd_diep("epoll_ctl");
 
     events = calloc(MAXEVENTS, sizeof event);
 

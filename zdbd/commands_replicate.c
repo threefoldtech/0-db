@@ -6,7 +6,8 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <inttypes.h>
-#include "zerodb.h"
+#include "libzdb.h"
+#include "zdbd.h"
 #include "index.h"
 #include "data.h"
 #include "namespace.h"

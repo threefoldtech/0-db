@@ -7,7 +7,8 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include <time.h>
-#include "zerodb.h"
+#include "libzdb.h"
+#include "zdbd.h"
 #include "index.h"
 #include "data.h"
 #include "namespace.h"
@@ -57,7 +58,7 @@ int command_args_validate(redis_client_t *client, int expected) {
 int command_admin_authorized(redis_client_t *client) {
     if(!client->admin) {
         // update failed statistics
-        rootsettings.stats.adminfailed += 1;
+        zdb_rootsettings.stats.adminfailed += 1;
 
         redis_hardsend(client, "-Permission denied");
         return 0;
@@ -122,20 +123,20 @@ int redis_dispatcher(redis_client_t *client) {
     // in that special case, we notify this client it's namespace
     // is not available anymore and we disconnect it
     if(client->ns == NULL) {
-        debug("[-] command: request fd: %d, no namespace, disconnecting.\n", client->fd);
+        zdbd_debug("[-] command: request fd: %d, no namespace, disconnecting.\n", client->fd);
         redis_hardsend(client, "-Your active namespace is not available anymore (probably removed).");
         return RESP_STATUS_DISCARD;
     }
 
-    debug("[+] command: request fd: %d, namespace: %s\n", client->fd, client->ns->name);
+    zdbd_debug("[+] command: request fd: %d, namespace: %s\n", client->fd, client->ns->name);
     client->commands += 1;
 
     if(key->type != STRING) {
-        debug("[-] command: not a string command, ignoring\n");
+        zdbd_debug("[-] command: not a string command, ignoring\n");
         return 0;
     }
 
-    debug("[+] command: '%.*s' [+%d args]\n", key->length, (char *) key->buffer, request->argc - 1);
+    zdbd_debug("[+] command: '%.*s' [+%d args]\n", key->length, (char *) key->buffer, request->argc - 1);
 
     for(unsigned int i = 0; i < sizeof(commands_handlers) / sizeof(command_t); i++) {
         if(strncasecmp(key->buffer, commands_handlers[i].command, key->length) == 0) {
@@ -143,7 +144,7 @@ int redis_dispatcher(redis_client_t *client) {
             client->executed = &commands_handlers[i];
 
             // update statistics
-            rootsettings.stats.cmdsvalid += 1;
+            // rootsettings.stats.cmdsvalid += 1; // FIXME
 
             // execute handler
             return commands_handlers[i].handler(client);
@@ -152,7 +153,7 @@ int redis_dispatcher(redis_client_t *client) {
 
     // unknown command
     printf("[-] command: unsupported redis command\n");
-    rootsettings.stats.cmdsfailed += 1;
+    // rootsettings.stats.cmdsfailed += 1; // FIXME
 
     // reset executed flag, this was a non-existing command
     client->executed = NULL;

@@ -23,7 +23,7 @@ hook_t *hook_new(char *name, size_t argc) {
     if(!(hook->argv = calloc(sizeof(char *), argc + 3)))
         zdb_diep("hook: calloc");
 
-    if(!(hook->argv[0] = strdup(rootsettings.hook)))
+    if(!(hook->argv[0] = strdup(zdb_rootsettings.hook)))
         zdb_diep("hook: strdup");
 
     if(!(hook->argv[1] = strdup(name)))
@@ -60,7 +60,7 @@ int hook_execute(hook_t *hook) {
     // child process now
     zdb_debug("[+] hook: executing hook <%s> (%lu args)\n", hook->argv[0], hook->argc);
 
-    execv(rootsettings.hook, hook->argv);
+    execv(zdb_rootsettings.hook, hook->argv);
     zdb_warnp("hook: execv");
 
     return 1;

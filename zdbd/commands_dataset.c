@@ -6,7 +6,8 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <inttypes.h>
-#include "zerodb.h"
+#include "libzdb.h"
+#include "zdbd.h"
 #include "index.h"
 #include "index_get.h"
 #include "data.h"
@@ -27,18 +28,18 @@ int command_exists(redis_client_t *client) {
         return 1;
     }
 
-    debug("[+] command: exists: lookup key: ");
-    debughex(request->argv[1]->buffer, request->argv[1]->length);
-    debug("\n");
+    zdbd_debug("[+] command: exists: lookup key: ");
+    zdbd_debughex(request->argv[1]->buffer, request->argv[1]->length);
+    zdbd_debug("\n");
 
     index_root_t *index = client->ns->index;
     index_entry_t *entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length);
 
-    debug("[+] command: exists: entry found: %s\n", (entry ? "yes" : "no"));
+    zdbd_debug("[+] command: exists: entry found: %s\n", (entry ? "yes" : "no"));
 
     // key found but deleted
     if(entry && entry->flags & INDEX_ENTRY_DELETED) {
-        debug("[+] command: exists: entry found but deleted\n");
+        zdbd_debug("[+] command: exists: entry found but deleted\n");
         entry = NULL;
     }
 
@@ -64,30 +65,30 @@ int command_check(redis_client_t *client) {
         return 1;
     }
 
-    debug("[+] command: check: lookup key: ");
-    debughex(request->argv[1]->buffer, request->argv[1]->length);
-    debug("\n");
+    zdbd_debug("[+] command: check: lookup key: ");
+    zdbd_debughex(request->argv[1]->buffer, request->argv[1]->length);
+    zdbd_debug("\n");
 
     index_root_t *index = client->ns->index;
     index_entry_t *entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length);
 
     // key not found at all
     if(!entry) {
-        debug("[-] command: check: key not found\n");
+        zdbd_debug("[-] command: check: key not found\n");
         redis_hardsend(client, "$-1");
         return 1;
     }
 
     // key found but deleted
     if(entry->flags & INDEX_ENTRY_DELETED) {
-        verbose("[-] command: check: key deleted\n");
+        zdbd_verbose("[-] command: check: key deleted\n");
         redis_hardsend(client, "$-1");
         return 1;
     }
 
     // key found and valid, let's checking the contents
-    debug("[+] command: get: entry found, flags: %x, data length: %" PRIu32 "\n", entry->flags, entry->length);
-    debug("[+] command: get: data file: %d, data offset: %" PRIu32 "\n", entry->dataid, entry->offset);
+    zdbd_debug("[+] command: get: entry found, flags: %x, data length: %" PRIu32 "\n", entry->flags, entry->length);
+    zdbd_debug("[+] command: get: data file: %d, data offset: %" PRIu32 "\n", entry->dataid, entry->offset);
 
     data_root_t *data = client->ns->data;
     int status = data_check(data, entry->offset, entry->dataid);
@@ -113,7 +114,7 @@ int command_del(redis_client_t *client) {
     }
 
     if(!client->writable) {
-        debug("[-] command: set: denied, read-only namespace\n");
+        zdbd_debug("[-] command: set: denied, read-only namespace\n");
         redis_hardsend(client, "-Namespace is in read-only mode");
         return 1;
     }
@@ -124,28 +125,28 @@ int command_del(redis_client_t *client) {
 
     // grabbing original entry
     if(!(entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length))) {
-        debug("[-] command: del: key not found\n");
+        zdbd_debug("[-] command: del: key not found\n");
         redis_hardsend(client, "-Key not found");
         return 1;
     }
 
     // avoid double deletion
     if(index_entry_is_deleted(entry)) {
-        debug("[-] command: del: key already deleted\n");
+        zdbd_debug("[-] command: del: key already deleted\n");
         redis_hardsend(client, "-Key not found");
         return 1;
     }
 
     // update data file, flag entry deleted
     if(!data_delete(data, entry->id, entry->idlength)) {
-        debug("[-] command: del: deleting data failed\n");
+        zdbd_debug("[-] command: del: deleting data failed\n");
         redis_hardsend(client, "-Cannot delete key");
         return 0;
     }
 
     // mark index entry as deleted
     if(index_entry_delete(index, entry)) {
-        debug("[-] command: del: index delete flag failed\n");
+        zdbd_debug("[-] command: del: index delete flag failed\n");
         redis_hardsend(client, "-Cannot delete key");
         return 0;
     }

@@ -109,7 +109,7 @@ index_header_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
     header.created = time(NULL);
     header.fileid = indexid;
     header.opened = time(NULL);
-    header.mode = rootsettings.mode;
+    header.mode = zdb_rootsettings.mode;
 
     if(!index_write(fd, &header, sizeof(index_header_t), root))
         zdb_diep("index_initialize: write");
@@ -241,7 +241,7 @@ static size_t index_load_file(index_root_t *root) {
     zdb_verbose("[+] index: created at: %s\n", index_date(header.created, date, sizeof(date)));
     zdb_verbose("[+] index: last open: %s\n", index_date(header.opened, date, sizeof(date)));
 
-    if(header.mode != rootsettings.mode) {
+    if(header.mode != zdb_rootsettings.mode) {
         zdb_danger("[!] ========================================================");
         zdb_danger("[!] DANGER: index created in another mode than running mode");
         zdb_danger("[!] DANGER: stopping here, to ensure no data loss");

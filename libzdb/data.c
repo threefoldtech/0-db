@@ -71,7 +71,7 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
 
     if((response = write(fd, buffer, length)) < 0) {
         // update statistics
-        rootsettings.stats.datawritefailed += 1;
+        zdb_rootsettings.stats.datawritefailed += 1;
 
         zdb_warnp("data write");
         return 0;
@@ -83,7 +83,7 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
     }
 
     // update statistics
-    rootsettings.stats.datadiskwrite += length;
+    zdb_rootsettings.stats.datadiskwrite += length;
 
     if(syncer)
         data_sync_check(root, fd);
@@ -303,7 +303,7 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
     payload.length = length;
 
     if(read(fd, payload.buffer, length) != (ssize_t) length) {
-        rootsettings.stats.datareadfailed += 1;
+        zdb_rootsettings.stats.datareadfailed += 1;
         zdb_warnp("data_get: read");
 
         free(payload.buffer);
@@ -311,7 +311,7 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
     }
 
     // update statistics
-    rootsettings.stats.datadiskread += length;
+    zdb_rootsettings.stats.datadiskread += length;
 
     return payload;
 }
@@ -360,7 +360,7 @@ static inline int data_check_real(int fd, size_t offset) {
 
     if(read(fd, buffer, header.datalength) != (ssize_t) header.datalength) {
         // update statistics
-        rootsettings.stats.datareadfailed += 1;
+        zdb_rootsettings.stats.datareadfailed += 1;
 
         zdb_warnp("data: checker: payload read");
         free(buffer);
@@ -368,7 +368,7 @@ static inline int data_check_real(int fd, size_t offset) {
     }
 
     // update statistics
-    rootsettings.stats.datadiskread += header.datalength;
+    zdb_rootsettings.stats.datadiskread += header.datalength;
 
     // checking integrity of the payload
     uint32_t integrity = data_crc32(buffer, header.datalength);

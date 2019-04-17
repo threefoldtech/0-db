@@ -14,6 +14,7 @@
 #include <errno.h>
 #include "sockets.h"
 #include "libzdb.h"
+#include "zdbd.h"
 #include "index.h"
 #include "data.h"
 #include "namespace.h"
@@ -32,9 +33,9 @@
 #endif
 
 #ifdef PROTOCOL_DEBUG
-    #define pdebug(...) { printf(__VA_ARGS__); }
+    #define pzdbd_debug(...) { printf(__VA_ARGS__); }
 #else
-    #define pdebug(...) ((void)0)
+    #define pzdbd_debug(...) ((void)0)
 #endif
 // -- internal static protocol debugger --
 
@@ -66,7 +67,7 @@ static void buffer_shift(buffer_t *buffer) {
         return;
     }
 
-    pdebug("[+] redis: buffer shifting\n");
+    pzdbd_debug("[+] redis: buffer shifting\n");
 
     buffer->length = buffer->writer - buffer->reader;
     buffer->remain = REDIS_BUFFER_SIZE - buffer->length;
@@ -84,7 +85,7 @@ static buffer_t buffer_new() {
 
     // allocating memory
     if(!(buffer.buffer = (char *) malloc(sizeof(char) * REDIS_BUFFER_SIZE))) {
-        warnp("new client buffer malloc");
+        zdbd_warnp("new client buffer malloc");
         return buffer;
     }
 
@@ -164,11 +165,11 @@ redis_response_t *redis_send_response(redis_client_t *client, redis_response_t *
     ssize_t sent;
 
     while(response->length > 0) {
-        debug("[+] redis: sending reply to %d (%ld bytes remains)\n", client->fd, response->length);
+        zdbd_debug("[+] redis: sending reply to %d (%ld bytes remains)\n", client->fd, response->length);
 
         if((sent = send(client->fd, response->reader, response->length, 0)) < 0) {
             if(errno != EAGAIN) {
-                warnp("redis_send_reply: send");
+                zdbd_warnp("redis_send_reply: send");
 
                 // we reply NULL because this is an error, the socket is not
                 // ready to receive this anyway, we won't sent it at all
@@ -176,7 +177,7 @@ redis_response_t *redis_send_response(redis_client_t *client, redis_response_t *
                 return NULL;
             }
 
-            debug("[-] redis: send: client %d is not ready for the send\n", client->fd);
+            zdbd_debug("[-] redis: send: client %d is not ready for the send\n", client->fd);
 
             // we still have some data to send, which could not
             // be sent because the socket is not ready, and we are in
@@ -189,13 +190,13 @@ redis_response_t *redis_send_response(redis_client_t *client, redis_response_t *
         }
 
         // updating statistics
-        rootsettings.stats.networktx += sent;
+        // zdbd_rootsettings.stats.networktx += sent; // FIXME
 
         response->reader += sent;
         response->length -= sent;
     }
 
-    debug("[+] redis: send: buffer sucessfully sent\n");
+    zdbd_debug("[+] redis: send: buffer sucessfully sent\n");
     return NULL;
 }
 
@@ -207,13 +208,13 @@ resp_status_t redis_delayed_write(int fd) {
     redis_response_t *response;
 
     if(!client || client->responses == NULL) {
-        debug("[+] redis: nothing to send to client (fd: %d)\n", fd);
+        zdbd_debug("[+] redis: nothing to send to client (fd: %d)\n", fd);
         return 0;
     }
 
     response = client->responses;
 
-    debug("[+] redis: sending available buffer to socket %d\n", fd);
+    zdbd_debug("[+] redis: sending available buffer to socket %d\n", fd);
     while(response) {
         // sending this response
         // if the send_response returns us something, then it
@@ -250,14 +251,14 @@ int redis_reply_heap(redis_client_t *client, void *payload, size_t length, void 
 
     // create a response based on parameters
     if(!(response = redis_response_new(payload, length, destructor))) {
-        warnp("redis_reply_head: malloc");
+        zdbd_warnp("redis_reply_head: malloc");
         return 1;
     }
 
     if(client->responses == NULL) {
         // try to send this response a first time
         if(redis_send_response(client, response) == NULL) {
-            pdebug("[+] redis: reply heap: send was made in single shot\n");
+            pzdbd_debug("[+] redis: reply heap: send was made in single shot\n");
             redis_response_free(response);
             return 0;
         }
@@ -291,7 +292,7 @@ int redis_reply_stack(redis_client_t *client, void *payload, size_t length) {
     // break protocol serialization (some pending stuff needs to be sent before)
     if(client->responses == NULL) {
         if(redis_send_response(client, &response) == NULL) {
-            pdebug("[+] redis: reply stack: no stack duplication needed\n");
+            pzdbd_debug("[+] redis: reply stack: no stack duplication needed\n");
             return 0;
         }
     }
@@ -355,7 +356,7 @@ redis_bulk_t redis_bulk(void *payload, size_t length) {
     //
     bulk.length = 1 + stroffset + 2 + length + 2;
     if(!(bulk.buffer = malloc(bulk.length))) {
-        warnp("bulk malloc");
+        zdbd_warnp("bulk malloc");
         return bulk;
     }
 
@@ -373,7 +374,7 @@ redis_bulk_t redis_bulk(void *payload, size_t length) {
 #define resp_discard(client, message) resp_discard_real(client, "-" message "\r\n")
 
 static void resp_discard_real(redis_client_t *client, const char *message) {
-    debug("[-] redis: resp: error: %s", message); // message needs to have CRLF
+    zdbd_debug("[-] redis: resp: error: %s", message); // message needs to have CRLF
 
     if(redis_reply_stack(client, (void *) message, strlen(message)) < 0)
         fprintf(stderr, "[-] send failed for error message\n");
@@ -420,14 +421,14 @@ static resp_status_t redis_handle_resp_empty(redis_client_t *client) {
     // checking for array request, we only support array
     // since any command are send using array
     if(*buffer->reader != '*') {
-        debug("[-] resp: request is not an array, rejecting\n");
+        zdbd_debug("[-] resp: request is not an array, rejecting\n");
         resp_discard(client, "Malformed request, array expected");
         return RESP_STATUS_DISCARD;
     }
 
     // reading the amount of argument
     request->argc = atoi(buffer->reader + 1);
-    debug("[+] redis: resp: %d arguments\n", request->argc);
+    zdbd_debug("[+] redis: resp: %d arguments\n", request->argc);
 
     if(request->argc == 0) {
         resp_discard(client, "Missing arguments");
@@ -445,7 +446,7 @@ static resp_status_t redis_handle_resp_empty(redis_client_t *client) {
     // allocating needed requests per arguments announced
     // (this is basicly why we limit the number or items)
     if(!(request->argv = (resp_object_t **) calloc(sizeof(resp_type_t *), request->argc))) {
-        warnp("request argv malloc");
+        zdbd_warnp("request argv malloc");
         resp_discard(client, "Internal memory error");
         return RESP_STATUS_DISCARD;
     }
@@ -467,7 +468,7 @@ static resp_status_t redis_handle_resp_header(redis_client_t *client) {
     // this could occures if the reader was set
     // to the next data and theses data are not yet available
     if(buffer->reader > buffer->writer) {
-        debug("[-] resp: header: trying to read data not received yet\n");
+        zdbd_debug("[-] resp: header: trying to read data not received yet\n");
         return RESP_STATUS_ABNORMAL;
     }
 
@@ -486,13 +487,13 @@ static resp_status_t redis_handle_resp_header(redis_client_t *client) {
 
     // checking if it's a string request
     if(*buffer->reader != '$') {
-        debug("[-] resp: request is not a string, rejecting\n");
+        zdbd_debug("[-] resp: request is not a string, rejecting\n");
         resp_discard(client, "Malformed query string");
         return RESP_STATUS_ABNORMAL;
     }
 
     if(!(request->argv[request->fillin] = calloc(sizeof(resp_object_t), 1))) {
-        warnp("request argc calloc");
+        zdbd_warnp("request argc calloc");
         resp_discard(client, "Internal memory error");
         return RESP_STATUS_DISCARD;
     }
@@ -510,7 +511,7 @@ static resp_status_t redis_handle_resp_header(redis_client_t *client) {
     }
 
     if(!(argument->buffer = (unsigned char *) malloc(argument->size))) {
-        warnp("argument buffer malloc");
+        zdbd_warnp("argument buffer malloc");
         resp_discard(client, "Internal memory error");
         return RESP_STATUS_DISCARD;
     }
@@ -540,7 +541,7 @@ static resp_status_t redis_handle_resp_payload(redis_client_t *client) {
             return RESP_STATUS_RESET;
         }
 
-        debug("[-] resp: reading payload: no data available on the buffer\n");
+        zdbd_debug("[-] resp: reading payload: no data available on the buffer\n");
         return RESP_STATUS_CONTINUE;
     }
 
@@ -551,10 +552,10 @@ static resp_status_t redis_handle_resp_payload(redis_client_t *client) {
     // caller do the next things
     size_t needed = argument->size - argument->filled;
 
-    pdebug("[+] redis: payload: needed: %lu, available: %lu\n", needed, available);
+    pzdbd_debug("[+] redis: payload: needed: %lu, available: %lu\n", needed, available);
 
     if(available >= needed) {
-        pdebug("[+] redis: more (or equals) available/needed, extracting needed\n");
+        pzdbd_debug("[+] redis: more (or equals) available/needed, extracting needed\n");
         void *argbuf = argument->buffer + argument->filled;
         memcpy(argbuf, buffer->reader, needed);
 
@@ -569,14 +570,14 @@ static resp_status_t redis_handle_resp_payload(redis_client_t *client) {
         // this is not *obligatory* (since reader/writer are updated)
         // but this makes more space for next call
         if(available == needed) {
-            pdebug("[+] redis: available was exactly what's needed, reset buffer\n");
+            pzdbd_debug("[+] redis: available was exactly what's needed, reset buffer\n");
             buffer_reset(buffer);
         }
 
         return RESP_STATUS_CONTINUE;
     }
 
-    pdebug("[+] redis: saving %lu bytes into user request\n", available);
+    pzdbd_debug("[+] redis: saving %lu bytes into user request\n", available);
 
     // we don't have enough data on the buffer
     // to fill the complete payload, let's take everything available
@@ -585,7 +586,7 @@ static resp_status_t redis_handle_resp_payload(redis_client_t *client) {
     memcpy(argument->buffer + argument->filled, buffer->reader, available);
     argument->filled += available;
 
-    pdebug("[+] redis: resetting buffer\n");
+    pzdbd_debug("[+] redis: resetting buffer\n");
     buffer_reset(&client->buffer);
 
     return RESP_STATUS_CONTINUE;
@@ -600,7 +601,7 @@ static inline int redis_handle_resp_ownerid(redis_client_t *client) {
     // it's a normal client, there is nothing special to do
     // just set the owner id as our own id
     if(!client->master) {
-        client->request->owner = rootsettings.iid;
+        // client->request->owner = zdbd_rootsettings.iid; // FIXME
         return 0;
     }
 
@@ -609,7 +610,7 @@ static inline int redis_handle_resp_ownerid(redis_client_t *client) {
     // and checking if it's a replay of our own database
     resp_object_t *ownobj = client->request->argv[client->request->argc - 1];
     if(ownobj->length > 32) {
-        debug("[-] redis: owner check: malformed owner, id is too long, dropping\n");
+        zdbd_debug("[-] redis: owner check: malformed owner, id is too long, dropping\n");
         return 1;
     }
 
@@ -621,10 +622,12 @@ static inline int redis_handle_resp_ownerid(redis_client_t *client) {
     // converting string into unsigned integer
     uint32_t ownerid = strtoul(temp, NULL, 10);
 
-    if(ownerid == rootsettings.iid) {
-        debug("[-] redis: owner check: looks like this comes from us, dropping\n");
+    /* FIXME
+    if(ownerid == zdbd_rootsettings.iid) {
+        zdbd_debug("[-] redis: owner check: looks like this comes from us, dropping\n");
         return 1;
     }
+    */
 
     // okay, let's pop this request from original object
     // so this request will looks like an original request
@@ -644,18 +647,18 @@ static resp_status_t redis_handle_resp_finished(redis_client_t *client) {
 
     // setting the request ownerid
     if(redis_handle_resp_ownerid(client)) {
-        debug("[-] redis: ownerid requested to ignore this request\n");
+        zdbd_debug("[-] redis: ownerid requested to ignore this request\n");
         redis_free_request(request);
         request->state = RESP_EMPTY;
 
         return 1;
     }
 
-    debug("[+] redis: request parsed, calling dispatcher\n");
+    zdbd_debug("[+] redis: request parsed, calling dispatcher\n");
     // value = redis_dispatcher(client);
-    debug("[+] redis: dispatcher done, return code: %d\n", value);
+    zdbd_debug("[+] redis: dispatcher done, return code: %d\n", value);
 
-    debug("[+] redis: calling posthandler\n");
+    zdbd_debug("[+] redis: calling posthandler\n");
     redis_posthandler_client(client);
 
     // clearing the request
@@ -682,14 +685,14 @@ resp_status_t redis_chunk_read(int fd) {
 go_again:
     // buffer is full, this is probably a bug
     if(buffer->remain == 0) {
-        debug("[-] resp: new chunk requested and buffer full\n");
+        zdbd_debug("[-] resp: new chunk requested and buffer full\n");
         return RESP_STATUS_DISCARD;
     }
 
-    pdebug("[+] redis: perform read on the socket\n");
+    pzdbd_debug("[+] redis: perform read on the socket\n");
     if((length = recv(fd, buffer->writer, buffer->remain, 0)) < 0) {
         if(errno != EAGAIN && errno != EWOULDBLOCK) {
-            warnp("client recv");
+            zdbd_warnp("client recv");
             return RESP_STATUS_ABNORMAL;
         }
 
@@ -705,12 +708,12 @@ go_again:
         // socket was empty
         // this is probably a connection reset by peer
         // let's disconnect this client
-        debug("[+] resp: empty socket read, client disconnected\n");
+        zdbd_debug("[+] resp: empty socket read, client disconnected\n");
         return RESP_STATUS_DISCONNECTED;
     }
 
     // updating statistics
-    rootsettings.stats.networkrx += length;
+    // zdbd_rootsettings.stats.networkrx += length; // FIXME
 
     buffer->writer += length;
     buffer->length += length;
@@ -726,7 +729,7 @@ go_again:
     // while we didn't parsed everything available
     // on the buffer
     while(buffer->reader < buffer->writer) {
-        pdebug("[+] redis: buffer parsing (r: %p, w: %p)\n", buffer->reader, buffer->writer);
+        pzdbd_debug("[+] redis: buffer parsing (r: %p, w: %p)\n", buffer->reader, buffer->writer);
 
         // checking if the current request is empty
         // if it is, let's doing a parsing to see if enough
@@ -748,7 +751,7 @@ go_again:
         // if state is RESP_FILLIN_HEADER, we are waiting for data
         // to be used to fill in the (next) argument header (the type and length)
         if(request->state == RESP_FILLIN_HEADER) {
-            pdebug("[+] redis: header parser\n");
+            pzdbd_debug("[+] redis: header parser\n");
 
             if((value = redis_handle_resp_header(client)) != RESP_STATUS_CONTINUE) {
                 // we didn't had enough information or data was invalid (malformed request)
@@ -760,7 +763,7 @@ go_again:
         // if state is RESP_FILLIN_PAYLOAD, we are waiting for data
         // to fill the payload of the argument (we know the type and the length now)
         if(request->state == RESP_FILLIN_PAYLOAD) {
-            pdebug("[+] redis: payload parser\n");
+            pzdbd_debug("[+] redis: payload parser\n");
 
             if((value = redis_handle_resp_payload(client)) != RESP_STATUS_CONTINUE) {
                 // we didn't had enough information or data was invalid (malformed request)
@@ -775,31 +778,31 @@ go_again:
         // with argc, we know all arguments was parsed correctly
         // we can do real work with this request
         if(request->fillin == request->argc) {
-            pdebug("[+] redis: request completed, executing\n");
+            pzdbd_debug("[+] redis: request completed, executing\n");
             value = redis_handle_resp_finished(client);
         }
     }
 
     // do not keep going on this request/client
     if(value == RESP_STATUS_DISCARD || value == RESP_STATUS_DISCONNECTED) {
-        pdebug("[+] redis: discard or disconnected received\n");
+        pzdbd_debug("[+] redis: discard or disconnected received\n");
         return value;
     }
 
     // specific end of work
     if(value == RESP_STATUS_DONE || value == RESP_STATUS_SHUTDOWN) {
-        pdebug("[+] redis: done or shutdown received\n");
+        pzdbd_debug("[+] redis: done or shutdown received\n");
         return value;
     }
 
     // not suceed, let's try again
     if(value != RESP_STATUS_SUCCESS) {
-        pdebug("[+] redis: parsing didn't suceed, trying again\n");
+        pzdbd_debug("[+] redis: parsing didn't suceed, trying again\n");
         goto go_again;
     }
 
     // success
-    pdebug("[+] redis: socket parsing succeed\n");
+    pzdbd_debug("[+] redis: socket parsing succeed\n");
     return RESP_STATUS_SUCCESS;
 }
 
@@ -807,7 +810,7 @@ void socket_nonblock(int fd) {
     int flags;
 
     if((flags = fcntl(fd, F_GETFL, 0)) < 0)
-        diep("fcntl");
+        zdbd_diep("fcntl");
 
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
@@ -816,13 +819,13 @@ void socket_keepalive(int fd) {
     int optval = 1;
 
     if(setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)) < 0)
-        warnp("setsockopt: keepalive");
+        zdbd_warnp("setsockopt: keepalive");
 }
 
 // allocate a new client for a new file descriptor
 // used to keep session-life information about clients
 redis_client_t *socket_client_new(int fd) {
-    debug("[+] new client (fd: %d)\n", fd);
+    zdbd_debug("[+] new client (fd: %d)\n", fd);
 
     if(fd >= (int) clients.length) {
         redis_client_t **newlist = NULL;
@@ -846,7 +849,7 @@ redis_client_t *socket_client_new(int fd) {
     // not using calloc to ensure everything is set to
     // default value by ourself and nothing is forget
     if(!(client = malloc(sizeof(redis_client_t)))) {
-        warnp("new client malloc");
+        zdbd_warnp("new client malloc");
         return NULL;
     }
 
@@ -870,7 +873,7 @@ redis_client_t *socket_client_new(int fd) {
 
     // allocating single request object
     if(!(client->request = (resp_request_t *) malloc(sizeof(resp_request_t)))) {
-        warnp("new client request malloc");
+        zdbd_warnp("new client request malloc");
         free(client);
         return NULL;
     }
@@ -888,16 +891,16 @@ redis_client_t *socket_client_new(int fd) {
 
     // by default, the default namespace is writable
     // except if protect mode is enabled
-    client->writable = (rootsettings.protect) ? 0 : 1;
+    client->writable = (zdbd_rootsettings.protect) ? 0 : 1;
 
     // set all users admin if no password are set
-    client->admin = (rootsettings.adminpwd) ? 0 : 1;
+    client->admin = (zdbd_rootsettings.adminpwd) ? 0 : 1;
 
     // set client to the list
     clients.list[fd] = client;
 
     // update statistics
-    rootsettings.stats.clients += 1;
+    // zdbd_rootsettings.stats.clients += 1; // FIXME
 
     return client;
 }
@@ -906,11 +909,11 @@ redis_client_t *socket_client_new(int fd) {
 void socket_client_free(int fd) {
     redis_client_t *client = clients.list[fd];
 
-    debug("[+] client: closing (fd: %d)\n", fd);
+    zdbd_debug("[+] client: closing (fd: %d)\n", fd);
 
     #ifndef RELEASE
     double elapsed = difftime(time(NULL), client->connected);
-    debug("[+] client: stayed %.f seconds, %lu commands\n", elapsed, client->commands);
+    zdbd_debug("[+] client: stayed %.f seconds, %lu commands\n", elapsed, client->commands);
     #endif
 
     // closing socket
@@ -938,7 +941,7 @@ int redis_detach_clients(namespace_t *namespace) {
             continue;
 
         if(clients.list[i]->ns == namespace) {
-            debug("[+] redis: client %d: waiting for disconnection\n", clients.list[i]->fd);
+            zdbd_debug("[+] redis: client %d: waiting for disconnection\n", clients.list[i]->fd);
             clients.list[i]->ns = NULL;
         }
     }
@@ -960,7 +963,7 @@ int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
     // this is used for administrative query not made to be
     // replicated
     if(source->request->owner == 0) {
-        debug("[-] redis: mirror: null-owner, not forwarding\n");
+        zdbd_debug("[-] redis: mirror: null-owner, not forwarding\n");
         return 0;
     }
 
@@ -989,7 +992,7 @@ int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
         length += source->request->argv[i]->length + 2;
     }
 
-    debug("[+] redis: mirroring %lu bytes from <%d> to <%d>\n", length, source->fd, target->fd);
+    zdbd_debug("[+] redis: mirroring %lu bytes from <%d> to <%d>\n", length, source->fd, target->fd);
 
     if(!(buffer = malloc(length)))
         return 1;
@@ -1018,7 +1021,7 @@ int redis_mirror_client(redis_client_t *source, redis_client_t *target) {
 
 // set needed flags to enable a client to wait on a command
 void redis_client_set_watcher(redis_client_t *client, command_t *handler, size_t timeoutms) {
-    debug("[+] redis: set watcher: command %s, timeout: %lu ms\n", handler->command, timeoutms);
+    zdbd_debug("[+] redis: set watcher: command %s, timeout: %lu ms\n", handler->command, timeoutms);
 
     // nothing to send to client, he is waiting now
     // we set the command pointer to that client waiting flag
@@ -1068,7 +1071,7 @@ void redis_idle_process() {
 
             uint64_t deltams = timespec_delta_ms(&checking->watchtime, &timecheck);
             if(deltams > checking->watchtimeout) {
-                debug("[+] redis: trigger: client %d waiting timeout\n", checking->fd);
+                zdbd_debug("[+] redis: trigger: client %d waiting timeout\n", checking->fd);
 
                 // not watching anymore
                 redis_client_unset_watcher(checking);
@@ -1121,7 +1124,7 @@ int redis_posthandler_client(redis_client_t *client) {
 
             #ifndef RELEASE
             char *waiting = checking->watching->command;
-            debug("[+] redis: trigger: client %d waits on <%s>, trigger <%s>\n", checking->fd, waiting, matching);
+            zdbd_debug("[+] redis: trigger: client %d waits on <%s>, trigger <%s>\n", checking->fd, waiting, matching);
             #endif
 
             // not watching anymore
@@ -1148,7 +1151,7 @@ static int redis_tcp_listen(char *listenaddr, int port) {
     int fd;
 
     if((hent = gethostbyname(listenaddr)) == NULL)
-        diep("gethostbyname");
+        zdbd_diep("gethostbyname");
 
     memcpy(&addr.sin_addr, hent->h_addr_list[0], hent->h_length);
 
@@ -1156,13 +1159,13 @@ static int redis_tcp_listen(char *listenaddr, int port) {
     addr.sin_port = htons(port);
 
     if((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-        diep("tcp socket");
+        zdbd_diep("tcp socket");
 
     if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
-        diep("tcp setsockopt");
+        zdbd_diep("tcp setsockopt");
 
     if(bind(fd, (struct sockaddr*) &addr, sizeof(addr)) == -1)
-        diep("tcp bind");
+        zdbd_diep("tcp bind");
 
     return fd;
 }
@@ -1173,7 +1176,7 @@ static int redis_unix_listen(char *socketpath) {
     int fd;
 
     if((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
-        diep("unix socket");
+        zdbd_diep("unix socket");
 
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
@@ -1182,7 +1185,7 @@ static int redis_unix_listen(char *socketpath) {
     unlink(socketpath);
 
     if(bind(fd, (struct sockaddr*) &addr, sizeof(addr)) == -1)
-        diep("unix bind");
+        zdbd_diep("unix bind");
 
     return fd;
 }
@@ -1191,31 +1194,31 @@ static void daemonize() {
     pid_t pid = fork();
 
     if(pid == -1)
-        diep("fork");
+        zdbd_diep("fork");
 
     if(pid != 0) {
-        success("[+] system: forking to background (pid: %d)", pid);
+        zdbd_success("[+] system: forking to background (pid: %d)", pid);
         exit(EXIT_SUCCESS);
     }
 
-    if(rootsettings.logfile) {
-        if(!(freopen(rootsettings.logfile, "w", stdout)))
-            diep(rootsettings.logfile);
+    if(zdbd_rootsettings.logfile) {
+        if(!(freopen(zdbd_rootsettings.logfile, "w", stdout)))
+            zdbd_diep(zdbd_rootsettings.logfile);
 
-        if(!(freopen(rootsettings.logfile, "w", stderr)))
-            diep(rootsettings.logfile);
+        if(!(freopen(zdbd_rootsettings.logfile, "w", stderr)))
+            zdbd_diep(zdbd_rootsettings.logfile);
 
         // reset stdout to line-buffered
         setvbuf(stdout, NULL, _IOLBF, 0);
     }
 
-    verbose("[+] system: working on background now");
+    zdbd_verbose("[+] system: working on background now");
 }
 
 static void redis_listen_hook() {
     hook_t *hook = hook_new("ready", 1);
 
-    hook_append(hook, rootsettings.zdbid);
+    hook_append(hook, zdb_rootsettings.zdbid); // FIXME
 
     hook_execute(hook);
     hook_free(hook);
@@ -1228,7 +1231,7 @@ int redis_listen(char *listenaddr, int port, char *socket) {
     clients.length = REDIS_CLIENTS_INITIAL_LENGTH;
 
     if(!(clients.list = calloc(sizeof(redis_client_t *), clients.length)))
-        diep("clients malloc");
+        zdbd_diep("clients malloc");
 
     if(socket) {
         redis.mainfd = redis_unix_listen(socket);
@@ -1240,15 +1243,15 @@ int redis_listen(char *listenaddr, int port, char *socket) {
     socket_nonblock(redis.mainfd);
 
     if(listen(redis.mainfd, SOMAXCONN) == -1)
-        diep("listen");
+        zdbd_diep("listen");
 
-    success("[+] listening on: %s", rootsettings.zdbid);
+    zdbd_success("[+] listening on: %s", zdb_rootsettings.zdbid); // FIXME
 
-    if(rootsettings.background)
+    if(zdbd_rootsettings.background)
         daemonize();
 
     // notify we are ready
-    if(rootsettings.hook)
+    if(zdb_rootsettings.hook) // FIXME
         redis_listen_hook();
 
     // entering the worker loop

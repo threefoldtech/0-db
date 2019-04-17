@@ -10,35 +10,27 @@
 #include <getopt.h>
 #include <ctype.h>
 #include <time.h>
-#include "zerodb.h"
+#include "libzdb.h"
+#include "zdbd.h"
 #include "index.h"
 #include "data.h"
 #include "namespace.h"
 #include "filesystem.h"
 #include "hook.h"
+#include "redis.h"
 
 //
 // global system settings
 //
-settings_t rootsettings = {
-    .datapath = ZDB_DEFAULT_DATAPATH,
-    .indexpath = ZDB_DEFAULT_INDEXPATH,
-    .listen = ZDB_DEFAULT_LISTENADDR,
-    .port = ZDB_DEFAULT_PORT,
+zdbd_settings_t zdbd_rootsettings = {
+    .listen = ZDBD_DEFAULT_LISTENADDR,
+    .port = ZDBD_DEFAULT_PORT,
     .verbose = 0,
-    .dump = 0,
-    .sync = 0,
-    .synctime = 0,
-    .mode = KEYVALUE,
     .adminpwd = NULL,
     .socket = NULL,
     .background = 0,
     .logfile = NULL,
-    .hook = NULL,
-    .zdbid = NULL,
-    .datasize = ZDB_DEFAULT_DATA_MAXSIZE,
     .protect = 0,
-    .maxsize = 0,
 };
 
 static struct option long_options[] = {
@@ -63,17 +55,10 @@ static struct option long_options[] = {
     {0, 0, 0, 0}
 };
 
-static char *modes[] = {
-    "default key-value",
-    "sequential keys",
-    "direct key position",
-    "direct key fixed block length",
-};
-
 // debug tools
 static char __hex[] = "0123456789abcdef";
 
-void fulldump(void *_data, size_t len) {
+void zdbd_fulldump(void *_data, size_t len) {
     uint8_t *data = _data;
     unsigned int i, j;
 
@@ -105,7 +90,7 @@ void fulldump(void *_data, size_t len) {
     printf("\n");
 }
 
-void hexdump(void *input, size_t length) {
+void zdbd_hexdump(void *input, size_t length) {
     unsigned char *buffer = (unsigned char *) input;
     char *output = calloc((length * 2) + 1, 1);
     char *writer = output;
@@ -119,7 +104,7 @@ void hexdump(void *input, size_t length) {
     free(output);
 }
 
-uint32_t instanceid() {
+static uint32_t instanceid() {
     struct timespec ts;
 
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -132,12 +117,12 @@ uint32_t instanceid() {
 //
 // global warning and fatal message
 //
-void *warnp(char *str) {
+void *zdbd_warnp(char *str) {
     fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
     return NULL;
 }
 
-void verbosep(char *prefix, char *str) {
+void zdbd_verbosep(char *prefix, char *str) {
 #ifdef RELEASE
     // only match on verbose flag if we are
     // in release mode, otherwise do always the
@@ -149,8 +134,8 @@ void verbosep(char *prefix, char *str) {
     fprintf(stderr, "[-] %s: %s: %s\n", prefix, str, strerror(errno));
 }
 
-void diep(char *str) {
-    warnp(str);
+void zdbd_diep(char *str) {
+    zdbd_warnp(str);
     exit(EXIT_FAILURE);
 }
 
@@ -163,7 +148,7 @@ static int signal_intercept(int signal, void (*function)(int)) {
     sig.sa_flags = 0;
 
     if((ret = sigaction(signal, &sig, NULL)) == -1)
-        diep("sigaction");
+        zdbd_diep("sigaction");
 
     return ret;
 }
@@ -185,9 +170,9 @@ static void sighandler(int signal) {
 
             fprintf(stderr, "[-] ----------------------------------");
 
-            if(rootsettings.hook) {
+            if(zdb_rootsettings.hook) { // FIXME
                 hook_t *hook = hook_new("crash", 1);
-                hook_append(hook, rootsettings.zdbid ? rootsettings.zdbid : "unknown-id");
+                hook_append(hook, zdb_rootsettings.zdbid ? zdb_rootsettings.zdbid : "unknown-id"); // FIXME
                 hook_execute(hook);
                 hook_free(hook);
             }
@@ -201,9 +186,9 @@ static void sighandler(int signal) {
         case SIGTERM:
             printf("\n[+] signal: request cleaning\n");
 
-            if(rootsettings.hook) {
+            if(zdb_rootsettings.hook) {
                 hook_t *hook = hook_new("close", 1);
-                hook_append(hook, rootsettings.zdbid ? rootsettings.zdbid : "unknown-id");
+                hook_append(hook, zdb_rootsettings.zdbid ? zdb_rootsettings.zdbid : "unknown-id"); // FIXME
                 hook_execute(hook);
                 hook_free(hook);
             }
@@ -219,25 +204,25 @@ static void sighandler(int signal) {
 static void zdbid_set(char *listenaddr, int port, char *socket) {
     if(socket) {
         // unix socket
-        if(asprintf(&rootsettings.zdbid, "unix://%s", socket) < 0)
-            diep("asprintf");
+        if(asprintf(&zdb_rootsettings.zdbid, "unix://%s", socket) < 0) // FIXME
+            zdbd_diep("asprintf");
 
         return;
     }
 
     // default tcp
-    if(asprintf(&rootsettings.zdbid, "tcp://%s:%d", listenaddr, port) < 0)
-        diep("asprintf");
+    if(asprintf(&zdb_rootsettings.zdbid, "tcp://%s:%d", listenaddr, port) < 0) // FIXME
+        zdbd_diep("asprintf");
 }
 
-static int proceed(struct settings_t *settings) {
-    verbose("[+] system: setting up environments\n");
+static int proceed(zdb_settings_t *zdb_settings, zdbd_settings_t *zdbd_settings) {
+    zdbd_verbose("[+] system: setting up environments\n");
     signal_intercept(SIGSEGV, sighandler);
     signal_intercept(SIGINT, sighandler);
     signal_intercept(SIGTERM, sighandler);
     signal(SIGCHLD, SIG_IGN);
 
-    zdbid_set(settings->listen, settings->port, settings->socket);
+    zdbid_set(zdbd_settings->listen, zdbd_settings->port, zdbd_settings->socket);
 
     // namespace is the root of the whole index/data system
     // anything related to data is always attached to at least
@@ -246,25 +231,23 @@ static int proceed(struct settings_t *settings) {
     //
     // the namespace system will take care about all the loading
     // and the destruction
-    namespaces_init(settings);
+    namespaces_init(zdb_settings);
 
     // apply global protected flag to the default namespace
-    if(settings->protect) {
+    if(zdbd_settings->protect) {
         namespace_t *defns = namespace_get_default();
-        defns->password = strdup(settings->adminpwd);
+        defns->password = strdup(zdbd_settings->adminpwd);
     }
 
     // apply global maximum size for the global namespace
-    if(settings->maxsize) {
+    if(zdb_settings->maxsize) {
         namespace_t *defns = namespace_get_default();
-        defns->maxsize = settings->maxsize;
+        defns->maxsize = zdb_settings->maxsize;
     }
 
-    /*
     // main worker point (if dump not enabled)
-    if(!settings->dump)
-        redis_listen(settings->listen, settings->port, settings->socket);
-    */
+    if(!zdb_settings->dump)
+        redis_listen(zdbd_settings->listen, zdbd_settings->port, zdbd_settings->socket);
 
     // we should not reach this point in production
     // this case is handled when calling explicitly
@@ -275,8 +258,9 @@ static int proceed(struct settings_t *settings) {
     // expected.
     namespaces_destroy();
 
-    free(settings->zdbid);
-    settings->zdbid = NULL;
+    // FIXME
+    free(zdb_settings->zdbid);
+    zdb_settings->zdbid = NULL;
 
     return 0;
 }
@@ -295,8 +279,8 @@ void usage() {
     printf("  --datasize <size>   maximum datafile size before split (default: %.2f MB)\n\n", MB(ZDB_DEFAULT_DATA_MAXSIZE));
 
     printf(" Network options:\n");
-    printf("  --listen <addr>     listen address (default " ZDB_DEFAULT_LISTENADDR ")\n");
-    printf("  --port   <port>     listen port (default %d)\n", ZDB_DEFAULT_PORT);
+    printf("  --listen <addr>     listen address (default " ZDBD_DEFAULT_LISTENADDR ")\n");
+    printf("  --port   <port>     listen port (default %d)\n", ZDBD_DEFAULT_PORT);
     printf("  --socket <path>     unix socket path (override listen and port)\n\n");
 
     printf(" Administrative:\n");
@@ -320,9 +304,12 @@ void usage() {
 // main entry: processing arguments
 //
 int main(int argc, char *argv[]) {
-    notice("[*] Zero-DB (0-db), v" ZDB_VERSION " (commit " REVISION ")");
+    zdbd_notice("[*] Zero-DB (0-db), v" ZDB_VERSION " (commit " REVISION ")");
 
-    settings_t *settings = &rootsettings;
+
+    zdb_settings_t *zdb_settings = &zdb_rootsettings;
+    zdbd_settings_t *zdbd_settings = &zdbd_rootsettings;
+
     int option_index = 0;
 
     while(1) {
@@ -333,91 +320,92 @@ int main(int argc, char *argv[]) {
 
         switch(i) {
             case 'd':
-                settings->datapath = optarg;
+                zdb_settings->datapath = optarg;
                 break;
 
             case 'i':
-                settings->indexpath = optarg;
+                zdb_settings->indexpath = optarg;
                 break;
 
             case 'l':
-                settings->listen = optarg;
+                zdbd_settings->listen = optarg;
                 break;
 
             case 'p':
-                settings->port = atoi(optarg);
+                zdbd_settings->port = atoi(optarg);
                 break;
 
             case 'v':
-                settings->verbose = 1;
-                verbose("[+] system: verbose mode enabled\n");
+                zdb_settings->verbose = 1;
+                zdbd_settings->verbose = 1;
+                zdbd_verbose("[+] system: verbose mode enabled\n");
                 break;
 
             case 'b':
-                settings->background = 1;
-                verbose("[+] system: background fork enabled\n");
+                zdbd_settings->background = 1;
+                zdbd_verbose("[+] system: background fork enabled\n");
                 break;
 
             case 'o':
-                settings->logfile = optarg;
+                zdbd_settings->logfile = optarg;
                 break;
 
             case 'x':
-                settings->dump = 1;
+                zdb_settings->dump = 1;
                 break;
 
             case 's':
-                settings->sync = 1;
+                zdb_settings->sync = 1;
                 break;
 
             case 'k':
-                settings->hook = optarg;
-                debug("[+] system: external hook: %s\n", settings->hook);
+                zdb_settings->hook = optarg;
+                zdbd_debug("[+] system: external hook: %s\n", zdb_settings->hook);
                 break;
 
             case 't':
-                settings->synctime = atoi(optarg);
+                zdb_settings->synctime = atoi(optarg);
                 break;
 
             case 'a':
-                settings->adminpwd = optarg;
-                verbose("[+] system: admin password set\n");
+                zdbd_settings->adminpwd = optarg;
+                zdbd_verbose("[+] system: admin password set\n");
                 break;
 
             case 'P':
-                settings->protect = 1;
-                verbose("[+] system: protected database enabled\n");
+                zdbd_settings->protect = 1;
+                zdbd_verbose("[+] system: protected database enabled\n");
                 break;
 
             case 'M':
-                settings->maxsize = atol(optarg);
-                verbose("[+] system: default namespace maxsize: %.2f MB\n", MB(settings->maxsize));
+                zdb_settings->maxsize = atol(optarg);
+                zdbd_verbose("[+] system: default namespace maxsize: %.2f MB\n", MB(zdb_settings->maxsize));
                 break;
 
             case 'm':
                 if(strcmp(optarg, "user") == 0) {
-                    settings->mode = KEYVALUE;
+                    zdb_settings->mode = KEYVALUE;
 
                 } else if(strcmp(optarg, "seq") == 0) {
-                    settings->mode = SEQUENTIAL;
+                    zdb_settings->mode = SEQUENTIAL;
 
                 } else if(strcmp(optarg, "direct") == 0) {
                     // settings->mode = DIRECTKEY;
-                    settings->mode = SEQUENTIAL;
+                    zdb_settings->mode = SEQUENTIAL;
 
-                    warning("[!] WARNING: direct mode doesn't exists anymore !");
-                    warning("[!] WARNING: this mode is replaced by 'sequential' mode");
-                    warning("[!] WARNING: which works the same way, but offers more");
-                    warning("[!] WARNING: flexibility and performance");
-                    warning("[!] WARNING: ");
-                    warning("[!] WARNING: direct mode will not be supported at all anymore");
-                    warning("[!] WARNING: in futur release");
+                    zdbd_warning("[!] WARNING: direct mode doesn't exists anymore !");
+                    zdbd_warning("[!] WARNING: this mode is replaced by 'sequential' mode");
+                    zdbd_warning("[!] WARNING: which works the same way, but offers more");
+                    zdbd_warning("[!] WARNING: flexibility and performance");
+                    zdbd_warning("[!] WARNING: ");
+                    zdbd_warning("[!] WARNING: direct mode will not be supported at all anymore");
+                    zdbd_warning("[!] WARNING: in futur release");
 
                 } else if(strcmp(optarg, "block") == 0) {
-                    settings->mode = DIRECTBLOCK;
+                    zdb_settings->mode = DIRECTBLOCK;
 
                 } else {
-                    danger("[-] invalid mode '%s'", optarg);
+                    zdbd_danger("[-] invalid mode '%s'", optarg);
                     fprintf(stderr, "[-] mode 'user', 'seq' or 'direct' expected\n");
                     exit(EXIT_FAILURE);
                 }
@@ -425,16 +413,16 @@ int main(int argc, char *argv[]) {
                 break;
 
             case 'u':
-                settings->socket = optarg;
+                zdbd_settings->socket = optarg;
                 break;
 
             case 'D':
-                settings->datasize = atol(optarg);
+                zdb_settings->datasize = atol(optarg);
                 size_t maxsize = 0xffffffff;
 
                 // maximum 4 GB (32 bits) allowed
-                if(settings->datasize >= maxsize) {
-                    danger("[-] datasize cannot be larger than %lu bytes (%.0f MB)", maxsize, MB(maxsize));
+                if(zdb_settings->datasize >= maxsize) {
+                    zdbd_danger("[-] datasize cannot be larger than %lu bytes (%.0f MB)", maxsize, MB(maxsize));
                     exit(EXIT_FAILURE);
                 }
 
@@ -449,47 +437,47 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if(settings->protect && !settings->adminpwd) {
-        danger("[-] protected mode only works with admin password");
+    if(zdbd_settings->protect && !zdbd_settings->adminpwd) {
+        zdbd_danger("[-] protected mode only works with admin password");
         exit(EXIT_FAILURE);
     }
 
     //
     // print information relative to database instance
     //
-    printf("[+] system: running mode: " COLOR_GREEN "%s" COLOR_RESET "\n", modes[settings->mode]);
+    printf("[+] system: running mode: " COLOR_GREEN "%s" COLOR_RESET "\n", zdb_modes[zdb_settings->mode]);
 
     // max files is limited by type length of dataid, which is uint16 by default
     // taking field size in bytes, multiplied by 8 for bits
     size_t maxfiles = 1 << sizeof(((data_root_t *) 0)->dataid) * 8;
 
     // max database size is maximum datafile size multiplied by amount of files
-    uint64_t maxsize = maxfiles * settings->datasize;
+    uint64_t maxsize = maxfiles * zdb_settings->datasize;
 
-    verbose("[+] system: maximum namespace size: %.2f GB\n", GB(maxsize));
+    zdbd_verbose("[+] system: maximum namespace size: %.2f GB\n", GB(maxsize));
 
     //
     // ensure default directories
     // for a fresh start if this is a new instance
     //
-    if(!dir_exists(settings->datapath)) {
-        verbose("[+] system: creating datapath: %s\n", settings->datapath);
-        dir_create(settings->datapath);
+    if(!dir_exists(zdb_settings->datapath)) {
+        zdbd_verbose("[+] system: creating datapath: %s\n", zdb_settings->datapath);
+        dir_create(zdb_settings->datapath);
     }
 
-    if(!dir_exists(settings->indexpath)) {
-        verbose("[+] system: creating indexpath: %s\n", settings->indexpath);
-        dir_create(settings->indexpath);
+    if(!dir_exists(zdb_settings->indexpath)) {
+        zdbd_verbose("[+] system: creating indexpath: %s\n", zdb_settings->indexpath);
+        dir_create(zdb_settings->indexpath);
     }
 
-    // generating instance id
-    settings->iid = instanceid();
-    verbose("[+] system: instance id: %u\n", settings->iid);
+    // generating instance id // FIXME
+    // zdb_settings->iid = instanceid();
+    // zdbd_verbose("[+] system: instance id: %u\n", settings->iid);
 
-    // initialize statistics
-    memset(&settings->stats, 0x00, sizeof(zstats_t));
-    settings->stats.boottime = time(NULL);
+    // initialize statistics // FIXME
+    memset(&zdb_settings->stats, 0x00, sizeof(zdb_stats_t));
+    zdb_settings->stats.boottime = time(NULL); // FIXME
 
     // let's go
-    return proceed(settings);
+    return proceed(zdb_settings, zdbd_settings);
 }

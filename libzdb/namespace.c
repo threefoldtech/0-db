@@ -294,11 +294,11 @@ static namespace_t *namespace_push(ns_root_t *root, namespace_t *namespace) {
 }
 
 static void namespace_create_hook(namespace_t *namespace) {
-    if(!rootsettings.hook)
+    if(!zdb_rootsettings.hook)
         return;
 
     hook_t *hook = hook_new("namespace-created", 2);
-    hook_append(hook, rootsettings.zdbid ? rootsettings.zdbid : "unknown-id");
+    hook_append(hook, zdb_rootsettings.zdbid ? zdb_rootsettings.zdbid : "unknown-id");
     hook_append(hook, namespace->name);
     hook_execute(hook);
     hook_free(hook);
@@ -505,11 +505,11 @@ static void namespace_kick_slot(namespace_t *namespace) {
 
 // trigger hook when namespace is reloaded
 static void namespace_reload_hook(namespace_t *namespace) {
-    if(!rootsettings.hook)
+    if(!zdb_rootsettings.hook)
         return;
 
     hook_t *hook = hook_new("namespace-reloaded", 2);
-    hook_append(hook, rootsettings.zdbid ? rootsettings.zdbid : "unknown-id");
+    hook_append(hook, zdb_rootsettings.zdbid ? zdb_rootsettings.zdbid : "unknown-id");
     hook_append(hook, namespace->name);
     hook_execute(hook);
     hook_free(hook);
@@ -566,11 +566,11 @@ int namespace_flush(namespace_t *namespace) {
 
 
 static void namespace_delete_hook(namespace_t *namespace) {
-    if(!rootsettings.hook)
+    if(!zdb_rootsettings.hook)
         return;
 
     hook_t *hook = hook_new("namespace-deleted", 2);
-    hook_append(hook, rootsettings.zdbid ? rootsettings.zdbid : "unknown-id");
+    hook_append(hook, zdb_rootsettings.zdbid ? zdb_rootsettings.zdbid : "unknown-id");
     hook_append(hook, namespace->name);
     hook_execute(hook);
     hook_free(hook);

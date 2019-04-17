@@ -7,7 +7,8 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include <time.h>
-#include "zerodb.h"
+#include "libzdb.h"
+#include "zdbd.h"
 #include "index.h"
 #include "index_get.h"
 #include "index_set.h"
@@ -49,7 +50,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
     // setting the timestamp
     time_t timestamp = timestamp_from_set(request);
 
-    debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
+    zdbd_debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
     // printf("[+] set key: %.*s\n", idlength, id);
     // printf("[+] set value: %.*s\n", request->argv[2]->length, (char *) request->argv[2]->buffer);
 
@@ -65,7 +66,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
 
     // checking if we need to update this entry of if data are unchanged
     if(existing && existing->crc == dreq.crc) {
-        debug("[+] command: set: existing %08x <> %08x crc match, ignoring\n", existing->crc, dreq.crc);
+        zdbd_debug("[+] command: set: existing %08x <> %08x crc match, ignoring\n", existing->crc, dreq.crc);
         redis_hardsend(client, "$-1");
         return 0;
     }
@@ -82,11 +83,11 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
         return 0;
     }
 
-    debug("[+] command: set: userkey: ");
-    debughex(id, idlength);
-    debug("\n");
+    zdbd_debug("[+] command: set: userkey: ");
+    zdbd_debughex(id, idlength);
+    zdbd_debug("\n");
 
-    debug("[+] command: set: offset: %lu\n", offset);
+    zdbd_debug("[+] command: set: offset: %lu\n", offset);
 
     index_entry_t idxreq = {
         .idlength = idlength,
@@ -154,7 +155,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
     // setting the timestamp
     time_t timestamp = timestamp_from_set(request);
 
-    debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
+    zdbd_debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
 
     data_request_t dreq = {
         .data = value,
@@ -168,7 +169,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
 
     // checking if we need to update this entry of if data are unchanged
     if(existing && existing->crc == dreq.crc) {
-        debug("[+] command: set: existing %08x <> %08x crc match, ignoring\n", existing->crc, dreq.crc);
+        zdbd_debug("[+] command: set: existing %08x <> %08x crc match, ignoring\n", existing->crc, dreq.crc);
         redis_hardsend(client, "$-1");
         return 0;
     }
@@ -186,11 +187,11 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
         return 0;
     }
 
-    debug("[+] command: set: sequential-key: ");
-    debughex(&id, idlength);
-    debug("\n");
+    zdbd_debug("[+] command: set: sequential-key: ");
+    zdbd_debughex(&id, idlength);
+    zdbd_debug("\n");
 
-    debug("[+] command: set: offset: %lu\n", offset);
+    zdbd_debug("[+] command: set: offset: %lu\n", offset);
 
     index_entry_t idxreq = {
         .idlength = idlength,
@@ -258,7 +259,7 @@ int command_set(redis_client_t *client) {
     }
 
     if(!client->writable) {
-        debug("[-] command: set: denied, read-only namespace\n");
+        zdbd_debug("[-] command: set: denied, read-only namespace\n");
         redis_hardsend(client, "-Namespace is in read-only mode");
         return 1;
     }
@@ -298,12 +299,12 @@ int command_set(redis_client_t *client) {
     //
     // if we do this after adding data, we could have an empty data file
     // which will fake the 'previous' offset when computing it on reload
-    if(data_next_offset(client->ns->data) + request->argv[2]->length > rootsettings.datasize) {
+    if(data_next_offset(client->ns->data) + request->argv[2]->length > zdb_rootsettings.datasize) { // FIXME
         size_t newid = index_jump_next(client->ns->index);
         data_jump_next(client->ns->data, newid);
     }
 
-    size_t offset = redis_set_handlers[rootsettings.mode](client, entry);
+    size_t offset = redis_set_handlers[zdb_rootsettings.mode](client, entry);
     if(offset == 0)
         return 0;
 

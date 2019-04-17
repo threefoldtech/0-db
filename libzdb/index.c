@@ -75,7 +75,7 @@ int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
 
     if((response = write(fd, buffer, length)) < 0) {
         // update statistics
-        rootsettings.stats.idxwritefailed += 1;
+        zdb_rootsettings.stats.idxwritefailed += 1;
 
         zdb_warnp("index write");
         return 0;
@@ -87,7 +87,7 @@ int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
     }
 
     // update statistics
-    rootsettings.stats.idxdiskwrite += length;
+    zdb_rootsettings.stats.idxdiskwrite += length;
 
     // flush disk if needed
     index_sync_check(root, fd);
@@ -100,7 +100,7 @@ static int index_read(int fd, void *buffer, size_t length) {
 
     if((response = read(fd, buffer, length)) < 0) {
         // update statistics
-        rootsettings.stats.idxreadfailed += 1;
+        zdb_rootsettings.stats.idxreadfailed += 1;
 
         zdb_warnp("index read");
         return 0;
@@ -117,7 +117,7 @@ static int index_read(int fd, void *buffer, size_t length) {
     }
 
     // update statistics
-    rootsettings.stats.idxdiskread += length;
+    zdb_rootsettings.stats.idxdiskread += length;
 
     return 1;
 }
@@ -218,9 +218,9 @@ size_t index_jump_next(index_root_t *root) {
 
     zdb_verbose("[+] index: jumping to the next file\n");
 
-    if(rootsettings.hook) {
+    if(zdb_rootsettings.hook) {
         hook = hook_new("jump", 4);
-        hook_append(hook, rootsettings.zdbid);
+        hook_append(hook, zdb_rootsettings.zdbid);
         hook_append(hook, root->indexfile);
     }
 
@@ -240,7 +240,7 @@ size_t index_jump_next(index_root_t *root) {
     index_open_final(root);
     index_initialize(root->indexfd, root->indexid, root);
 
-    if(rootsettings.hook) {
+    if(zdb_rootsettings.hook) {
         hook_append(hook, root->indexfile);
         hook_execute(hook);
         hook_free(hook);

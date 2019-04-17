@@ -7,7 +7,8 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include <time.h>
-#include "zerodb.h"
+#include "libzdb.h"
+#include "zdbd.h"
 #include "index.h"
 #include "data.h"
 #include "namespace.h"
@@ -49,7 +50,7 @@ int command_auth(redis_client_t *client) {
     if(!command_args_validate(client, 2))
         return 1;
 
-    if(!rootsettings.adminpwd) {
+    if(!zdbd_rootsettings.adminpwd) { // FIXME
         redis_hardsend(client, "-Authentification disabled");
         return 0;
     }
@@ -62,7 +63,7 @@ int command_auth(redis_client_t *client) {
     char password[192];
     sprintf(password, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
 
-    if(strcmp(password, rootsettings.adminpwd) == 0) {
+    if(strcmp(password, zdbd_rootsettings.adminpwd) == 0) { // FIXME
         client->admin = 1;
         redis_hardsend(client, "+OK");
         return 0;
@@ -90,12 +91,12 @@ int command_stop(redis_client_t *client) {
 
 int command_info(redis_client_t *client) {
     char info[4096];
-    zstats_t *stats = &rootsettings.stats;
+    zdb_stats_t *stats = &zdb_rootsettings.stats;
 
     sprintf(info, "# server\n");
     sprintf(info + strlen(info), "server_name: 0-db (zdb)\n");
     sprintf(info + strlen(info), "server_revision: " REVISION "\n");
-    sprintf(info + strlen(info), "instance_id: %u\n", rootsettings.iid);
+    sprintf(info + strlen(info), "instance_id: %u\n", zdb_rootsettings.iid); // FIXME
     sprintf(info + strlen(info), "boot_time: %ld\n", stats->boottime);
     sprintf(info + strlen(info), "uptime: %ld\n", time(NULL) - stats->boottime);
 

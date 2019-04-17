@@ -6,7 +6,8 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <inttypes.h>
-#include "zerodb.h"
+#include "libzdb.h"
+#include "zdbd.h"
 #include "index.h"
 #include "index_get.h"
 #include "index_scan.h"
@@ -61,7 +62,7 @@ static int history_send_array(redis_client_t *client, history_response_t *histor
     // computing the full length expected
     size_t fullsize = history->payload.length + 256;
     if(!(response = malloc(fullsize))) {
-        warnp("history send array: malloc");
+        zdbd_warnp("history send array: malloc");
         redis_hardsend(client, "-Internal Error");
         return 1;
     }
@@ -121,7 +122,7 @@ int history_send(redis_client_t *client, index_item_t *item, index_ekey_t *ekey)
     response.timestamp = item->timestamp;
     response.ekey = ekey;
 
-    debug("[+] command: history: we got everything needed, sending\n");
+    zdbd_debug("[+] command: history: we got everything needed, sending\n");
     history_send_array(client, &response);
 
     // cleaning allocated here
@@ -161,14 +162,14 @@ int command_history(redis_client_t *client) {
     if(client->request->argc == 2) {
         // grabbing original entry
         if(!(entry = index_get(index, client->request->argv[1]->buffer, client->request->argv[1]->length))) {
-            debug("[-] command: history: key not found\n");
+            zdbd_debug("[-] command: history: key not found\n");
             redis_hardsend(client, "-Key not found");
             return 1;
         }
 
         // checking for deletion
         if(index_entry_is_deleted(entry)) {
-            debug("[-] command: history: key deleted, ignoring\n");
+            zdbd_debug("[-] command: history: key deleted, ignoring\n");
             redis_hardsend(client, "-Key not found");
             return 1;
         }
@@ -187,7 +188,7 @@ int command_history(redis_client_t *client) {
     // and check if this is a legitim request
     if(client->request->argv[2]->length != sizeof(index_ekey_t)) {
         // the requested exact index looks not correct
-        debug("[-] command: history: invalid exact key size\n");
+        zdbd_debug("[-] command: history: invalid exact key size\n");
         redis_hardsend(client, "-Invalid arguments");
         return 1;
     }
@@ -201,19 +202,19 @@ int command_history(redis_client_t *client) {
     memcpy(&ekey, userekey, sizeof(index_ekey_t));
 
     if(ekey.indexid == 0 && ekey.offset == 0) {
-        debug("[-] command: history: exact key is null, nothing more to do\n");
+        zdbd_debug("[-] command: history: exact key is null, nothing more to do\n");
         redis_hardsend(client, "-No more history");
         return 1;
     }
 
     if(!(item = index_item_get_disk(index, ekey.indexid, ekey.offset, idlength))) {
-        debug("[-] command: history: cannot read index entry requested\n");
+        zdbd_debug("[-] command: history: cannot read index entry requested\n");
         redis_hardsend(client, "-Invalid arguments (index query)");
         return 1;
     }
 
     if(memcmp(userkey, item->id, idlength)) {
-        debug("[-] command: history: key mismatch from user and index, denied\n");
+        zdbd_debug("[-] command: history: key mismatch from user and index, denied\n");
         free(item);
         redis_hardsend(client, "-Invalid arguments (invalid key)");
         return 1;

@@ -10,7 +10,8 @@
 #ifdef __APPLE__
 
 #include <sys/event.h>
-#include "zerodb.h"
+#include "libzdb.h"
+#include "zdbd.h"
 #include "index.h"
 #include "data.h"
 #include "namespace.h"
@@ -30,7 +31,7 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
             EV_SET(&evset, ev->ident, EVFILT_READ, EV_DELETE, 0, 0, NULL);
 
             if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1)
-                diep("kevent");
+                zdbd_diep("kevent");
 
             socket_client_free(ev->ident);
             continue;
@@ -39,7 +40,7 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
             int clientfd;
 
             if((clientfd = accept(redis->mainfd, NULL, NULL)) == -1) {
-                warnp("accept");
+                zdbd_warnp("accept");
                 continue;
             }
 
@@ -47,18 +48,18 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
             socket_keepalive(clientfd);
             socket_client_new(clientfd);
 
-            verbose("[+] incoming connection (socket %d)\n", clientfd);
+            zdbd_verbose("[+] incoming connection (socket %d)\n", clientfd);
 
 
             EV_SET(&evset, clientfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
             if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1) {
-                warnp("kevent: filter read");
+                zdbd_warnp("kevent: filter read");
                 continue;
             }
 
             EV_SET(&evset, clientfd, EVFILT_WRITE, EV_ADD | EV_ONESHOT, 0, 0, NULL);
             if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1) {
-                warnp("kevent: filter write");
+                zdbd_warnp("kevent: filter write");
                 continue;
             }
 
@@ -102,10 +103,10 @@ int socket_handler(redis_handler_t *handler) {
     EV_SET(&evset, handler->mainfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
 
     if((handler->evfd = kqueue()) < 0)
-        diep("kqueue");
+        zdbd_diep("kqueue");
 
     if(kevent(handler->evfd, &evset, 1, NULL, 0, NULL) == -1)
-        diep("kevent");
+        zdbd_diep("kevent");
 
     // waiting for clients
     // this is how we supports multi-client using a single thread

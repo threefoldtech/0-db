@@ -7,7 +7,8 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include <sys/statvfs.h>
-#include "zerodb.h"
+#include "libzdb.h"
+#include "zdbd.h"
 #include "index.h"
 #include "data.h"
 #include "namespace.h"
@@ -35,14 +36,14 @@ int command_nsnew(redis_client_t *client) {
     sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
 
     if(!namespace_valid_name(target)) {
-        debug("[-] command: nsnew: namespace name doesn't fit critera\n");
+        zdbd_debug("[-] command: nsnew: namespace name doesn't fit critera\n");
         redis_hardsend(client, "-This name is not allowed");
         return 1;
     }
 
     // deny already existing namespace
     if(namespace_get(target)) {
-        debug("[-] command: nsnew: namespace already exists\n");
+        zdbd_debug("[-] command: nsnew: namespace already exists\n");
         redis_hardsend(client, "-This namespace is not available");
         return 1;
     }
@@ -81,20 +82,20 @@ int command_nsdel(redis_client_t *client) {
     sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
 
     if(strcmp(target, NAMESPACE_DEFAULT) == 0) {
-        debug("[-] command: nsdel: trying to remove default namespace\n");
+        zdbd_debug("[-] command: nsdel: trying to remove default namespace\n");
         redis_hardsend(client, "-Cannot remove default namespace");
         return 1;
     }
 
     // deny not existing namespace
     if(!(namespace = namespace_get(target))) {
-        debug("[-] command: nsdel: namespace not found\n");
+        zdbd_debug("[-] command: nsdel: namespace not found\n");
         redis_hardsend(client, "-This namespace doesn't exists");
         return 1;
     }
 
     if(client->ns == namespace) {
-        debug("[-] command: nsdel: trying to remove currently used namespace\n");
+        zdbd_debug("[-] command: nsdel: trying to remove currently used namespace\n");
         redis_hardsend(client, "-Cannot remove namespace you're currently using.");
         return 1;
     }
@@ -133,7 +134,7 @@ int command_select(redis_client_t *client) {
 
     // checking for existing namespace
     if(!(namespace = namespace_get(target))) {
-        debug("[-] command: select: namespace not found\n");
+        zdbd_debug("[-] command: select: namespace not found\n");
         redis_hardsend(client, "-Namespace not found");
         return 1;
     }
@@ -148,14 +149,14 @@ int command_select(redis_client_t *client) {
             // if the namespace allows public access, we authorize it
             // but in read-only mode
             if(!namespace->public) {
-                debug("[-] command: select: namespace not public and password not provided\n");
+                zdbd_debug("[-] command: select: namespace not public and password not provided\n");
                 redis_hardsend(client, "-Namespace protected and private");
                 return 1;
             }
 
             // namespace is public, which means we are
             // in a read-only mode now
-            debug("[-] command: select: protected namespace, no password set, setting read-only\n");
+            zdbd_debug("[-] command: select: protected namespace, no password set, setting read-only\n");
             writable = 0;
 
         } else {
@@ -176,7 +177,7 @@ int command_select(redis_client_t *client) {
                 return 1;
             }
 
-            debug("[-] command: select: protected and password match, access granted\n");
+            zdbd_debug("[-] command: select: protected and password match, access granted\n");
 
             // password provided and match
         }
@@ -185,7 +186,7 @@ int command_select(redis_client_t *client) {
     }
 
     // switching client's active namespace
-    debug("[+] command: select: moving user to namespace '%s'\n", namespace->name);
+    zdbd_debug("[+] command: select: moving user to namespace '%s'\n", namespace->name);
     client->ns = namespace;
     client->writable = writable;
 
@@ -205,7 +206,7 @@ int command_nslist(redis_client_t *client) {
     sprintf(line, "*%lu\r\n", namespace_length());
     redis_reply_stack(client, line, strlen(line));
 
-    debug("[+] command: nslist: sending %lu items\n", namespace_length());
+    zdbd_debug("[+] command: nslist: sending %lu items\n", namespace_length());
 
     // sending each namespace line by line**
     for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
@@ -237,7 +238,7 @@ int command_nsinfo(redis_client_t *client) {
 
     // checking for existing namespace
     if(!(namespace = namespace_get(target))) {
-        debug("[-] command: nsinfo: namespace not found\n");
+        zdbd_debug("[-] command: nsinfo: namespace not found\n");
         redis_hardsend(client, "-Namespace not found");
         return 1;
     }
@@ -266,7 +267,7 @@ int command_nsinfo(redis_client_t *client) {
         sprintf(info + strlen(info), "index_disk_freespace_mb: %.2f\n", MB(sfree));
 
     } else {
-        warnp(namespace->indexpath);
+        zdbd_warnp(namespace->indexpath);
     }
 
     // data path
@@ -277,7 +278,7 @@ int command_nsinfo(redis_client_t *client) {
         sprintf(info + strlen(info), "data_disk_freespace_mb: %.2f\n", MB(sfree));
 
     } else {
-        warnp(namespace->datapath);
+        zdbd_warnp(namespace->datapath);
     }
 
 
@@ -347,7 +348,7 @@ int command_nsset(redis_client_t *client) {
 
     // checking for existing namespace
     if(!(namespace = namespace_get(target))) {
-        debug("[-] command: nsset: namespace not found\n");
+        zdbd_debug("[-] command: nsset: namespace not found\n");
         redis_hardsend(client, "-Namespace not found");
         return 1;
     }
@@ -357,7 +358,7 @@ int command_nsset(redis_client_t *client) {
     //
     if(strcmp(command, "maxsize") == 0) {
         namespace->maxsize = atoll(value);
-        debug("[+] command: nsset: new size limit: %lu\n", namespace->maxsize);
+        zdbd_debug("[+] command: nsset: new size limit: %lu\n", namespace->maxsize);
 
     } else if(strcmp(command, "password") == 0) {
         // clearing password using "*" password
@@ -365,21 +366,21 @@ int command_nsset(redis_client_t *client) {
             free(namespace->password);
             namespace->password = NULL;
 
-            debug("[+] command: nsset: password cleared\n");
+            zdbd_debug("[+] command: nsset: password cleared\n");
 
             // updating password
         } else {
             namespace->password = strdup(value);
-            debug("[+] command: nsset: password set and updated\n");
+            zdbd_debug("[+] command: nsset: password set and updated\n");
         }
 
 
     } else if(strcmp(command, "public") == 0) {
         namespace->public = (value[0] == '1') ? 1 : 0;
-        debug("[+] command: nsset: changing public view to: %d\n", namespace->public);
+        zdbd_debug("[+] command: nsset: changing public view to: %d\n", namespace->public);
 
     } else {
-        debug("[-] command: nsset: unknown property '%s'\n", command);
+        zdbd_debug("[-] command: nsset: unknown property '%s'\n", command);
         redis_hardsend(client, "-Invalid property");
         return 1;
     }
@@ -424,7 +425,7 @@ int command_reload(redis_client_t *client) {
 
     // checking for existing namespace
     if(!(namespace = namespace_get(target))) {
-        debug("[-] command: nsset: namespace not found\n");
+        zdbd_debug("[-] command: nsset: namespace not found\n");
         redis_hardsend(client, "-Namespace not found");
         return 1;
     }

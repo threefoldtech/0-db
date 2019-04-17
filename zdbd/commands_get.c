@@ -7,7 +7,8 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include "index.h"
-#include "zerodb.h"
+#include "libzdb.h"
+#include "zdbd.h"
 #include "index_seq.h"
 #include "index_get.h"
 #include "data.h"
@@ -23,28 +24,28 @@ int command_get(redis_client_t *client) {
         return 1;
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
-        debug("[-] command: get: invalid key size (too big)\n");
+        zdbd_debug("[-] command: get: invalid key size (too big)\n");
         redis_hardsend(client, "-Invalid key");
         return 1;
     }
 
     // fetching index entry for this key
     if(!(entry = index_get(client->ns->index, request->argv[1]->buffer, request->argv[1]->length))) {
-        debug("[-] command: get: key not found\n");
+        zdbd_debug("[-] command: get: key not found\n");
         redis_hardsend(client, "$-1");
         return 1;
     }
 
     // key found but deleted
     if(entry->flags & INDEX_ENTRY_DELETED) {
-        verbose("[-] command: get: key deleted\n");
+        zdbd_verbose("[-] command: get: key deleted\n");
         redis_hardsend(client, "$-1");
         return 1;
     }
 
     // key found and valid, let's checking the contents
-    debug("[+] command: get: entry found, flags: %x, data length: %" PRIu32 "\n", entry->flags, entry->length);
-    debug("[+] command: get: data file: %d, data offset: %" PRIu32 "\n", entry->dataid, entry->offset);
+    zdbd_debug("[+] command: get: entry found, flags: %x, data length: %" PRIu32 "\n", entry->flags, entry->length);
+    zdbd_debug("[+] command: get: data file: %d, data offset: %" PRIu32 "\n", entry->dataid, entry->offset);
 
     data_root_t *data = client->ns->data;
     data_payload_t payload = data_get(data, entry->offset, entry->length, entry->dataid, entry->idlength);
