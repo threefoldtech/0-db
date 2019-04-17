@@ -11,13 +11,7 @@
 #include <limits.h>
 #include <errno.h>
 #include "libzdb.h"
-#include "filesystem.h"
-#include "index.h"
-#include "index_seq.h"
-#include "index_loader.h"
-#include "index_branch.h"
-#include "index_set.h"
-#include "data.h"
+#include "libzdb_private.h"
 
 //
 // index initializer and dumper

@@ -9,11 +9,6 @@
 #include <time.h>
 #include "libzdb.h"
 #include "zdbd.h"
-#include "index.h"
-#include "index_get.h"
-#include "index_set.h"
-#include "data.h"
-#include "namespace.h"
 #include "redis.h"
 #include "commands.h"
 #include "commands_get.h"

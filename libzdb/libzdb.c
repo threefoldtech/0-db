@@ -11,8 +11,7 @@
 #include <ctype.h>
 #include <time.h>
 #include "libzdb.h"
-#include "index.h"
-#include "data.h"
+#include "libzdb_private.h"
 
 //
 // global system settings

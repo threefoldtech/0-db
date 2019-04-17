@@ -12,11 +12,6 @@
 #include <time.h>
 #include "libzdb.h"
 #include "zdbd.h"
-#include "index.h"
-#include "data.h"
-#include "namespace.h"
-#include "filesystem.h"
-#include "hook.h"
 #include "redis.h"
 
 //

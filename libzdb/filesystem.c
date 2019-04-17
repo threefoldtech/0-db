@@ -13,8 +13,8 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <ftw.h>
-#include "filesystem.h"
 #include "libzdb.h"
+#include "libzdb_private.h"
 
 //
 // system directory management

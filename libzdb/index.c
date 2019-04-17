@@ -11,12 +11,7 @@
 #include <limits.h>
 #include <x86intrin.h>
 #include "libzdb.h"
-#include "index.h"
-#include "index_loader.h"
-#include "index_seq.h"
-#include "index_branch.h"
-#include "data.h"
-#include "hook.h"
+#include "libzdb_private.h"
 
 // NOTE: there is no more a global variable for the index
 //       since each namespace have their own index, now

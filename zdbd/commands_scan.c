@@ -8,12 +8,6 @@
 #include <inttypes.h>
 #include "libzdb.h"
 #include "zdbd.h"
-#include "index.h"
-#include "index_scan.h"
-#include "index_get.h"
-#include "index_branch.h"
-#include "data.h"
-#include "namespace.h"
 #include "redis.h"
 #include "commands.h"
 #include "commands_scan.h"

@@ -4,8 +4,7 @@
 #include <inttypes.h>
 #include <time.h>
 #include "libzdb.h"
-#include "index.h"
-#include "index_seq.h"
+#include "libzdb_private.h"
 
 // perform a binary search on the seqmap to get
 // the fileid back based on the index mapped with fileid

@@ -8,12 +8,7 @@
 #include <inttypes.h>
 #include <time.h>
 #include "libzdb.h"
-#include "index.h"
-#include "index_branch.h"
-#include "index_loader.h"
-#include "index_seq.h"
-#include "index_set.h"
-#include "index_get.h"
+#include "libzdb_private.h"
 
 //
 // in memory and on disk index representation

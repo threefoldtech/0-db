@@ -4,8 +4,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include "libzdb.h"
-#include "index.h"
-#include "index_branch.h"
+#include "libzdb_private.h"
 
 // maximum allowed branch in memory
 //

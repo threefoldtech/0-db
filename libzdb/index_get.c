@@ -7,9 +7,7 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include "libzdb.h"
-#include "index.h"
-#include "index_seq.h"
-#include "index_get.h"
+#include "libzdb_private.h"
 
 static index_entry_t *index_get_handler_memkey(index_root_t *index, void *id, uint8_t idlength) {
     return index_entry_get(index, id, idlength);

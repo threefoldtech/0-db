@@ -8,9 +8,6 @@
 #include <inttypes.h>
 #include "libzdb.h"
 #include "zdbd.h"
-#include "index.h"
-#include "data.h"
-#include "namespace.h"
 #include "redis.h"
 #include "commands.h"
 #include "commands_replicate.h"

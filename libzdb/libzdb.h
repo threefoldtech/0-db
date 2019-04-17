@@ -110,8 +110,7 @@
 
     } zdb_settings_t;
 
-    void zdb_hexdump(void *buffer, size_t length);
-    void zdb_fulldump(void *data, size_t len);
+    extern zdb_settings_t zdb_rootsettings;
 
     #define COLOR_RED    "\033[31;1m"
     #define COLOR_YELLOW "\033[33;1m"
@@ -119,30 +118,22 @@
     #define COLOR_CYAN   "\033[36;1m"
     #define COLOR_RESET  "\033[0m"
 
-    #define zdb_danger(fmt, ...)  { printf(COLOR_RED    fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define zdb_warning(fmt, ...) { printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define zdb_success(fmt, ...) { printf(COLOR_GREEN  fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define zdb_notice(fmt, ...)  { printf(COLOR_CYAN   fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-
     #define KB(x)   (x / (1024.0))
     #define MB(x)   (x / (1024 * 1024.0))
     #define GB(x)   (x / (1024 * 1024 * 1024.0))
     #define TB(x)   (x / (1024 * 1024 * 1024 * 1024.0))
 
-    #ifndef RELEASE
-        #define zdb_verbose(...) { printf(__VA_ARGS__); }
-        #define zdb_debug(...) { printf(__VA_ARGS__); }
-        #define zdb_debughex(...) { zdb_hexdump(__VA_ARGS__); }
-    #else
-        #define zdb_verbose(...) { if(zdb_rootsettings.verbose) { printf(__VA_ARGS__); } }
-        #define zdb_debug(...) ((void)0)
-        #define zdb_debughex(...) ((void)0)
-    #endif
-
-    extern zdb_settings_t zdb_rootsettings;
     extern char *zdb_modes[];
 
-    void zdb_diep(char *str);
-    void *zdb_warnp(char *str);
-    void zdb_verbosep(char *prefix, char *str);
+    #include "data.h"
+    #include "filesystem.h"
+    #include "hook.h"
+    #include "index.h"
+    #include "index_branch.h"
+    #include "index_get.h"
+    #include "index_loader.h"
+    #include "index_scan.h"
+    #include "index_seq.h"
+    #include "index_set.h"
+    #include "namespace.h"
 #endif

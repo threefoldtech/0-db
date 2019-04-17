@@ -9,10 +9,6 @@
 #include "index.h"
 #include "libzdb.h"
 #include "zdbd.h"
-#include "index_seq.h"
-#include "index_get.h"
-#include "data.h"
-#include "namespace.h"
 #include "redis.h"
 #include "commands.h"
 

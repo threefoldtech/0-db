@@ -12,9 +12,6 @@
 #include <sys/event.h>
 #include "libzdb.h"
 #include "zdbd.h"
-#include "index.h"
-#include "data.h"
-#include "namespace.h"
 #include "redis.h"
 
 #define MAXEVENTS 64

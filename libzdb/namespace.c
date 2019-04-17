@@ -11,13 +11,7 @@
 #include <limits.h>
 #include <time.h>
 #include "libzdb.h"
-#include "index.h"
-#include "index_branch.h"
-#include "index_loader.h"
-#include "data.h"
-#include "namespace.h"
-#include "filesystem.h"
-#include "hook.h"
+#include "libzdb_private.h"
 
 // we keep a list of namespace currently used
 // each namespace used will keep file descriptor opened

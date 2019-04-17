@@ -10,8 +10,7 @@
 #include <time.h>
 #include <limits.h>
 #include "libzdb.h"
-#include "index.h"
-#include "index_scan.h"
+#include "libzdb_private.h"
 
 //
 // walk functions

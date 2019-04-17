@@ -5,7 +5,7 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include "libzdb.h"
-#include "hook.h"
+#include "libzdb_private.h"
 
 
 hook_t *hook_new(char *name, size_t argc) {
