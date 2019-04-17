@@ -40,13 +40,7 @@
     #define ZDB_VERSION     "1.0.0"
 
     typedef struct zdb_stats_t {
-        time_t boottime;          // timestamp when zdb started (used for uptime)
-        uint32_t clients;         // lifetime amount of clients connected
-
-        // commands
-        uint64_t cmdsvalid;       // amount of commands (found) executed
-        uint64_t cmdsfailed;      // amount of commands nof found received
-        uint64_t adminfailed;     // amount of authentication failed
+        time_t inittime;          // timestamp when zdb started (used for uptime)
 
         // index
         uint64_t idxreadfailed;   // amount of index disk read failure
@@ -59,10 +53,6 @@
         uint64_t datawritefailed; // amount of data payload disk write failure
         uint64_t datadiskread;    // amount of data bytes read on disk (except index loader)
         uint64_t datadiskwrite;   // amount of data bytes written on disk (except namespace creation)
-
-        // network
-        uint64_t networkrx;       // amount of bytes received over the network
-        uint64_t networktx;       // amount of bytes transmitted over the network
 
     } zdb_stats_t;
 

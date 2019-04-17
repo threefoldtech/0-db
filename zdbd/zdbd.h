@@ -25,6 +25,21 @@
     //             out of box on a version 2.x.x)
     #define ZDBD_VERSION     "1.0.0"
 
+    typedef struct zdbd_stats_t {
+        time_t boottime;          // timestamp when zdb started (used for uptime)
+        uint32_t clients;         // lifetime amount of clients connected
+
+        // commands
+        uint64_t cmdsvalid;       // amount of commands (found) executed
+        uint64_t cmdsfailed;      // amount of commands nof found received
+        uint64_t adminfailed;     // amount of authentication failed
+
+        // network
+        uint64_t networkrx;       // amount of bytes received over the network
+        uint64_t networktx;       // amount of bytes transmitted over the network
+
+    } zdbd_stats_t;
+
     typedef struct zdbd_settings_t {
         char *listen;     // network listen address
         int port;         // network listen port
@@ -34,6 +49,8 @@
         int background;   // flag to run in background
         char *logfile;    // where to redirect logs in background mode
         int protect;      // flag default namespace to use admin password (for writing)
+
+        zdbd_stats_t stats;
 
     } zdbd_settings_t;
 

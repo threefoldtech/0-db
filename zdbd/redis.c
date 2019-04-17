@@ -187,7 +187,7 @@ redis_response_t *redis_send_response(redis_client_t *client, redis_response_t *
         }
 
         // updating statistics
-        // zdbd_rootsettings.stats.networktx += sent; // FIXME
+        zdbd_rootsettings.stats.networktx += sent;
 
         response->reader += sent;
         response->length -= sent;
@@ -710,7 +710,7 @@ go_again:
     }
 
     // updating statistics
-    // zdbd_rootsettings.stats.networkrx += length; // FIXME
+    zdbd_rootsettings.stats.networkrx += length;
 
     buffer->writer += length;
     buffer->length += length;
@@ -897,7 +897,7 @@ redis_client_t *socket_client_new(int fd) {
     clients.list[fd] = client;
 
     // update statistics
-    // zdbd_rootsettings.stats.clients += 1; // FIXME
+    zdbd_rootsettings.stats.clients += 1;
 
     return client;
 }

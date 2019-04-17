@@ -279,7 +279,6 @@ int main(int argc, char *argv[]) {
     zdbd_notice("[*] 0-db engine, v%s (commit %s)", zdb_version(), zdb_revision());
     zdbd_notice("[*] 0-db server, v" ZDBD_VERSION " (commit " ZDBD_REVISION ")");
 
-
     zdb_settings_t *zdb_settings = zdb_settings_get();
     zdbd_settings_t *zdbd_settings = &zdbd_rootsettings;
 
@@ -449,7 +448,11 @@ int main(int argc, char *argv[]) {
 
     // initialize statistics // FIXME
     memset(&zdb_settings->stats, 0x00, sizeof(zdb_stats_t));
-    zdb_settings->stats.boottime = time(NULL); // FIXME
+    zdb_settings->stats.inittime = time(NULL); // FIXME
+
+    // initialize daemon statistics // FIXME
+    memset(&zdbd_settings->stats, 0x00, sizeof(zdb_stats_t));
+    zdbd_settings->stats.boottime = time(NULL); // FIXME
 
     // let's go
     return proceed(zdb_settings, zdbd_settings);

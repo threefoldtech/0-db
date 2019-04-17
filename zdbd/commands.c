@@ -55,7 +55,7 @@ int command_args_validate(redis_client_t *client, int expected) {
 int command_admin_authorized(redis_client_t *client) {
     if(!client->admin) {
         // update failed statistics
-        // zdb_rootsettings.stats.adminfailed += 1; // FIXME
+        zdbd_rootsettings.stats.adminfailed += 1;
 
         redis_hardsend(client, "-Permission denied");
         return 0;
@@ -141,7 +141,7 @@ int redis_dispatcher(redis_client_t *client) {
             client->executed = &commands_handlers[i];
 
             // update statistics
-            // rootsettings.stats.cmdsvalid += 1; // FIXME
+            zdbd_rootsettings.stats.cmdsvalid += 1;
 
             // execute handler
             return commands_handlers[i].handler(client);
@@ -150,7 +150,7 @@ int redis_dispatcher(redis_client_t *client) {
 
     // unknown command
     printf("[-] command: unsupported redis command\n");
-    // rootsettings.stats.cmdsfailed += 1; // FIXME
+    zdbd_rootsettings.stats.cmdsfailed += 1;
 
     // reset executed flag, this was a non-existing command
     client->executed = NULL;
