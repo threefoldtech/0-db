@@ -1,8 +1,8 @@
 #ifndef __LIBZDB_H
     #define __LIBZDB_H
 
-    #ifndef REVISION
-        #define REVISION "(unknown)"
+    #ifndef ZDB_REVISION
+        #define ZDB_REVISION "(unknown)"
     #endif
 
     #define ZDB_DEFAULT_DATAPATH    "./zdb-data"

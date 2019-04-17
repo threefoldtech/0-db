@@ -8,7 +8,7 @@ LDFLAGS += -rdynamic
 # grab version from git, if possible
 REVISION := $(shell git describe --abbrev=8 --dirty --always --tags)
 ifneq ($(REVISION),)
-	CFLAGS += -DREVISION=\"$(REVISION)\"
+	CFLAGS += -DZDB_REVISION=\"$(REVISION)\"
 endif
 
 ifeq ($(STATIC),1)

@@ -3,6 +3,9 @@
 
     zdb_settings_t *zdb_settings_get();
 
+    char *zdb_version();
+    char *zdb_revision();
+
     char *zdb_running_mode(index_mode_t mode);
 
     char *zdb_id();

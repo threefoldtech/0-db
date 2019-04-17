@@ -62,3 +62,11 @@ uint32_t zdb_instanceid_generate() {
 uint32_t zdb_instanceid_get() {
     return zdb_rootsettings.iid;
 }
+
+char *zdb_version() {
+    return ZDB_VERSION;
+}
+
+char *zdb_revision() {
+    return ZDB_REVISION;
+}

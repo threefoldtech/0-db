@@ -276,7 +276,8 @@ void usage() {
 // main entry: processing arguments
 //
 int main(int argc, char *argv[]) {
-    zdbd_notice("[*] Zero-DB (0-db), v" ZDB_VERSION " (commit " REVISION ")");
+    zdbd_notice("[*] 0-db engine, v%s (commit %s)", zdb_version(), zdb_revision());
+    zdbd_notice("[*] 0-db server, v" ZDBD_VERSION " (commit " ZDBD_REVISION ")");
 
 
     zdb_settings_t *zdb_settings = zdb_settings_get();

@@ -1,8 +1,8 @@
 #ifndef __ZDBD_H
     #define __ZDBD_H
 
-    #ifndef REVISION
-        #define REVISION "(unknown)"
+    #ifndef ZDBD_REVISION
+        #define ZDBD_REVISION "(unknown)"
     #endif
 
     #define ZDBD_DEFAULT_LISTENADDR  "0.0.0.0"
