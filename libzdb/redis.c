@@ -18,7 +18,6 @@
 #include "data.h"
 #include "namespace.h"
 #include "redis.h"
-#include "commands.h"
 #include "hook.h"
 
 // full protocol debug
@@ -653,7 +652,7 @@ static resp_status_t redis_handle_resp_finished(redis_client_t *client) {
     }
 
     debug("[+] redis: request parsed, calling dispatcher\n");
-    value = redis_dispatcher(client);
+    // value = redis_dispatcher(client);
     debug("[+] redis: dispatcher done, return code: %d\n", value);
 
     debug("[+] redis: calling posthandler\n");
@@ -1114,6 +1113,7 @@ int redis_posthandler_client(redis_client_t *client) {
         if(!checking || !checking->watching || checking->ns != client->ns)
             continue;
 
+#if 0
         // matching on the exact command
         // or the wildcard command
         if(checking->watching == client->executed || checking->watching->handler == command_asterisk) {
@@ -1131,6 +1131,7 @@ int redis_posthandler_client(redis_client_t *client) {
             snprintf(response, sizeof(response), "+%s\r\n", matching);
             redis_reply_stack(checking, response, strlen(response));
         }
+#endif
     }
 
     return 0;

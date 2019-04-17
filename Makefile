@@ -1,5 +1,6 @@
 all release:
-	$(MAKE) -C src $@
+	$(MAKE) -C libzdb $@
+	$(MAKE) -C zdbd $@
 	$(MAKE) -C tools $@
 
 	cp -f src/zdb bin/
@@ -9,10 +10,12 @@ all release:
 	cp -f tools/namespace-editor/namespace-editor bin/zdb-namespace-editor
 
 clean:
-	$(MAKE) -C src $@
+	$(MAKE) -C libzdb $@
+	$(MAKE) -C zdbd $@
 	$(MAKE) -C tools $@
 
 mrproper:
-	$(MAKE) -C src $@
+	$(MAKE) -C libzdb $@
+	$(MAKE) -C zdbd $@
 	$(MAKE) -C tools $@
 	$(RM) bin/*
