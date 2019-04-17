@@ -127,7 +127,7 @@ void zdbd_verbosep(char *prefix, char *str) {
     // only match on verbose flag if we are
     // in release mode, otherwise do always the
     // print, we are in debug mode anyway
-    if(!rootsettings.verbose)
+    if(!zdbd_rootsettings.verbose)
         return;
 #endif
 

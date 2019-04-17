@@ -50,7 +50,7 @@
         #define zdbd_debug(...) { printf(__VA_ARGS__); }
         #define zdbd_debughex(...) { zdbd_hexdump(__VA_ARGS__); }
     #else
-        #define zdbd_verbose(...) { if(zdbdrootsettings.verbose) { printf(__VA_ARGS__); } }
+        #define zdbd_verbose(...) { if(zdbd_rootsettings.verbose) { printf(__VA_ARGS__); } }
         #define zdbd_debug(...) ((void)0)
         #define zdbd_debughex(...) ((void)0)
     #endif

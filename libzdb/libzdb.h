@@ -134,7 +134,7 @@
         #define zdb_debug(...) { printf(__VA_ARGS__); }
         #define zdb_debughex(...) { zdb_hexdump(__VA_ARGS__); }
     #else
-        #define zdb_verbose(...) { if(rootsettings.verbose) { printf(__VA_ARGS__); } }
+        #define zdb_verbose(...) { if(zdb_rootsettings.verbose) { printf(__VA_ARGS__); } }
         #define zdb_debug(...) ((void)0)
         #define zdb_debughex(...) ((void)0)
     #endif
