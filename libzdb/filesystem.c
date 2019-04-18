@@ -19,12 +19,12 @@
 //
 // system directory management
 //
-int dir_exists(char *path) {
+int zdb_dir_exists(char *path) {
     struct stat sb;
     return (stat(path, &sb) == 0 && S_ISDIR(sb.st_mode));
 }
 
-int dir_create(char *path) {
+int zdb_dir_create(char *path) {
     char tmp[ZDB_PATH_MAX], *p = NULL;
     size_t len;
 
@@ -58,7 +58,7 @@ static int dir_remove_cb(const char *fpath, const struct stat *sb, int tflag, st
     return tflag;
 }
 
-int dir_remove(char *path) {
+int zdb_dir_remove(char *path) {
     return nftw(path, dir_remove_cb, 64, FTW_DEPTH | FTW_PHYS);
 }
 
@@ -81,6 +81,6 @@ static int dir_clean_cb(const char *fpath, const struct stat *sb, int tflag, str
     return tflag;
 }
 
-int dir_clean_payload(char *path) {
+int zdb_dir_clean_payload(char *path) {
     return nftw(path, dir_clean_cb, 64, FTW_DEPTH | FTW_PHYS);
 }

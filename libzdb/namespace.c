@@ -175,14 +175,14 @@ static char *namespace_path(char *prefix, char *name) {
 
 namespace_t *namespace_ensure(namespace_t *namespace) {
     zdb_debug("[+] namespaces: checking index [%s]\n", namespace->indexpath);
-    if(!dir_exists(namespace->indexpath)) {
-        if(dir_create(namespace->indexpath) < 0)
+    if(!zdb_dir_exists(namespace->indexpath)) {
+        if(zdb_dir_create(namespace->indexpath) < 0)
             return zdb_warnp("index dir_create");
     }
 
     zdb_debug("[+] namespaces: checking data [%s]\n", namespace->datapath);
-    if(!dir_exists(namespace->datapath)) {
-        if(dir_create(namespace->datapath) < 0)
+    if(!zdb_dir_exists(namespace->datapath)) {
+        if(zdb_dir_create(namespace->datapath) < 0)
             return zdb_warnp("data dir_create");
     }
 
@@ -593,10 +593,10 @@ int namespace_delete(namespace_t *namespace) {
 
     // removing files
     zdb_debug("[+] namespace: removing: %s\n", namespace->indexpath);
-    dir_remove(namespace->indexpath);
+    zdb_dir_remove(namespace->indexpath);
 
     zdb_debug("[+] namespace: removing: %s\n", namespace->datapath);
-    dir_remove(namespace->datapath);
+    zdb_dir_remove(namespace->datapath);
 
     // hook notification
     namespace_delete_hook(namespace);

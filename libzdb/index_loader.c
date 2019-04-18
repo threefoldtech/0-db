@@ -509,5 +509,5 @@ void index_destroy_global() {
 
 // delete index files (not the namespace descriptor)
 void index_delete_files(index_root_t *root) {
-    dir_clean_payload(root->indexdir);
+    zdb_dir_clean_payload(root->indexdir);
 }

@@ -211,14 +211,10 @@ static int proceed(zdb_settings_t *zdb_settings, zdbd_settings_t *zdbd_settings)
 
     zdbd_id_set(zdbd_settings->listen, zdbd_settings->port, zdbd_settings->socket);
 
-    // namespace is the root of the whole index/data system
-    // anything related to data is always attached to at least
-    // one namespace (the default) one, and all the others
-    // are based on a fork of namespace
-    //
-    // the namespace system will take care about all the loading
-    // and the destruction
-    namespaces_init(zdb_settings);
+    if(!zdb_open(zdb_settings)) {
+        zdbd_danger("[-] zdb_open: cannot open database");
+        return 1;
+    }
 
     // apply global protected flag to the default namespace
     if(zdbd_settings->protect) {
@@ -243,10 +239,7 @@ static int proceed(zdb_settings_t *zdb_settings, zdbd_settings_t *zdbd_settings)
     // this is useful when profiling to ensure there
     // is no memory leaks, if everything is cleaned as
     // expected.
-    namespaces_destroy();
-
-    // cleaning library allocations
-    zdb_destroy(zdb_settings);
+    zdb_close(zdb_settings);
 
     return 0;
 }
@@ -442,26 +435,12 @@ int main(int argc, char *argv[]) {
 
     zdbd_verbose("[+] system: maximum namespace size: %.2f GB\n", GB(maxsize));
 
-    //
-    // ensure default directories
-    // for a fresh start if this is a new instance
-    //
-    if(!dir_exists(zdb_settings->datapath)) {
-        zdbd_verbose("[+] system: creating datapath: %s\n", zdb_settings->datapath);
-        dir_create(zdb_settings->datapath);
-    }
-
-    if(!dir_exists(zdb_settings->indexpath)) {
-        zdbd_verbose("[+] system: creating indexpath: %s\n", zdb_settings->indexpath);
-        dir_create(zdb_settings->indexpath);
-    }
-
     // dump instance id
     zdbd_verbose("[+] system: instance id: %u\n", zdb_instanceid_get());
 
-    // initialize daemon statistics // FIXME
+    // initialize daemon statistics
     memset(&zdbd_settings->stats, 0x00, sizeof(zdb_stats_t));
-    zdbd_settings->stats.boottime = time(NULL); // FIXME
+    zdbd_settings->stats.boottime = time(NULL);
 
     // let's go
     return proceed(zdb_settings, zdbd_settings);

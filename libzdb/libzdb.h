@@ -123,4 +123,5 @@
     #include "index_set.h"
     #include "namespace.h"
     #include "settings.h"
+    #include "bootstrap.h"
 #endif

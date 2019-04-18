@@ -520,5 +520,5 @@ void data_emergency(data_root_t *root) {
 
 // delete data files
 void data_delete_files(data_root_t *root) {
-    dir_clean_payload(root->datadir);
+    zdb_dir_clean_payload(root->datadir);
 }
