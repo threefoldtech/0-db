@@ -58,6 +58,12 @@ zdb_settings_t *zdb_settings_get() {
     return &zdb_rootsettings;
 }
 
+void zdb_destroy(zdb_settings_t *zdb_settings) {
+    zdb_debug("[+] bootstrap: cleaning library\n");
+    free(zdb_settings->zdbid);
+    zdb_settings->zdbid = NULL;
+}
+
 //
 // tools
 //
@@ -79,19 +85,8 @@ char *zdb_id() {
 }
 
 // set zdb id from string // FIXME
-char *zdb_id_set(char *listenaddr, int port, char *socket) {
-    if(socket) {
-        // unix socket
-        if(asprintf(&zdb_rootsettings.zdbid, "unix://%s", socket) < 0)
-            zdb_diep("asprintf");
-
-        return zdb_rootsettings.zdbid;
-    }
-
-    // default tcp
-    if(asprintf(&zdb_rootsettings.zdbid, "tcp://%s:%d", listenaddr, port) < 0)
-        zdb_diep("asprintf");
-
+char *zdb_id_set(char *id) {
+    zdb_rootsettings.zdbid = strdup(id);
     return zdb_rootsettings.zdbid;
 }
 

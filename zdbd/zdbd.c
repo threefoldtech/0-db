@@ -124,6 +124,21 @@ void zdbd_diep(char *str) {
     exit(EXIT_FAILURE);
 }
 
+// internal id generatir
+char *zdbd_id_set(char *listenaddr, int port, char *socket) {
+    char temp[512];
+
+    if(socket) {
+        // unix socket
+        snprintf(temp, sizeof(temp), "unix://%s", socket);
+        return zdb_id_set(temp);
+    }
+
+    // default tcp
+    snprintf(temp, sizeof(temp), "tcp://%s:%d", listenaddr, port);
+    return zdb_id_set(temp);
+}
+
 static int signal_intercept(int signal, void (*function)(int)) {
     struct sigaction sig;
     int ret;
@@ -194,7 +209,7 @@ static int proceed(zdb_settings_t *zdb_settings, zdbd_settings_t *zdbd_settings)
     signal_intercept(SIGTERM, sighandler);
     signal(SIGCHLD, SIG_IGN);
 
-    zdb_id_set(zdbd_settings->listen, zdbd_settings->port, zdbd_settings->socket); // FIXME?
+    zdbd_id_set(zdbd_settings->listen, zdbd_settings->port, zdbd_settings->socket);
 
     // namespace is the root of the whole index/data system
     // anything related to data is always attached to at least
@@ -230,9 +245,8 @@ static int proceed(zdb_settings_t *zdb_settings, zdbd_settings_t *zdbd_settings)
     // expected.
     namespaces_destroy();
 
-    // FIXME
-    free(zdb_settings->zdbid);
-    zdb_settings->zdbid = NULL;
+    // cleaning library allocations
+    zdb_destroy(zdb_settings);
 
     return 0;
 }
