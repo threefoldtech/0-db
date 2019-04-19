@@ -1,6 +1,8 @@
 #ifndef __LIBZDB_H
     #define __LIBZDB_H
 
+    #include <stdint.h>
+
     #ifndef ZDB_REVISION
         #define ZDB_REVISION "(unknown)"
     #endif
