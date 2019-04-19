@@ -126,4 +126,5 @@
     #include "namespace.h"
     #include "settings.h"
     #include "bootstrap.h"
+    #include "api.h"
 #endif
