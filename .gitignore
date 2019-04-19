@@ -71,3 +71,5 @@ utilities/db-sync/db-sync
 utilities/db-replicate/db-replicate
 utilities/db-mirror/db-mirror
 tests/pipeline/pipeline
+zdbd/zdb
+zdbd/zdbd
