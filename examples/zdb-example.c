@@ -4,6 +4,11 @@
 #include <time.h>
 #include "libzdb.h"
 
+void dump_type(zdb_api_type_t status) {
+    char *msg = zdb_api_debug_type(status);
+    printf("[+] example: " COLOR_CYAN "%s" COLOR_RESET "\n", msg);
+}
+
 int stuff(zdb_settings_t *settings) {
     (void) settings;
     namespace_t *ns = namespace_get_default();
@@ -15,14 +20,22 @@ int stuff(zdb_settings_t *settings) {
     char *data = "Hello World !";
 
     zdb_api_t *reply = zdb_api_set(ns, key, strlen(key), data, strlen(data));
-    printf("[+] example: response type: %s\n", zdb_api_debug_type(reply->status));
+    dump_type(reply->status);
+    zdb_api_reply_free(reply);
+
+    //
+    // ensure existance
+    //
+    printf("[+] example: checking if key exists\n");
+    reply = zdb_api_exists(ns, key, strlen(key));
+    dump_type(reply->status);
     zdb_api_reply_free(reply);
 
     //
     // looking up for this entry
     //
     reply = zdb_api_get(ns, key, strlen(key));
-    printf("[+] example: response type: %s\n", zdb_api_debug_type(reply->status));
+    dump_type(reply->status);
 
     if(reply->status == ZDB_API_ENTRY) {
         zdb_api_entry_t *entry = reply->payload;
@@ -31,6 +44,32 @@ int stuff(zdb_settings_t *settings) {
     }
 
     zdb_api_reply_free(reply);
+
+    //
+    // checking consistancy
+    //
+    printf("[+] example: checking data consistancy\n");
+    reply = zdb_api_check(ns, key, strlen(key));
+    dump_type(reply->status);
+    zdb_api_reply_free(reply);
+
+    //
+    // deleting the key
+    //
+    printf("[+] example: deleting key\n");
+    reply = zdb_api_del(ns, key, strlen(key));
+    dump_type(reply->status);
+    zdb_api_reply_free(reply);
+
+    //
+    // checking if key was well removed
+    //
+    printf("[+] example: checking for key suppression\n");
+    reply = zdb_api_exists(ns, key, strlen(key));
+    dump_type(reply->status);
+    zdb_api_reply_free(reply);
+
+
 
     return 0;
 }
