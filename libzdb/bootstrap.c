@@ -27,7 +27,7 @@ zdb_settings_t *zdb_initialize() {
     s->datapath = ZDB_DEFAULT_DATAPATH;
     s->indexpath = ZDB_DEFAULT_INDEXPATH;
     s->datasize = ZDB_DEFAULT_DATA_MAXSIZE;
-    s->mode = KEYVALUE;
+    s->mode = ZDB_MODE_KEY_VALUE;
 
     // resetting values
     s->verbose = 0;

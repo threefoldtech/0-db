@@ -628,10 +628,10 @@ int index_emergency(index_root_t *root) {
 // returns a string mode name about the
 // current running mode
 const char *index_modename(index_root_t *index) {
-    if(index->mode == KEYVALUE)
+    if(index->mode == ZDB_MODE_KEY_VALUE)
         return "userkey";
 
-    if(index->mode == SEQUENTIAL)
+    if(index->mode == ZDB_MODE_SEQUENTIAL)
         return "sequential";
 
     return "unknown";

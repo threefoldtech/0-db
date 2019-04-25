@@ -397,7 +397,7 @@ index_entry_t *index_set_memory(index_root_t *root, void *id, index_entry_t *ent
     // is not deleted (otherwise it's ot used), we don't need to
     // take care about inserting, we can directly call an updating
     // to keep the same workflow like it was added in live
-    if(root->mode == SEQUENTIAL)
+    if(root->mode == ZDB_MODE_SEQUENTIAL)
         return index_update_memory_handler_sequential(root, &setter, NULL);
 
     // others mode (aka userkey mode)

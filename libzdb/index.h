@@ -3,16 +3,16 @@
 
     typedef enum index_mode_t {
         // default key-value store
-        KEYVALUE = 0,
+        ZDB_MODE_KEY_VALUE = 0,
 
         // auto-generated sequential id
-        SEQUENTIAL = 1,
+        ZDB_MODE_SEQUENTIAL = 1,
 
         // id is hard-fixed data position
-        DIRECTKEY = 2,
+        ZDB_MODE_DIRECT_KEY = 2,
 
         // fixed-block length
-        DIRECTBLOCK = 3,
+        ZDB_MODE_DIRECTBLOCK = 3,
 
         // amount of modes available
         ZDB_MODES

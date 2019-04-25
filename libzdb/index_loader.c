@@ -463,7 +463,7 @@ index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespa
     root->namespace = namespace;
     root->mode = settings->mode;
 
-    if(settings->mode == SEQUENTIAL)
+    if(settings->mode == ZDB_MODE_SEQUENTIAL)
         root->seqid = index_allocate_seqid();
 
     // since this function will be called for each namespace
@@ -473,7 +473,7 @@ index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespa
     index_allocate_single();
     index_load(root);
 
-    if(settings->mode == KEYVALUE)
+    if(settings->mode == ZDB_MODE_KEY_VALUE)
         index_dump(root, settings->dump);
 
     index_dump_statistics(root);

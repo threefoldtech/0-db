@@ -96,6 +96,7 @@ int main() {
     // keep all others settings by default
     zdb_settings->datapath = "/tmp/zdb-example/data";
     zdb_settings->indexpath = "/tmp/zdb-example/index";
+    // zdb_settings->mode = ZDB_MODE_SEQUENTIAL;
 
     // open the database
     zdb_open(zdb_settings);

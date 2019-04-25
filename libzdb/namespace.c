@@ -408,7 +408,7 @@ ns_root_t *namespaces_allocate(zdb_settings_t *settings) {
         zdb_diep("namespace malloc");
 
     // allocating (if needed, only some modes needs it) the big (single) index branches
-    if(settings->mode == KEYVALUE) {
+    if(settings->mode == ZDB_MODE_KEY_VALUE) {
         zdb_debug("[+] namespaces: pre-allocating index (%d lazy branches)\n", buckets_branches);
 
         // allocating minimal branches array
