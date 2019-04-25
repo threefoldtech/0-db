@@ -2,7 +2,7 @@ LIB = libzdb
 SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 
-CFLAGS += -g -fPIC -std=gnu99 -O0 -W -Wall -Wextra -msse4.2 -Wno-implicit-fallthrough
+CFLAGS += -g -fPIC -std=gnu11 -O0 -W -Wall -Wextra -msse4.2 -Wno-implicit-fallthrough
 LDFLAGS += -rdynamic
 
 # grab version from git, if possible
