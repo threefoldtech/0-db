@@ -2,7 +2,7 @@ EXEC = namespace-editor
 SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 
-CFLAGS += -g -std=gnu99 -W -Wall -O2 -msse4.2 -I../../src
+CFLAGS += -g -std=gnu99 -W -Wall -O2 -msse4.2 -I../../libzdb
 LDFLAGS += -rdynamic 
 
 all: $(EXEC)

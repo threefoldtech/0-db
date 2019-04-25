@@ -64,6 +64,11 @@ void zdb_fulldump(void *_data, size_t len) {
     printf("\n");
 }
 
+// public wrapper
+void zdb_tools_fulldump(void *_data, size_t len) {
+    return zdb_fulldump(_data, len);
+}
+
 void zdb_hexdump(void *input, size_t length) {
     unsigned char *buffer = (unsigned char *) input;
     char *output = calloc((length * 2) + 1, 1);
@@ -76,6 +81,11 @@ void zdb_hexdump(void *input, size_t length) {
 
     printf("0x%s", output);
     free(output);
+}
+
+// public wrapper
+void zdb_tools_hexdump(void *input, size_t length) {
+    return zdb_hexdump(input, length);
 }
 
 //

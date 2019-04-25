@@ -11,8 +11,7 @@
 #include <inttypes.h>
 #include <sys/stat.h>
 #include <time.h>
-#include "zerodb.h"
-#include "index.h"
+#include "libzdb.h"
 
 void *warnp(char *str) {
     fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
@@ -22,22 +21,6 @@ void *warnp(char *str) {
 void diep(char *str) {
     warnp(str);
     exit(EXIT_FAILURE);
-}
-
-static char __hex[] = "0123456789abcdef";
-
-void hexdump(void *input, size_t length) {
-    unsigned char *buffer = (unsigned char *) input;
-    char *output = calloc((length * 2) + 1, 1);
-    char *writer = output;
-
-    for(unsigned int i = 0, j = 0; i < length; i++, j += 2) {
-        *writer++ = __hex[(buffer[i] & 0xF0) >> 4];
-        *writer++ = __hex[buffer[i] & 0x0F];
-    }
-
-    printf("0x%s", output);
-    free(output);
 }
 
 static char *index_date(uint32_t epoch, char *target, size_t length) {
@@ -111,7 +94,7 @@ int index_dump(int fd) {
         printf("[+]   parent id  : %" PRIu16 "\n", entry->parentid);
         printf("[+]   parent offs: %" PRIu32 "\n", entry->parentoff);
         printf("[+]   entry key  : ");
-        hexdump(entry->id, entry->idlength);
+        zdb_tools_hexdump(entry->id, entry->idlength);
         printf("\n");
     }
 

@@ -10,10 +10,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <getopt.h>
-#include "zerodb.h"
-#include "index.h"
-#include "data.h"
-#include "namespace.h"
+#include "libzdb.h"
 
 static struct option long_options[] = {
     {"index",     required_argument, 0, 'f'},
