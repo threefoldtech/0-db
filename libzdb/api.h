@@ -10,6 +10,11 @@
         ZDB_API_NOT_FOUND,
         ZDB_API_DELETED,
         ZDB_API_INTERNAL_ERROR,
+        ZDB_API_TRUE,
+        ZDB_API_FALSE,
+        ZDB_API_INSERT_DENIED,
+
+        ZDB_API_ITEMS_TOTAL  // last element
 
     } zdb_api_type_t;
 
@@ -33,6 +38,9 @@
 
     zdb_api_t *zdb_api_set(namespace_t *ns, void *key, size_t ksize, void *payload, size_t psize);
     zdb_api_t *zdb_api_get(namespace_t *ns, void *key, size_t ksize);
+    zdb_api_t *zdb_api_exists(namespace_t *ns, void *key, size_t ksize);
+    zdb_api_t *zdb_api_check(namespace_t *ns, void *key, size_t ksize);
+    zdb_api_t *zdb_api_del(namespace_t *ns, void *key, size_t ksize);
 
     char *zdb_api_debug_type(zdb_api_type_t type);
     void zdb_api_reply_free(zdb_api_t *reply);

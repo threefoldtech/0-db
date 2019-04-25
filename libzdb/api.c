@@ -3,6 +3,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <time.h>
+#include <assert.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
 
@@ -11,8 +12,19 @@ static char *__zdb_api_types[] = {
     "ZDB_API_FAILURE",
     "ZDB_API_ENTRY",
     "ZDB_API_UP_TO_DATE",
-    "ZDB_API_BUFFER"
+    "ZDB_API_BUFFER",
+    "ZDB_API_NOT_FOUND",
+    "ZDB_API_DELETED",
+    "ZDB_API_INTERNAL_ERROR",
+    "ZDB_API_TRUE",
+    "ZDB_API_FALSE",
+    "ZDB_API_INSERT_DENIED",
 };
+
+static_assert(
+    sizeof(__zdb_api_types) / sizeof(char *) == ZDB_API_ITEMS_TOTAL,
+    "zdb_api_types not inline with enum"
+);
 
 //
 // api response
@@ -153,78 +165,71 @@ static zdb_api_t *api_set_handler_userkey(namespace_t *ns, void *key, size_t ksi
 }
 
 static zdb_api_t *api_set_handler_sequential(namespace_t *ns, void *key, size_t ksize, void *payload, size_t psize, index_entry_t *existing) {
-#if 0
-    resp_request_t *request = client->request;
-    index_root_t *index = client->ns->index;
-    data_root_t *data = client->ns->data;
+    // we don't need the key, we have the existing pointer
+    // or we generate a new one
+    (void) key;
+
     index_entry_t *idxentry = NULL;
 
     // if user provided a key and existing is not set
     // this means the key was not found, and we cannot update
     // it (obviously)
-    if(request->argv[1]->length && !existing) {
-        redis_hardsend(client, "-Invalid key, only update authorized");
-        return 0;
-    }
+    if(ksize && !existing)
+        return zdb_api_reply(ZDB_API_INSERT_DENIED, NULL);
 
     // create some easier accessor
     // grab the next id, this may be replaced
     // by user input if the key exists
-    uint32_t id = index_next_id(index);
+    uint32_t id = index_next_id(ns->index);
     uint8_t idlength = sizeof(uint32_t);
 
     // setting key to existing if we do an update
     if(existing)
         memcpy(&id, existing->id, existing->idlength);
 
-    unsigned char *value = request->argv[2]->buffer;
-    uint32_t valuelength = request->argv[2]->length;
+    // setting the timestamp // FIXME
+    // time_t timestamp = timestamp_from_set(request);
+    time_t timestamp = time(NULL);
 
-    // setting the timestamp
-    time_t timestamp = timestamp_from_set(request);
-
-    zdbd_debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
+    zdb_debug("[+] api: set: %u bytes key, %lu bytes data\n", idlength, psize);
 
     data_request_t dreq = {
-        .data = value,
-        .datalength = valuelength,
+        .data = payload,
+        .datalength = psize,
         .vid = &id,
         .idlength = idlength,
         .flags = 0,
-        .crc = data_crc32(value, valuelength),
+        .crc = data_crc32(payload, psize),
         .timestamp = timestamp,
     };
 
     // checking if we need to update this entry of if data are unchanged
     if(existing && existing->crc == dreq.crc) {
-        zdbd_debug("[+] command: set: existing %08x <> %08x crc match, ignoring\n", existing->crc, dreq.crc);
-        redis_hardsend(client, "$-1");
-        return 0;
+        zdb_debug("[+] api: set: existing %08x <> %08x crc match, ignoring\n", existing->crc, dreq.crc);
+        return zdb_api_reply(ZDB_API_UP_TO_DATE, NULL);
     }
 
     // insert the data on the datafile
     // this will returns us the offset where the header is
     // size_t offset = data_insert(value, valuelength, id, idlength);
-    size_t offset = data_insert(data, &dreq);
+    size_t offset = data_insert(ns->data, &dreq);
 
     // checking for writing error
     // if we couldn't write the data, we won't add entry on the index
     // and report to the client an error
-    if(offset == 0) {
-        redis_hardsend(client, "-Cannot write data right now");
-        return 0;
-    }
+    if(offset == 0)
+        return zdb_api_reply(ZDB_API_INTERNAL_ERROR, NULL);
 
-    zdbd_debug("[+] command: set: sequential-key: ");
-    zdbd_debughex(&id, idlength);
-    zdbd_debug("\n");
+    zdb_debug("[+] api: set: sequential-key: ");
+    zdb_debughex(&id, idlength);
+    zdb_debug("\n");
 
-    zdbd_debug("[+] command: set: offset: %lu\n", offset);
+    zdb_debug("[+] api: set: offset: %lu\n", offset);
 
     index_entry_t idxreq = {
         .idlength = idlength,
         .offset = offset,
-        .length = request->argv[2]->length,
+        .length = psize,
         .crc = dreq.crc,
         .flags = 0,
         .timestamp = timestamp,
@@ -235,10 +240,9 @@ static zdb_api_t *api_set_handler_sequential(namespace_t *ns, void *key, size_t 
         .id = &id,
     };
 
-    if(!(idxentry = index_set(index, &setter, existing))) {
+    if(!(idxentry = index_set(ns->index, &setter, existing))) {
         // cannot insert index (disk issue)
-        redis_hardsend(client, "-Cannot write index right now");
-        return 0;
+        return zdb_api_reply(ZDB_API_INTERNAL_ERROR, NULL);
     }
 
     // building response
@@ -247,17 +251,7 @@ static zdb_api_t *api_set_handler_sequential(namespace_t *ns, void *key, size_t 
     //
     // this is how the sequential-id can returns the id generated
     // redis_bulk_t response = redis_bulk(id, idlength);
-    redis_bulk_t response = redis_bulk(&id, idlength);
-    if(!response.buffer) {
-        redis_hardsend(client, "-Internal Error (bulk)");
-        return 0;
-    }
-
-    redis_reply_heap(client, response.buffer, response.length, free);
-
-    return offset;
-#endif
-    return NULL;
+    return zdb_api_reply_buffer(&id, idlength);
 }
 
 
@@ -311,12 +305,9 @@ zdb_api_t *zdb_api_set(namespace_t *ns, void *key, size_t ksize, void *payload, 
 }
 
 
-
-
-
-
-
-
+//
+// GET
+//
 zdb_api_t *zdb_api_get(namespace_t *ns, void *key, size_t ksize) {
     index_entry_t *entry = NULL;
 
@@ -349,3 +340,79 @@ zdb_api_t *zdb_api_get(namespace_t *ns, void *key, size_t ksize) {
     // it wil be free by zdb_api_reply_free later
     return zdb_api_reply_entry(key, ksize, payload.buffer, payload.length);
 }
+
+
+//
+// DATASET
+//
+zdb_api_t *zdb_api_exists(namespace_t *ns, void *key, size_t ksize) {
+    index_entry_t *entry = index_get(ns->index, key, ksize);
+
+    zdb_debug("[+] api: exists: entry found: %s\n", (entry ? "yes" : "no"));
+
+    if(!entry)
+        return zdb_api_reply(ZDB_API_FALSE, NULL);
+
+    // key found but deleted
+    if(entry && entry->flags & INDEX_ENTRY_DELETED) {
+        zdb_debug("[+] api: exists: entry found but deleted\n");
+        return zdb_api_reply(ZDB_API_FALSE, NULL);
+    }
+
+    return zdb_api_reply(ZDB_API_TRUE, NULL);
+}
+
+zdb_api_t *zdb_api_check(namespace_t *ns, void *key, size_t ksize) {
+    index_entry_t *entry = index_get(ns->index, key, ksize);
+
+    // key not found at all
+    if(!entry) {
+        zdb_debug("[-] api: check: key not found\n");
+        return zdb_api_reply(ZDB_API_NOT_FOUND, NULL);
+    }
+
+    // key found but deleted
+    if(entry->flags & INDEX_ENTRY_DELETED) {
+        zdb_verbose("[-] api: check: key deleted\n");
+        return zdb_api_reply(ZDB_API_DELETED, NULL);
+    }
+
+    // key found and valid, let's checking the contents
+    zdb_debug("[+] api: get: entry found, flags: %x, data length: %" PRIu32 "\n", entry->flags, entry->length);
+    zdb_debug("[+] api: get: data file: %d, data offset: %" PRIu32 "\n", entry->dataid, entry->offset);
+
+    int status = data_check(ns->data, entry->offset, entry->dataid);
+    return zdb_api_reply(status ? ZDB_API_TRUE : ZDB_API_FALSE, NULL);
+}
+
+zdb_api_t *zdb_api_del(namespace_t *ns, void *key, size_t ksize) {
+    index_entry_t *entry;
+
+    // grabbing original entry
+    if(!(entry = index_get(ns->index, key, ksize))) {
+        zdb_debug("[-] api: del: key not found\n");
+        return zdb_api_reply(ZDB_API_NOT_FOUND, NULL);
+    }
+
+    // avoid double deletion
+    if(index_entry_is_deleted(entry)) {
+        zdb_debug("[-] api: del: key already deleted\n");
+        return zdb_api_reply(ZDB_API_DELETED, NULL);
+    }
+
+    // update data file, flag entry deleted
+    if(!data_delete(ns->data, entry->id, entry->idlength)) {
+        zdb_debug("[-] api: del: deleting data failed\n");
+        return zdb_api_reply(ZDB_API_INTERNAL_ERROR, NULL);
+    }
+
+    // mark index entry as deleted
+    if(index_entry_delete(ns->index, entry)) {
+        zdb_debug("[-] command: del: index delete flag failed\n");
+        return zdb_api_reply(ZDB_API_INTERNAL_ERROR, NULL);
+    }
+
+    return zdb_api_reply_success();
+}
+
+
