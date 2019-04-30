@@ -39,7 +39,7 @@
     //        and not assure retro-compatibility
     //        (eg: files written on version 1.x.x won't works
     //             out of box on a version 2.x.x)
-    #define ZDB_VERSION     "1.0.0"
+    #define ZDB_VERSION     "1.1.0"
 
     typedef struct zdb_stats_t {
         time_t inittime;          // timestamp when zdb started (used for uptime)
