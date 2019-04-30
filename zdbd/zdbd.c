@@ -363,14 +363,14 @@ int main(int argc, char *argv[]) {
 
             case 'm':
                 if(strcmp(optarg, "user") == 0) {
-                    zdb_settings->mode = KEYVALUE;
+                    zdb_settings->mode = ZDB_MODE_KEY_VALUE;
 
                 } else if(strcmp(optarg, "seq") == 0) {
-                    zdb_settings->mode = SEQUENTIAL;
+                    zdb_settings->mode = ZDB_MODE_SEQUENTIAL;
 
                 } else if(strcmp(optarg, "direct") == 0) {
                     // settings->mode = DIRECTKEY;
-                    zdb_settings->mode = SEQUENTIAL;
+                    zdb_settings->mode = ZDB_MODE_SEQUENTIAL;
 
                     zdbd_warning("[!] WARNING: direct mode doesn't exists anymore !");
                     zdbd_warning("[!] WARNING: this mode is replaced by 'sequential' mode");
@@ -381,7 +381,7 @@ int main(int argc, char *argv[]) {
                     zdbd_warning("[!] WARNING: in futur release");
 
                 } else if(strcmp(optarg, "block") == 0) {
-                    zdb_settings->mode = DIRECTBLOCK;
+                    zdb_settings->mode = ZDB_MODE_DIRECTBLOCK;
 
                 } else {
                     zdbd_danger("[-] invalid mode '%s'", optarg);

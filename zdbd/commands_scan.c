@@ -164,6 +164,7 @@ static scan_info_t *scan_initial_get(scan_info_t *info, redis_client_t *client) 
         return NULL;
     }
 
+    // FIXME
     #if 0
     // grabbing original entry
     if(!(entry = redis_get_handlers[rootsettings.mode](client))) {
@@ -426,7 +427,7 @@ int command_kscan(redis_client_t *client) {
     #endif
 
     // it doesn't make sens to do that on sequential index
-    if(index->mode != KEYVALUE) {
+    if(index->mode != ZDB_MODE_KEY_VALUE) {
         redis_hardsend(client, "-Index running mode doesn't support this feature");
         return 1;
     }
