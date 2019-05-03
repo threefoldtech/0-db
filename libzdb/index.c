@@ -118,10 +118,13 @@ static int index_read(int fd, void *buffer, size_t length) {
 }
 
 // set global filename based on the index id
-void index_set_id(index_root_t *root) {
+void index_set_id(index_root_t *root, uint16_t fileid) {
+    root->indexid = fileid;
     sprintf(root->indexfile, "%s/zdb-index-%05u", root->indexdir, root->indexid);
 }
 
+//
+// open index _without_ changing internal fd
 static int index_open_file_mode(index_root_t *root, uint16_t fileid, int mode) {
     char filename[512];
     int fd;
@@ -130,19 +133,43 @@ static int index_open_file_mode(index_root_t *root, uint16_t fileid, int mode) {
     zdb_debug("[+] index: opening file: %s (ro: %s)\n", filename, (mode & O_RDONLY) ? "yes" : "no");
 
     if((fd = open(filename, mode)) < 0) {
-        zdb_verbosep("index_open_file_mode", filename);
+        zdb_verbosep("index_open", filename);
         return -1;
     }
 
     return fd;
 }
 
-static int index_open_file(index_root_t *root, int fileid) {
+int index_open_file_readonly(index_root_t *root, uint16_t fileid) {
     return index_open_file_mode(root, fileid, O_RDONLY);
 }
 
-int index_open_file_rw(index_root_t *root, int fileid) {
+int index_open_file_readwrite(index_root_t *root, uint16_t fileid) {
     return index_open_file_mode(root, fileid, O_RDWR);
+}
+
+//
+// open index _with_ internal fd set
+static int index_open_mode(index_root_t *root, uint16_t fileid, int mode) {
+    char *roenabled = (mode == O_RDONLY) ? "yes" : "no";
+
+    index_set_id(root, fileid);
+    zdb_debug("[+] index: opening file: %s (ro: %s)\n", root->indexfile, roenabled);
+
+    if((root->indexfd = open(root->indexfile, mode)) < 0) {
+        zdb_verbosep("index_open", root->indexfile);
+        return -1;
+    }
+
+    return root->indexfd;
+}
+
+int index_open_readonly(index_root_t *root, uint16_t fileid) {
+    return index_open_mode(root, fileid, O_RDONLY);
+}
+
+int index_open_readwrite(index_root_t *root, uint16_t fileid) {
+    return index_open_mode(root, fileid, O_RDWR);
 }
 
 // main function to call when you need to deal with multiple index id
@@ -160,7 +187,7 @@ inline int index_grab_fileid(index_root_t *root, uint16_t fileid) {
         // the requested datafile is not the current datafile opened
         // we will re-open the expected datafile temporary
         zdb_debug("[-] index: switching file: %d, requested: %d\n", root->indexid, fileid);
-        if((fd = index_open_file(root, fileid)) < 0)
+        if((fd = index_open_file_readonly(root, fileid)) < 0)
             return -1;
     }
 
@@ -205,6 +232,10 @@ void index_open_final(index_root_t *root) {
     printf("[+] index: active file: %s\n", root->indexfile);
 }
 
+void index_close(index_root_t *root) {
+    close(root->indexfd);
+}
+
 // jumping to the next index id file, this needs to be sync'd with
 // data file, we only do this when datafile changes basicly, this is
 // triggered by a datafile too big event
@@ -220,17 +251,17 @@ size_t index_jump_next(index_root_t *root) {
     }
 
     // closing current file descriptor
-    close(root->indexfd);
+    index_close(root);
 
     // moving to the next file
-    root->indexid += 1;
+    uint64_t fileid = root->indexid + 1;
     root->nextid = 0;
 
     // do not reset root->previous
     // since we need it to keep track of previous
     // entry for RSCAN support
 
-    index_set_id(root);
+    index_set_id(root, fileid);
 
     index_open_final(root);
     index_initialize(root->indexfd, root->indexid, root);
@@ -321,7 +352,7 @@ index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t o
         return NULL;
 
     // open requested file
-    if((fd = index_open_file(root, indexid)) < 0) {
+    if((fd = index_open_file_readonly(root, indexid)) < 0) {
         free(item);
         return NULL;
     }
@@ -403,7 +434,7 @@ int index_entry_delete_disk(index_root_t *root, index_entry_t *entry) {
     entry->flags |= INDEX_ENTRY_DELETED;
 
     // (re-)open the expected index file, in read-write mode
-    if((fd = index_open_file_rw(root, entry->dataid)) < 0)
+    if((fd = index_open_file_readwrite(root, entry->dataid)) < 0)
         return 1;
 
     // jump to the right offset for this entry

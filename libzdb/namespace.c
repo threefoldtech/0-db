@@ -175,13 +175,13 @@ static char *namespace_path(char *prefix, char *name) {
 
 namespace_t *namespace_ensure(namespace_t *namespace) {
     zdb_debug("[+] namespaces: checking index [%s]\n", namespace->indexpath);
-    if(!zdb_dir_exists(namespace->indexpath)) {
+    if(zdb_dir_exists(namespace->indexpath) != ZDB_DIRECTORY_EXISTS) {
         if(zdb_dir_create(namespace->indexpath) < 0)
             return zdb_warnp("index dir_create");
     }
 
     zdb_debug("[+] namespaces: checking data [%s]\n", namespace->datapath);
-    if(!zdb_dir_exists(namespace->datapath)) {
+    if(zdb_dir_exists(namespace->datapath) != ZDB_DIRECTORY_EXISTS) {
         if(zdb_dir_create(namespace->datapath) < 0)
             return zdb_warnp("data dir_create");
     }

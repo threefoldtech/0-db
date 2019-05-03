@@ -105,6 +105,9 @@
     void zdb_tools_fulldump(void *_data, size_t len);
     void zdb_tools_hexdump(void *input, size_t length);
 
+    void *zdb_warnp(char *str);
+    void zdb_diep(char *str);
+
     #define COLOR_RED    "\033[31;1m"
     #define COLOR_YELLOW "\033[33;1m"
     #define COLOR_GREEN  "\033[32;1m"

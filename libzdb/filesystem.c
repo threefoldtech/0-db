@@ -21,7 +21,14 @@
 //
 int zdb_dir_exists(char *path) {
     struct stat sb;
-    return (stat(path, &sb) == 0 && S_ISDIR(sb.st_mode));
+
+    if(stat(path, &sb) != 0)
+        return ZDB_PATH_NOT_AVAILABLE;
+
+    if(!S_ISDIR(sb.st_mode))
+        return ZDB_PATH_IS_NOT_DIRECTORY;
+
+    return ZDB_DIRECTORY_EXISTS;
 }
 
 int zdb_dir_create(char *path) {
@@ -83,4 +90,16 @@ static int dir_clean_cb(const char *fpath, const struct stat *sb, int tflag, str
 
 int zdb_dir_clean_payload(char *path) {
     return nftw(path, dir_clean_cb, 64, FTW_DEPTH | FTW_PHYS);
+}
+
+int zdb_file_exists(char *path) {
+    struct stat sb;
+
+    if(stat(path, &sb) != 0)
+        return ZDB_PATH_NOT_AVAILABLE;
+
+    if(S_ISDIR(sb.st_mode))
+        return ZDB_PATH_IS_DIRECTORY;
+
+    return ZDB_FILE_EXISTS;
 }

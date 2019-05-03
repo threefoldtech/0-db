@@ -233,7 +233,7 @@
     // extern but not really public functions
     // used by index_loader
     int index_write(int fd, void *buffer, size_t length, index_root_t *root);
-    void index_set_id(index_root_t *root);
+    void index_set_id(index_root_t *root, uint16_t fileid);
     void index_open_final(index_root_t *root);
 
     extern index_item_t *index_transition;
@@ -253,7 +253,16 @@
     void index_item_header_dump(index_item_t *item);
 
     uint32_t index_key_hash(unsigned char *id, uint8_t idlength);
-    int index_open_file_rw(index_root_t *root, int fileid);
+
+    // open index _without_ setting internal fd
+    int index_open_file_readonly(index_root_t *root, uint16_t fileid);
+    int index_open_file_readwrite(index_root_t *root, uint16_t fileid);
+
+    // open index by setting index fd
+    int index_open_readonly(index_root_t *root, uint16_t fileid);
+    int index_open_readwrite(index_root_t *root, uint16_t fileid);
+
+    void index_close(index_root_t *root);
 
     const char *index_modename(index_root_t *index);
 #endif

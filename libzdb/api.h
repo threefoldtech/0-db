@@ -44,4 +44,25 @@
 
     char *zdb_api_debug_type(zdb_api_type_t type);
     void zdb_api_reply_free(zdb_api_t *reply);
+
+    // index helper
+    char *zdb_index_date(uint32_t epoch, char *target, size_t length);
+
+    // index loader
+    void zdb_index_set_id(index_root_t *root, uint64_t fileid);
+
+    int zdb_index_open_readonly(index_root_t *root, uint16_t fileid);
+    int zdb_index_open_readwrite(index_root_t *root, uint16_t fileid);
+    void zdb_index_close(index_root_t *zdbindex);
+
+    index_root_t *zdb_index_init_lazy(zdb_settings_t *settings, char *indexdir, void *namespace);
+    uint64_t zdb_index_availity_check(index_root_t *root);
+
+    // index header validity
+    index_header_t *zdb_index_descriptor_load(index_root_t *root);
+    index_header_t *zdb_index_descriptor_validate(index_header_t *header, index_root_t *root);
+
+    // low level index
+    index_item_t *zdb_index_raw_fetch_entry(index_root_t *root);
+    off_t zdb_index_raw_offset(index_root_t *root);
 #endif

@@ -82,3 +82,26 @@ index_entry_t *index_get(index_root_t *index, void *id, uint8_t idlength) {
     return entry;
 }
 
+//
+// low level helper
+//
+index_item_t *index_raw_fetch_entry(index_root_t *root) {
+    uint8_t idlength;
+    index_item_t *entry = NULL;
+
+    if(read(root->indexfd, &idlength, sizeof(idlength)) != sizeof(idlength))
+        return NULL;
+
+    // we have the length of the key
+    ssize_t entrylength = sizeof(index_item_t) + idlength;
+    if(!(entry = malloc(entrylength)))
+        zdb_diep("index_raw_fetch_entry: malloc");
+
+    // rollback the 1 byte read for the id length
+    lseek(root->indexfd, -1, SEEK_CUR);
+
+    if(read(root->indexfd, entry, entrylength) != entrylength)
+        zdb_diep("index header read failed");
+
+    return entry;
+}

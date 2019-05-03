@@ -16,7 +16,7 @@
 //
 // index initializer and dumper
 //
-static char *index_date(uint32_t epoch, char *target, size_t length) {
+char *zdb_internal_index_date(uint32_t epoch, char *target, size_t length) {
     struct tm *timeval;
     time_t unixtime;
 
@@ -111,7 +111,6 @@ index_header_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
     return header;
 }
 
-
 static int index_try_rootindex(index_root_t *root) {
     // try to open the index file with create flag
     if((root->indexfd = open(root->indexfile, O_CREAT | O_RDWR, 0600)) < 0) {
@@ -148,6 +147,40 @@ static int index_try_rootindex(index_root_t *root) {
     return 1;
 }
 
+index_header_t *index_descriptor_load(index_root_t *root) {
+    index_header_t *header;
+    ssize_t length;
+
+    if(!(header = malloc(sizeof(index_header_t)))) {
+        zdb_warnp("index_descriptor_load: malloc");
+        return NULL;
+    }
+
+    lseek(root->indexfd, 0, SEEK_SET);
+
+    if((length = read(root->indexfd, header, sizeof(index_header_t))) != sizeof(index_header_t)) {
+        free(header);
+        return NULL;
+    }
+
+    return header;
+}
+
+index_header_t *index_descriptor_validate(index_header_t *header, index_root_t *root) {
+    if(memcmp(header->magic, "IDX0", 4)) {
+        zdb_danger("[-] %s: invalid header, wrong magic", root->indexfile);
+        return NULL;
+    }
+
+    if(header->version != ZDB_IDXFILE_VERSION) {
+        zdb_danger("[-] %s: unsupported version detected", root->indexfile);
+        zdb_danger("[-] file version: %d, supported version: %d", header->version, ZDB_IDXFILE_VERSION);
+        return NULL;
+    }
+
+    return header;
+}
+
 // opening, reading then closing the index file
 // if the index was created, 0 is returned
 //
@@ -165,6 +198,10 @@ static size_t index_load_file(index_root_t *root) {
         return 0;
 
     if((length = read(root->indexfd, &header, sizeof(index_header_t))) != sizeof(index_header_t)) {
+        //
+        // FIXME: replace this with helper
+        //
+
         if(length < 0) {
             // read failed, probably caused by a system error
             // this is probably an unrecoverable issue, let's skip this
@@ -186,7 +223,7 @@ static size_t index_load_file(index_root_t *root) {
         // we could not read anything, which basicly means that
         // the file is empty, we probably just created it
         //
-        // if the current indexid is not zero, this is probablu
+        // if the current indexid is not zero, this is probably
         // a new file not expected, otherwise if index is zero,
         // this is the initial index file we need to create
         if(root->indexid > 0) {
@@ -209,16 +246,8 @@ static size_t index_load_file(index_root_t *root) {
         header = index_initialize(root->indexfd, root->indexid, root);
     }
 
-    if(memcmp(header.magic, "IDX0", 4)) {
-        zdb_danger("[-] %s: invalid header, wrong magic", root->indexfile);
-        exit(EXIT_FAILURE);
-    }
-
-    if(header.version != ZDB_IDXFILE_VERSION) {
-        zdb_danger("[-] %s: unsupported version detected", root->indexfile);
-        zdb_danger("[-] file version: %d, supported version: %d", header.version, ZDB_IDXFILE_VERSION);
-        exit(EXIT_FAILURE);
-    }
+    if(!index_descriptor_validate(&header, root))
+        return 1;
 
     // re-writing the header, with updated data if the index is writable
     // if the file was just created, it's okay, we have a new struct ready
@@ -232,8 +261,8 @@ static size_t index_load_file(index_root_t *root) {
     }
 
     char date[256];
-    zdb_verbose("[+] index: created at: %s\n", index_date(header.created, date, sizeof(date)));
-    zdb_verbose("[+] index: last open: %s\n", index_date(header.opened, date, sizeof(date)));
+    zdb_verbose("[+] index: created at: %s\n", zdb_internal_index_date(header.created, date, sizeof(date)));
+    zdb_verbose("[+] index: last open: %s\n", zdb_internal_index_date(header.opened, date, sizeof(date)));
 
     if(header.mode != zdb_rootsettings.mode) {
         zdb_danger("[!] ========================================================");
@@ -341,26 +370,49 @@ static size_t index_load_file(index_root_t *root) {
     return length;
 }
 
+// returns the amount of index files available (if any)
+uint64_t index_availity_check(index_root_t *root) {
+    uint64_t maxfiles = (1 << (sizeof(((index_entry_t *) 0)->dataid) * 8));
+    uint64_t fileid;
+
+    for(fileid = 0; fileid < maxfiles; fileid++) {
+        index_set_id(root, fileid);
+
+        // if we can't open fileid 0, we don't have any index
+        // file available (returns 0)
+        //
+        // if we can at least open fileid 0, we have at least 1 index
+        // file available (fileid 1, ...)
+        if(zdb_file_exists(root->indexfile) != ZDB_FILE_EXISTS)
+            break;
+    }
+
+    return fileid;
+}
+
 // load all the index found
 // if no index files exists, we create the original one
 static void index_load(index_root_t *root) {
-    uint64_t maxfiles = (1 << (sizeof(((index_entry_t *) 0)->dataid) * 8));
+    uint64_t maxfile = index_availity_check(root);
+    uint64_t fileid;
 
-    for(root->indexid = 0; root->indexid < maxfiles; root->indexid++) {
-        index_set_id(root);
+    if(maxfile > 0) {
+        // opening all index files one by one
+        for(fileid = 0; fileid < maxfile; fileid++) {
+            index_set_id(root, fileid);
 
-        if(index_load_file(root) == 0) {
-            // if the index was not the first one
-            // we created a new index, we need to remove it
-            // and fallback to the previous one
-            if(root->indexid > 0) {
-                unlink(root->indexfile);
-                root->indexid -= 1;
+            if(index_load_file(root) == 0) {
+                zdb_verbose("[-] index_load: something went wrong with index %d\n", root->indexid);
+                break;
             }
+        }
 
-            // writing the final filename
-            index_set_id(root);
-            break;
+    } else {
+        // we need to create the index
+        index_set_id(root, 0);
+        if(index_load_file(root) != 0) {
+            zdb_verbose("[-] index_load: seems initial index could not be created\n");
+            return;
         }
     }
 
@@ -443,11 +495,13 @@ index_seqid_t *index_allocate_seqid() {
     return seqid;
 }
 
-// create an index and load files
-index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches) {
-    index_root_t *root = calloc(sizeof(index_root_t), 1);
+index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir, void *namespace) {
+    index_root_t *root;
 
-    zdb_debug("[+] index: initializing\n");
+    if(!(root = calloc(sizeof(index_root_t), 1))) {
+        zdb_diep("index: calloc");
+        return NULL;
+    }
 
     root->indexdir = indexdir;
     root->indexid = 0;
@@ -459,9 +513,19 @@ index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespa
     root->synctime = settings->synctime;
     root->lastsync = 0;
     root->status = INDEX_NOT_LOADED | INDEX_HEALTHY;
-    root->branches = branches;
+    root->branches = NULL;
     root->namespace = namespace;
     root->mode = settings->mode;
+
+    return root;
+}
+
+// create an index and load files
+index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches) {
+    zdb_debug("[+] index: initializing\n");
+
+    index_root_t *root = index_init_lazy(settings, indexdir, namespace);
+    root->branches = branches;
 
     if(settings->mode == ZDB_MODE_SEQUENTIAL)
         root->seqid = index_allocate_seqid();

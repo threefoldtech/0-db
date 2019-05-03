@@ -52,21 +52,19 @@ zdb_settings_t *zdb_open(zdb_settings_t *zdb_settings) {
     // ensure default directories exists
     // for a fresh start if this is a new instance
     //
-    if(!zdb_dir_exists(zdb_settings->datapath)) {
+    if(zdb_dir_exists(zdb_settings->datapath) != ZDB_DIRECTORY_EXISTS) {
         zdb_verbose("[+] system: creating datapath: %s\n", zdb_settings->datapath);
         zdb_dir_create(zdb_settings->datapath);
     }
 
-    if(!zdb_dir_exists(zdb_settings->indexpath)) {
+    if(zdb_dir_exists(zdb_settings->indexpath) != ZDB_DIRECTORY_EXISTS) {
         zdb_verbose("[+] system: creating indexpath: %s\n", zdb_settings->indexpath);
         zdb_dir_create(zdb_settings->indexpath);
     }
 
-
-
     // namespace is the root of the whole index/data system
     // anything related to data is always attached to at least
-    // one namespace (the default) one, and all the others
+    // one namespace (the default), and all the others
     // are based on a fork of namespace
     //
     // the namespace system will take care about all the loading

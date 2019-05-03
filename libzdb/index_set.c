@@ -71,7 +71,7 @@ int index_seq_overwrite(index_root_t *root, index_set_t *set) {
     uint32_t offset = index_seq_offset(relative);
 
     // (re-)open the expected index file, in read-write mode
-    if((fd = index_open_file_rw(root, seqmap->fileid)) < 0)
+    if((fd = index_open_readwrite(root, seqmap->fileid)) < 0)
         return 1;
 
     // jump to the right offset for this entry

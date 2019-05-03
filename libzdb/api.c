@@ -4,6 +4,8 @@
 #include <inttypes.h>
 #include <time.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
 
@@ -415,4 +417,46 @@ zdb_api_t *zdb_api_del(namespace_t *ns, void *key, size_t ksize) {
     return zdb_api_reply_success();
 }
 
+char *zdb_index_date(uint32_t epoch, char *target, size_t length) {
+    return zdb_internal_index_date(epoch, target, length);
+}
 
+index_root_t *zdb_index_init_lazy(zdb_settings_t *settings, char *indexdir, void *namespace) {
+    return index_init_lazy(settings, indexdir, namespace);
+}
+
+uint64_t zdb_index_availity_check(index_root_t *root) {
+    return index_availity_check(root);
+}
+
+index_header_t *zdb_index_descriptor_load(index_root_t *root) {
+    return index_descriptor_load(root);
+}
+
+index_header_t *zdb_index_descriptor_validate(index_header_t *header, index_root_t *root) {
+    return index_descriptor_validate(header, root);
+}
+
+void zdb_index_set_id(index_root_t *root, uint64_t fileid) {
+    return index_set_id(root, fileid);
+}
+
+int zdb_index_open_readonly(index_root_t *root, uint16_t fileid) {
+    return index_open_readonly(root, fileid);
+}
+
+int zdb_index_open_readwrite(index_root_t *root, uint16_t fileid) {
+    return index_open_readwrite(root, fileid);
+}
+
+index_item_t *zdb_index_raw_fetch_entry(index_root_t *root) {
+    return index_raw_fetch_entry(root);
+}
+
+off_t zdb_index_raw_offset(index_root_t *root) {
+    return lseek(root->indexfd, 0, SEEK_CUR);
+}
+
+void zdb_index_close(index_root_t *root) {
+    index_close(root);
+}

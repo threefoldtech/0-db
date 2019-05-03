@@ -13,125 +13,120 @@
 #include <time.h>
 #include "libzdb.h"
 
-void *warnp(char *str) {
-    fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
-    return NULL;
-}
+int index_dump_files(index_root_t *zdbindex, uint64_t maxfile) {
+    index_header_t *header;
+    char datestr[64];
+    size_t totalentries = 0;
 
-void diep(char *str) {
-    warnp(str);
-    exit(EXIT_FAILURE);
-}
+    for(uint16_t fileid = 0; fileid < maxfile; fileid += 1) {
+        //
+        // loading index file
+        //
+        zdb_index_open_readonly(zdbindex, fileid);
 
-static char *index_date(uint32_t epoch, char *target, size_t length) {
-    struct tm *timeval;
-    time_t unixtime;
+        if(!(header = zdb_index_descriptor_load(zdbindex)))
+            return 1;
 
-    unixtime = epoch;
+        if(!zdb_index_descriptor_validate(header, zdbindex))
+            return 1;
 
-    timeval = localtime(&unixtime);
-    strftime(target, length, "%F %T", timeval);
+        printf("[+] index-dump: header seems correct\n");
+        printf("[+] index-dump: created at: %s\n", zdb_index_date(header->created, datestr, sizeof(datestr)));
+        printf("[+] index-dump: last open: %s\n", zdb_index_date(header->opened, datestr, sizeof(datestr)));
 
-    return target;
-}
+        //
+        // dumping contents
+        //
+        index_item_t *entry = NULL;
+        size_t entrycount = 0;
+        off_t curoff;
 
-int index_dump(int fd) {
-    index_header_t header;
-    char entrydate[64];
+        curoff = zdb_index_raw_offset(zdbindex);
 
-    // first step, let's validate the header
-    if(read(fd, &header, sizeof(index_header_t)) != (size_t) sizeof(index_header_t)) {
-        fprintf(stderr, "[-] cannot read index header\n");
-        return 1;
-    }
+        while((entry = zdb_index_raw_fetch_entry(zdbindex))) {
+            entrycount += 1;
+            totalentries += 1;
 
-    if(memcmp(header.magic, "IDX0", 4) != 0) {
-        fprintf(stderr, "[-] index header magic mismatch\n");
-        return 1;
-    }
+            zdb_index_date(entry->timestamp, datestr, sizeof(datestr));
 
-    if(header.version != ZDB_IDXFILE_VERSION) {
-        fprintf(stderr, "[-] index version mismatch (%d <> %d)\n", header.version, ZDB_IDXFILE_VERSION);
-        return 1;
-    }
+            printf("[+] index entry: %lu, offset: %lu\n", entrycount, curoff);
+            printf("[+]   id length  : %" PRIu8 "\n", entry->idlength);
+            printf("[+]   data length: %" PRIu32 "\n", entry->length);
+            printf("[+]   data offset: %" PRIu32 "\n", entry->offset);
+            printf("[+]   data fileid: %" PRIu16 "\n", entry->dataid);
+            printf("[+]   entry flags: 0x%X\n", entry->flags);
+            printf("[+]   entry date : %s\n", datestr);
+            printf("[+]   previous   : %" PRIu32 "\n", entry->previous);
+            printf("[+]   data crc   : %08x\n", entry->crc);
+            printf("[+]   parent id  : %" PRIu16 "\n", entry->parentid);
+            printf("[+]   parent offs: %" PRIu32 "\n", entry->parentoff);
+            printf("[+]   entry key  : ");
+            zdb_tools_hexdump(entry->id, entry->idlength);
+            printf("\n");
 
-    printf("[+] index header seems correct\n");
+            // saving current offset
+            curoff = zdb_index_raw_offset(zdbindex);
+            free(entry);
+        }
 
-    // now it's time to read each entries
-    // each time, one entry starts by the entry-header
-    // then entry payload.
-    // the entry headers starts with the amount of bytes
-    // of the key, which is needed to read the full header
-    uint8_t idlength;
-    index_item_t *entry = NULL;
-    size_t entrycount = 0;
+        printf("[+] ---------------------------\n");
+        printf("[+] file done, file entries found: %lu\n", entrycount);
 
-    while(read(fd, &idlength, sizeof(idlength)) == sizeof(idlength)) {
-        // we have the length of the key
-        ssize_t entrylength = sizeof(index_item_t) + idlength;
-        if(!(entry = realloc(entry, entrylength)))
-            diep("realloc");
-
-        // rollback the 1 byte read for the id length
-        off_t curoff = lseek(fd, -1, SEEK_CUR);
-
-        if(read(fd, entry, entrylength) != entrylength)
-            diep("index header read failed");
-
-        entrycount += 1;
-
-        index_date(entry->timestamp, entrydate, sizeof(entrydate));
-
-        printf("[+] index entry: %lu, offset: %lu\n", entrycount, curoff);
-        printf("[+]   id length  : %" PRIu8 "\n", entry->idlength);
-        printf("[+]   data length: %" PRIu32 "\n", entry->length);
-        printf("[+]   data offset: %" PRIu32 "\n", entry->offset);
-        printf("[+]   data fileid: %" PRIu16 "\n", entry->dataid);
-        printf("[+]   entry flags: 0x%X\n", entry->flags);
-        printf("[+]   entry date : %s\n", entrydate);
-        printf("[+]   previous   : %" PRIu32 "\n", entry->previous);
-        printf("[+]   data crc   : %08x\n", entry->crc);
-        printf("[+]   parent id  : %" PRIu16 "\n", entry->parentid);
-        printf("[+]   parent offs: %" PRIu32 "\n", entry->parentoff);
-        printf("[+]   entry key  : ");
-        zdb_tools_hexdump(entry->id, entry->idlength);
-        printf("\n");
+        zdb_index_close(zdbindex);
     }
 
     printf("[+] ---------------------------\n");
-    printf("[+] all done, entry found: %lu\n", entrycount);
-
-    free(entry);
+    printf("[+] all done, entries found: %lu\n", totalentries);
 
     return 0;
 }
 
 int main(int argc, char *argv[]) {
-    char *filename = NULL;
-    int fd;
-    struct stat sb;
+    char *dirname = NULL;
 
     if(argc < 2) {
-        fprintf(stderr, "Usage: %s index-filename\n", argv[0]);
+        fprintf(stderr, "Usage: %s index-path\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
-    filename = argv[1];
-    printf("[+] dumping index: %s\n", filename);
+    // loading zdb
+    printf("[*] 0-db engine v%s\n", zdb_version());
 
-    if(stat(filename, &sb) != 0)
-        diep(filename);
+    // fetching directory path
+    dirname = argv[1];
+    printf("[+] index-dump: loading: %s\n", dirname);
 
-    if(S_ISDIR(sb.st_mode)) {
-        fprintf(stderr, "[-] %s: target is a directory\n", filename);
+    if(zdb_dir_exists(dirname) != ZDB_DIRECTORY_EXISTS) {
+        fprintf(stderr, "[-] index-dump: could not reach index directory\n");
         exit(EXIT_FAILURE);
     }
 
-    if((fd = open(filename, O_RDONLY, 0600)) < 0)
-        diep(filename);
+    // initializing database
+    zdb_settings_t *zdb_settings = zdb_initialize();
+    zdb_id_set("index-dump");
 
-    index_dump(fd);
-    close(fd);
+    // WARNING: we *don't* open the database, this would populate
+    //          memory, reading and loading everything... we just want
+    //          to initialize structs but not loads anything
+    //
+    //          we will shortcut the database loading and directly
+    //          call the low-level index lazy loader (lazy loader won't
+    //          load anything except structs)
+    //
+    // zdb_open(zdb_settings);
+    index_root_t *zdbindex;
 
-    return 0;
+    if(!(zdbindex = zdb_index_init_lazy(zdb_settings, dirname, NULL))) {
+        fprintf(stderr, "[-] index-dump: cannot load index\n");
+        exit(EXIT_FAILURE);
+    }
+
+    uint64_t maxfile = zdb_index_availity_check(zdbindex);
+    if(maxfile == 0) {
+        fprintf(stderr, "[-] index-dump: no index files found\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // dumping index
+    return index_dump_files(zdbindex, maxfile);
 }
