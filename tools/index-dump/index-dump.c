@@ -31,8 +31,8 @@ int index_dump_files(index_root_t *zdbindex, uint64_t maxfile) {
             return 1;
 
         printf("[+] index-dump: header seems correct\n");
-        printf("[+] index-dump: created at: %s\n", zdb_index_date(header->created, datestr, sizeof(datestr)));
-        printf("[+] index-dump: last open: %s\n", zdb_index_date(header->opened, datestr, sizeof(datestr)));
+        printf("[+] index-dump: created at: %s\n", zdb_header_date(header->created, datestr, sizeof(datestr)));
+        printf("[+] index-dump: last open: %s\n", zdb_header_date(header->opened, datestr, sizeof(datestr)));
 
         //
         // dumping contents
@@ -47,7 +47,7 @@ int index_dump_files(index_root_t *zdbindex, uint64_t maxfile) {
             entrycount += 1;
             totalentries += 1;
 
-            zdb_index_date(entry->timestamp, datestr, sizeof(datestr));
+            zdb_header_date(entry->timestamp, datestr, sizeof(datestr));
 
             printf("[+] index entry: %lu, offset: %lu\n", entrycount, curoff);
             printf("[+]   id length  : %" PRIu8 "\n", entry->idlength);

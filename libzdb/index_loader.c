@@ -7,8 +7,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <time.h>
 #include <limits.h>
+#include <time.h>
 #include <errno.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
@@ -16,18 +16,6 @@
 //
 // index initializer and dumper
 //
-char *zdb_internal_index_date(uint32_t epoch, char *target, size_t length) {
-    struct tm *timeval;
-    time_t unixtime;
-
-    unixtime = epoch;
-
-    timeval = localtime(&unixtime);
-    strftime(target, length, "%F %T", timeval);
-
-    return target;
-}
-
 static inline void index_dump_entry(index_entry_t *entry) {
     printf("[+] key [");
     zdb_hexdump(entry->id, entry->idlength);
@@ -261,8 +249,8 @@ static size_t index_load_file(index_root_t *root) {
     }
 
     char date[256];
-    zdb_verbose("[+] index: created at: %s\n", zdb_internal_index_date(header.created, date, sizeof(date)));
-    zdb_verbose("[+] index: last open: %s\n", zdb_internal_index_date(header.opened, date, sizeof(date)));
+    zdb_verbose("[+] index: created at: %s\n", zdb_header_date(header.created, date, sizeof(date)));
+    zdb_verbose("[+] index: last open: %s\n", zdb_header_date(header.opened, date, sizeof(date)));
 
     if(header.mode != zdb_rootsettings.mode) {
         zdb_danger("[!] ========================================================");

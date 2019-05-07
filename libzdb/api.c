@@ -417,10 +417,6 @@ zdb_api_t *zdb_api_del(namespace_t *ns, void *key, size_t ksize) {
     return zdb_api_reply_success();
 }
 
-char *zdb_index_date(uint32_t epoch, char *target, size_t length) {
-    return zdb_internal_index_date(epoch, target, length);
-}
-
 index_root_t *zdb_index_init_lazy(zdb_settings_t *settings, char *indexdir, void *namespace) {
     return index_init_lazy(settings, indexdir, namespace);
 }

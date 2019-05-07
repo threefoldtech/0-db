@@ -1,8 +1,6 @@
 #ifndef __ZDB_INDEX_LOADER_H
     #define __ZDB_INDEX_LOADER_H
 
-    char *zdb_internal_index_date(uint32_t epoch, char *target, size_t length);
-
     // initialize index header file
     index_header_t index_initialize(int fd, uint16_t indexid, index_root_t *root);
 

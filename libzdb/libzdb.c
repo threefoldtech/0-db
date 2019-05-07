@@ -9,6 +9,7 @@
 #include <execinfo.h>
 #include <getopt.h>
 #include <ctype.h>
+#include <time.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
 
@@ -112,3 +113,16 @@ void zdb_diep(char *str) {
     zdb_warnp(str);
     exit(EXIT_FAILURE);
 }
+
+char *zdb_header_date(uint32_t epoch, char *target, size_t length) {
+    struct tm *timeval;
+    time_t unixtime;
+
+    unixtime = epoch;
+
+    timeval = localtime(&unixtime);
+    strftime(target, length, "%F %T", timeval);
+
+    return target;
+}
+
