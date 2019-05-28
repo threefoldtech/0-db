@@ -11,14 +11,15 @@ SET and GET request.
 # Quick links
 1. [Build targets](#build-targets)
 2. [Build instructions](#build-instructions)
-3. [Always append](#always-append)
-4. [Running modes](#running-modes)
-5. [Implementation](#implementation)
-6. [Supported commands](#supported-commands)
-7. [Namespaces](#namespaces)
-8. [Hook system](#hook-system)
-9. [Limitation](#limitation)
-10. [Tests](#tests)
+3. [Running](#running)
+4. [Always append](#always-append)
+5. [Running modes](#running-modes)
+6. [Implementation](#implementation)
+7. [Supported commands](#supported-commands)
+8. [Namespaces](#namespaces)
+9. [Hook system](#hook-system)
+10. [Limitation](#limitation)
+11. [Tests](#tests)
 
 # Build targets
 Currently supported system:
@@ -38,6 +39,10 @@ To build the project (server, tools):
 You can build each parts separatly by running `make` in each separated directories.
 
 > By default, the code is compiled in debug mode, in order to use it in production, please use `make release`
+
+# Running
+## default port
+0-db listens by default on port `9900` but this can be overidden on the commandline.
 
 # Always append
 Data file (files which contains everything, included payload) are **in any cases** always append:
