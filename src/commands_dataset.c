@@ -136,6 +136,13 @@ int command_del(redis_client_t *client) {
         return 1;
     }
 
+    // disable deletion when worm mode enabled
+    if(client->ns->worm) {
+        debug("[-] command: del: denied, deleting a key with worm mode\n");
+        redis_hardsend(client, "-Cannot delete a key when namespace is in worm mode");
+        return 1;
+    }
+
     // update data file, flag entry deleted
     if(!data_delete(data, entry->id, entry->idlength)) {
         debug("[-] command: del: deleting data failed\n");

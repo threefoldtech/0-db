@@ -86,6 +86,9 @@ void namespace_descriptor_update(namespace_t *namespace, int fd) {
     if(namespace->public)
         header.flags |= NS_FLAGS_PUBLIC;
 
+    if(namespace->worm)
+        header.flags |= NS_FLAGS_WORM;
+
     if(write(fd, &header, sizeof(ns_header_t)) != sizeof(ns_header_t))
         warnp("namespace header write");
 
@@ -134,6 +137,7 @@ static void namespace_descriptor_load(namespace_t *namespace) {
 
     namespace->maxsize = header.maxsize;
     namespace->public = (header.flags & NS_FLAGS_PUBLIC);
+    namespace->worm = (header.flags & NS_FLAGS_WORM);
 
     if(header.passlength) {
         if(!(namespace->password = calloc(sizeof(char), header.passlength + 1))) {
@@ -151,6 +155,7 @@ static void namespace_descriptor_load(namespace_t *namespace) {
     debug("[+] namespace '%s': maxsize: %lu\n", namespace->name, namespace->maxsize);
     debug("[+] -> password protection: %s\n", namespace->password ? "yes" : "no");
     debug("[+] -> public access: %s\n", namespace->public ? "yes" : "no");
+    debug("[+] -> worm mode: %s\n", namespace->worm ? "yes" : "no");
 
     close(fd);
 }
@@ -226,6 +231,7 @@ namespace_t *namespace_load_light(ns_root_t *nsroot, char *name) {
     namespace->indexpath = namespace_path(nsroot->settings->indexpath, name);
     namespace->datapath = namespace_path(nsroot->settings->datapath, name);
     namespace->public = 1;  // by default, namespace are public (no password)
+    namespace->worm = 0;    // by default, worm mode is disabled
     namespace->maxsize = 0; // by default, there is no limits
     namespace->idlist = 0;  // by default, no list set
 
