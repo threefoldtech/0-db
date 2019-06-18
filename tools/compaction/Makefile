@@ -5,7 +5,8 @@ OBJ = $(SRC:.c=.o)
 CFLAGS += -g -std=gnu99 -W -Wall -O2 -msse4.2 -I../../src
 LDFLAGS += -rdynamic
 
-all: $(EXEC)
+# all: $(EXEC)
+all:
 
 release: CFLAGS += -DRELEASE
 release: $(EXEC)
