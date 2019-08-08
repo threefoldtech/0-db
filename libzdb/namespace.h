@@ -8,6 +8,7 @@
 
     typedef enum ns_flags_t {
         NS_FLAGS_PUBLIC = 1,   // public read-only namespace
+        NS_FLAGS_WORM = 2,     // worm mode enabled or not
 
     } ns_flags_t;
 
@@ -17,7 +18,7 @@
         uint8_t namelength;    // length of the namespace name
         uint8_t passlength;    // length of the password
         uint32_t maxsize;      // maximum datasize allowed on that namespace
-        uint8_t flags;         // some flags (see define below)
+        uint8_t flags;         // some flags (see define above)
 
     } __attribute__((packed)) ns_header_t;
 
@@ -31,6 +32,8 @@
         char public;           // publicly readable (read without password)
         size_t maxsize;        // maximum size allowed
         size_t idlist;         // nsroot list index
+        char worm;             // worm mode (write only read multiple)
+                               // this mode disable overwrite/deletion
 
     } namespace_t;
 

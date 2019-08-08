@@ -277,6 +277,13 @@ int command_set(redis_client_t *client) {
             floating = entry->length;
     }
 
+    // checking if worm mode enabled and key already exists
+    if(entry && client->ns->worm) {
+        zdbd_debug("[-] command: set: denied, overwriting an existing key with worm mode\n");
+        redis_hardsend(client, "-Namespace is protected by worm mode");
+        return 1;
+    }
+
     // check if namespace limitation is set
     if(client->ns->maxsize) {
         size_t limits = client->ns->maxsize + floating;

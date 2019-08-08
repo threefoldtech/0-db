@@ -244,6 +244,7 @@ int command_nsinfo(redis_client_t *client) {
     sprintf(info + strlen(info), "name: %s\n", namespace->name);
     sprintf(info + strlen(info), "entries: %lu\n", namespace->index->entries);
     sprintf(info + strlen(info), "public: %s\n", namespace->public ? "yes" : "no");
+    sprintf(info + strlen(info), "worm: %s\n", namespace->worm ? "yes" : "no");
     sprintf(info + strlen(info), "password: %s\n", namespace->password ? "yes" : "no");
     sprintf(info + strlen(info), "data_size_bytes: %lu\n", namespace->index->datasize);
     sprintf(info + strlen(info), "data_size_mb: %.2f\n", MB(namespace->index->datasize));
@@ -375,6 +376,10 @@ int command_nsset(redis_client_t *client) {
     } else if(strcmp(command, "public") == 0) {
         namespace->public = (value[0] == '1') ? 1 : 0;
         zdbd_debug("[+] command: nsset: changing public view to: %d\n", namespace->public);
+
+    } else if(strcmp(command, "worm") == 0) {
+        namespace->worm = (value[0] == '1') ? 1 : 0;
+        zdbd_debug("[+] command: nsset: changing worm mode to: %d\n", namespace->worm);
 
     } else {
         zdbd_debug("[-] command: nsset: unknown property '%s'\n", command);
