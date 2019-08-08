@@ -5,6 +5,9 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #include <signal.h>
 #include <execinfo.h>
 #include <getopt.h>
@@ -155,6 +158,11 @@ void diep(char *str) {
     exit(EXIT_FAILURE);
 }
 
+void dieg(char *str, int status) {
+    fprintf(stderr, "[-] %s: %s\n", str, gai_strerror(status));
+    exit(EXIT_FAILURE);
+}
+
 static int signal_intercept(int signal, void (*function)(int)) {
     struct sigaction sig;
     int ret;
@@ -217,7 +225,7 @@ static void sighandler(int signal) {
     exit(128 + signal);
 }
 
-static void zdbid_set(char *listenaddr, int port, char *socket) {
+static void zdbid_set(char *listenaddr, char *port, char *socket) {
     if(socket) {
         // unix socket
         if(asprintf(&rootsettings.zdbid, "unix://%s", socket) < 0)
@@ -227,7 +235,7 @@ static void zdbid_set(char *listenaddr, int port, char *socket) {
     }
 
     // default tcp
-    if(asprintf(&rootsettings.zdbid, "tcp://%s:%d", listenaddr, port) < 0)
+    if(asprintf(&rootsettings.zdbid, "tcp://%s:%s", listenaddr, port) < 0)
         diep("asprintf");
 }
 
@@ -295,7 +303,7 @@ void usage() {
 
     printf(" Network options:\n");
     printf("  --listen <addr>     listen address (default " ZDB_DEFAULT_LISTENADDR ")\n");
-    printf("  --port   <port>     listen port (default %d)\n", ZDB_DEFAULT_PORT);
+    printf("  --port   <port>     listen port (default %s)\n", ZDB_DEFAULT_PORT);
     printf("  --socket <path>     unix socket path (override listen and port)\n\n");
 
     printf(" Administrative:\n");
@@ -344,7 +352,7 @@ int main(int argc, char *argv[]) {
                 break;
 
             case 'p':
-                settings->port = atoi(optarg);
+                settings->port = optarg;
                 break;
 
             case 'v':

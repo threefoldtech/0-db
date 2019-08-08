@@ -7,8 +7,8 @@
 
     #define ZDB_DEFAULT_DATAPATH    "./zdb-data"
     #define ZDB_DEFAULT_INDEXPATH   "./zdb-index"
-    #define ZDB_DEFAULT_LISTENADDR  "0.0.0.0"
-    #define ZDB_DEFAULT_PORT        9900
+    #define ZDB_DEFAULT_LISTENADDR  "::"
+    #define ZDB_DEFAULT_PORT        "9900"
 
     #define ZDB_PATH_MAX    4096
 
@@ -72,7 +72,7 @@
         char *datapath;   // path where data files will be written
         char *indexpath;  // path where index files will be written
         char *listen;     // network listen address
-        int port;         // network listen port
+        char *port;       // network listen port
         int verbose;      // enable verbose print (function 'verbose')
         int dump;         // ask to dump index on the load-time
         int sync;         // force to sync each write
@@ -152,6 +152,7 @@
     extern settings_t rootsettings;
 
     void diep(char *str);
+    void dieg(char *str, int status);
     void *warnp(char *str);
     void verbosep(char *prefix, char *str);
 #endif
