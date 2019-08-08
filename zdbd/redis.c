@@ -1140,26 +1140,28 @@ int redis_posthandler_client(redis_client_t *client) {
 // to a none-valid namespace, in order to notify them
 
 // classic tcp socket
-static int redis_tcp_listen(char *listenaddr, int port) {
-    struct sockaddr_in addr;
-    struct hostent *hent;
+static int redis_tcp_listen(char *listenaddr, char *port) {
+    struct addrinfo hints;
+    struct addrinfo *sinfo;
+    int status;
     int fd;
 
-    if((hent = gethostbyname(listenaddr)) == NULL)
-        zdbd_diep("gethostbyname");
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
 
-    memcpy(&addr.sin_addr, hent->h_addr_list[0], hent->h_length);
+    zdbd_debug("[+] network: looking for: host: %s, port: %s\n", listenaddr, port);
 
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
+    if((status = getaddrinfo(listenaddr, port, &hints, &sinfo)) != 0)
+        zdbd_dieg("getaddrinfo", status);
 
-    if((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    if((fd = socket(sinfo->ai_family, SOCK_STREAM, 0)) == -1)
         zdbd_diep("tcp socket");
 
     if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
         zdbd_diep("tcp setsockopt");
 
-    if(bind(fd, (struct sockaddr*) &addr, sizeof(addr)) == -1)
+    if(bind(fd, sinfo->ai_addr, sinfo->ai_addrlen) == -1)
         zdbd_diep("tcp bind");
 
     return fd;
@@ -1219,7 +1221,7 @@ static void redis_listen_hook() {
     hook_free(hook);
 }
 
-int redis_listen(char *listenaddr, int port, char *socket) {
+int redis_listen(char *listenaddr, char *port, char *socket) {
     zdb_settings_t *zdb_settings = zdb_settings_get();
     redis_handler_t redis;
 

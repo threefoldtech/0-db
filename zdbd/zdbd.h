@@ -5,8 +5,8 @@
         #define ZDBD_REVISION "(unknown)"
     #endif
 
-    #define ZDBD_DEFAULT_LISTENADDR  "0.0.0.0"
-    #define ZDBD_DEFAULT_PORT        9900
+    #define ZDBD_DEFAULT_LISTENADDR  "::"
+    #define ZDBD_DEFAULT_PORT        "9900"
 
     #define ZDBD_PATH_MAX    4096
 
@@ -42,7 +42,7 @@
 
     typedef struct zdbd_settings_t {
         char *listen;     // network listen address
-        int port;         // network listen port
+        char *port;       // network listen port
         int verbose;      // enable verbose print (function 'verbose')
         char *adminpwd;   // admin password, if NULL, all users are admin
         char *socket;     // unix socket path
@@ -75,6 +75,7 @@
     extern zdbd_settings_t zdbd_rootsettings;
 
     void zdbd_diep(char *str);
+    void zdbd_dieg(char *str, int status);
     void *zdbd_warnp(char *str);
     void zdbd_verbosep(char *prefix, char *str);
 #endif

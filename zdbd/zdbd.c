@@ -5,6 +5,9 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #include <signal.h>
 #include <execinfo.h>
 #include <getopt.h>
@@ -124,8 +127,13 @@ void zdbd_diep(char *str) {
     exit(EXIT_FAILURE);
 }
 
+void zdbd_dieg(char *str, int status) {
+    fprintf(stderr, "[-] %s: %s\n", str, gai_strerror(status));
+    exit(EXIT_FAILURE);
+}
+
 // internal id generatir
-char *zdbd_id_set(char *listenaddr, int port, char *socket) {
+char *zdbd_id_set(char *listenaddr, char *port, char *socket) {
     char temp[512];
 
     if(socket) {
@@ -135,7 +143,7 @@ char *zdbd_id_set(char *listenaddr, int port, char *socket) {
     }
 
     // default tcp
-    snprintf(temp, sizeof(temp), "tcp://%s:%d", listenaddr, port);
+    snprintf(temp, sizeof(temp), "tcp://%s:%s", listenaddr, port);
     return zdb_id_set(temp);
 }
 
@@ -259,7 +267,7 @@ void usage() {
 
     printf(" Network options:\n");
     printf("  --listen <addr>     listen address (default " ZDBD_DEFAULT_LISTENADDR ")\n");
-    printf("  --port   <port>     listen port (default %d)\n", ZDBD_DEFAULT_PORT);
+    printf("  --port   <port>     listen port (default %s)\n", ZDBD_DEFAULT_PORT);
     printf("  --socket <path>     unix socket path (override listen and port)\n\n");
 
     printf(" Administrative:\n");
@@ -311,7 +319,7 @@ int main(int argc, char *argv[]) {
                 break;
 
             case 'p':
-                zdbd_settings->port = atoi(optarg);
+                zdbd_settings->port = optarg;
                 break;
 
             case 'v':
