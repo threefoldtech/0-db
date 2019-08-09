@@ -20,13 +20,16 @@ ifeq ($(COVERAGE),1)
 	LDFLAGS += -lgcov --coverage
 endif
 
-all: $(LIB).a
+all: $(LIB).a $(LIB).so
 
 release: CFLAGS += -DRELEASE -O2
-release: clean $(LIB).a
+release: clean $(LIB).a $(LIB).so
+
+$(LIB).so: $(OBJ)
+	$(CC) -shared -o $@ $^ $(LDFLAGS)
 
 $(LIB).a: $(OBJ)
-	$(CC) -shared -o $@ $^ $(LDFLAGS)
+	ar rcs $(LIB).a $(OBJ)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
@@ -35,5 +38,5 @@ clean:
 	$(RM) *.o
 
 mrproper: clean
-	$(RM) $(LIB).a
+	$(RM) $(LIB).a $(LIB).so
 	$(RM) *.gcno *.gcda *.gcov
