@@ -1150,15 +1150,6 @@ static int redis_tcp_listen(char *listenaddr, char *port) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-<<<<<<< HEAD:src/redis.c
-    debug("[+] network: looking for: host: %s, port: %s\n", listenaddr, port);
-
-    if((status = getaddrinfo(listenaddr, port, &hints, &sinfo)) != 0)
-        dieg("getaddrinfo", status);
-
-    if((fd = socket(sinfo->ai_family, SOCK_STREAM, 0)) == -1)
-        diep("tcp socket");
-=======
     zdbd_debug("[+] network: looking for: host: %s, port: %s\n", listenaddr, port);
 
     if((status = getaddrinfo(listenaddr, port, &hints, &sinfo)) != 0)
@@ -1166,17 +1157,12 @@ static int redis_tcp_listen(char *listenaddr, char *port) {
 
     if((fd = socket(sinfo->ai_family, SOCK_STREAM, 0)) == -1)
         zdbd_diep("tcp socket");
->>>>>>> development-lib:zdbd/redis.c
 
     if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
         zdbd_diep("tcp setsockopt");
 
     if(bind(fd, sinfo->ai_addr, sinfo->ai_addrlen) == -1)
-<<<<<<< HEAD:src/redis.c
-        diep("tcp bind");
-=======
         zdbd_diep("tcp bind");
->>>>>>> development-lib:zdbd/redis.c
 
     return fd;
 }

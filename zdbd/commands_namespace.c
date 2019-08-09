@@ -383,7 +383,7 @@ int command_nsset(redis_client_t *client) {
 
     } else if(strcmp(command, "worm") == 0) {
         namespace->worm = (value[0] == '1') ? 1 : 0;
-        debug("[+] command: nsset: changing worm mode to: %d\n", namespace->worm);
+        zdbd_debug("[+] command: nsset: changing worm mode to: %d\n", namespace->worm);
 
     } else {
         zdbd_debug("[-] command: nsset: unknown property '%s'\n", command);
