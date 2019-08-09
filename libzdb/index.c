@@ -151,7 +151,9 @@ int index_open_file_readwrite(index_root_t *root, uint16_t fileid) {
 //
 // open index _with_ internal fd set
 static int index_open_mode(index_root_t *root, uint16_t fileid, int mode) {
+    #ifndef RELEASE
     char *roenabled = (mode == O_RDONLY) ? "yes" : "no";
+    #endif
 
     index_set_id(root, fileid);
     zdb_debug("[+] index: opening file: %s (ro: %s)\n", root->indexfile, roenabled);

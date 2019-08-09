@@ -447,7 +447,7 @@ int main(int argc, char *argv[]) {
     zdbd_verbose("[+] system: instance id: %u\n", zdb_instanceid_get());
 
     // initialize daemon statistics
-    memset(&zdbd_settings->stats, 0x00, sizeof(zdb_stats_t));
+    memset(&zdbd_settings->stats, 0x00, sizeof(zdbd_stats_t));
     zdbd_settings->stats.boottime = time(NULL);
 
     // let's go
