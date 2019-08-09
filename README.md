@@ -1,12 +1,16 @@
 # 0-db [![Build Status](https://travis-ci.org/threefoldtech/0-db.svg?branch=master)](https://travis-ci.org/threefoldtech/0-db) [![codecov](https://codecov.io/gh/threefoldtech/0-db/branch/master/graph/badge.svg)](https://codecov.io/gh/threefoldtech/0-db)  
-0-db is a super fast and efficient key-value store redis-protocol (mostly) compatible which
-makes data persistant inside an always append datafile, with namespaces support.
+0-db (zdb) is a super fast and efficient key-value store which makes data persistant
+inside an always append datafile, with namespaces support.
+
+The database is split in two part:
+- The database engine, which can be used as static or shared library
+- The network daemon using resp (redis protocol) to make a remote database
 
 Indexes are created to speedup restart/reload process, this index is always append too,
-except in direct-mode (see below for more information).
+except in sequential-mode (see below for more information).
 
-We use it as backend for many of our blockchain work and might replace redis for basic
-SET and GET request.
+We use it as backend for many of our blockchain work. It might replace redis for basic request,
+but 0-db is not a redis replacement and never will.
 
 # Quick links
 1. [Build targets](#build-targets)
@@ -32,7 +36,7 @@ Currently supported hardware:
 This project won't compile on something else (for now).
 
 # Build instructions
-To build the project (server, tools):
+To build the project (library, server, tools):
 * Type `make` on the root directory
 * The binaries will be placed on `bin/` directory
 
@@ -41,8 +45,14 @@ You can build each parts separatly by running `make` in each separated directori
 > By default, the code is compiled in debug mode, in order to use it in production, please use `make release`
 
 # Running
-## default port
-0-db listens by default on port `9900` but this can be overidden on the commandline.
+
+0-db is made to be run in network server mode (using zdbd), documentation here is about the server.
+More documentation will comes about the library itself. The library is fresh new and lack of documentation.
+
+## Default port
+0-db listens by default on port `9900` but this can be overidden on the commandline using `--port` option.
+Without argulent, datafiles and indexfiles will be stored on the current working directory, inside
+`zdb-data` and `zdb-index` directories.
 
 # Always append
 Data file (files which contains everything, included payload) are **in any cases** always append:
