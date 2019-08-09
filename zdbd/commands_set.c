@@ -14,6 +14,7 @@
 #include "commands_get.h"
 
 static time_t timestamp_from_set(resp_request_t *request) {
+    // no timestamp on request, setting current time
     if(request->argc == 3)
         return time(NULL);
 

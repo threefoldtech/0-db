@@ -310,6 +310,8 @@ static size_t index_load_file(index_root_t *root) {
             .flags = entry->flags,
             .idxoffset = offset,
             .crc = entry->crc,
+            .parentid = entry->parentid,
+            .parentoff = entry->parentoff,
         };
 
         // insert this entry like it was inserted by a user

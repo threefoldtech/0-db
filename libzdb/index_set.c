@@ -171,6 +171,8 @@ index_entry_t *index_insert_memory_handler_memkey(index_root_t *root, index_set_
     entry->flags = new->flags;
     entry->crc = new->crc;
     entry->timestamp = new->timestamp;
+    entry->parentid = new->parentid;
+    entry->parentoff = new->parentoff;
 
     uint32_t branchkey = index_key_hash(entry->id, entry->idlength);
 
