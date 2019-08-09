@@ -2,8 +2,13 @@ EXEC = index-dump
 SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 
-CFLAGS += -g -std=gnu99 -W -Wall -O2 -msse4.2 -I../../src
-LDFLAGS += -rdynamic 
+CFLAGS += -g -std=gnu99 -W -Wall -O2 -msse4.2 -I../../libzdb
+LDFLAGS += ../../libzdb/libzdb.a -rdynamic
+
+ifeq ($(COVERAGE),1)
+	CFLAGS += -coverage -fprofile-arcs -ftest-coverage
+	LDFLAGS += -lgcov --coverage
+endif
 
 all: $(EXEC)
 

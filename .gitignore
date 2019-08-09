@@ -72,3 +72,5 @@ utilities/db-replicate/db-replicate
 utilities/db-mirror/db-mirror
 tests/pipeline/pipeline
 zos.log
+zdbd/zdb
+zdbd/zdbd

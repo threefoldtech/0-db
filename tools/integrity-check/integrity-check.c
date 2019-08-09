@@ -11,7 +11,7 @@
 #ifdef SHADUMP
 #include <openssl/sha.h>
 #endif
-#include "zerodb.h"
+#include "libzdb.h"
 #include "data.h"
 
 void *warnp(char *str) {

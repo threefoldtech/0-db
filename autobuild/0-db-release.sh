@@ -5,7 +5,10 @@ apt-get update
 apt-get install -y build-essential git
 
 pushd /0-db
-pushd src
+pushd libzdb
+make release
+popd
+pushd zdbd
 make release STATIC=1
 popd
 make

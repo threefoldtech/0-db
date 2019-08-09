@@ -12,7 +12,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <getopt.h>
-#include "zerodb.h"
+#include "libzdb.h"
 #include "index.h"
 #include "data.h"
 #include "namespace.h"

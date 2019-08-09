@@ -1,15 +1,11 @@
-EXEC = compaction
+EXEC = zdb-example
 SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 
-CFLAGS += -g -std=gnu99 -W -Wall -O2 -msse4.2 -I../../src
-LDFLAGS += -rdynamic
+CFLAGS += -g -std=gnu99 -O0 -W -Wall -Wextra -msse4.2 -Wno-implicit-fallthrough -I../libzdb
+LDFLAGS += -rdynamic ../libzdb/libzdb.a
 
-# all: $(EXEC)
-all:
-
-release: CFLAGS += -DRELEASE
-release: $(EXEC)
+all: $(EXEC)
 
 $(EXEC): $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
