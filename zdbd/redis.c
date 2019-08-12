@@ -1164,6 +1164,8 @@ static int redis_tcp_listen(char *listenaddr, char *port) {
     if(bind(fd, sinfo->ai_addr, sinfo->ai_addrlen) == -1)
         zdbd_diep("tcp bind");
 
+    freeaddrinfo(sinfo);
+
     return fd;
 }
 
