@@ -71,7 +71,7 @@ int index_seq_overwrite(index_root_t *root, index_set_t *set) {
     uint32_t offset = index_seq_offset(relative);
 
     // (re-)open the expected index file, in read-write mode
-    if((fd = index_open_readwrite(root, seqmap->fileid)) < 0)
+    if((fd = index_open_readwrite_oneshot(root, seqmap->fileid)) < 0)
         return 1;
 
     // jump to the right offset for this entry
@@ -124,7 +124,7 @@ int index_append_entry_on_disk(index_root_t *root, index_set_t *set) {
     zdb_debug("[+] index: writing entry on disk (%lu bytes)\n", entrylength);
 
     // updating entry with the real offset
-    // we use to insert this object
+    // we used to insert this object
     entry->idxoffset = curoffset;
     index_item_t *item = index_item_from_set(root, set);
 

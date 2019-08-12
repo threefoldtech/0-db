@@ -163,7 +163,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
         .timestamp = timestamp,
     };
 
-    // checking if we need to update this entry of if data are unchanged
+    // checking if we need to update this entry or if data are unchanged
     if(existing && existing->crc == dreq.crc) {
         zdbd_debug("[+] command: set: existing %08x <> %08x crc match, ignoring\n", existing->crc, dreq.crc);
         redis_hardsend(client, "$-1");

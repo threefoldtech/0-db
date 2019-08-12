@@ -261,6 +261,7 @@
     // open index by setting index fd
     int index_open_readonly(index_root_t *root, uint16_t fileid);
     int index_open_readwrite(index_root_t *root, uint16_t fileid);
+    int index_open_readwrite_oneshot(index_root_t *root, uint16_t fileid);
 
     void index_close(index_root_t *root);
 

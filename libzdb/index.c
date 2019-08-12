@@ -68,6 +68,8 @@ static inline int index_sync_check(index_root_t *root, int fd) {
 int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
     ssize_t response;
 
+    zdb_debug("[+] index: writing %lu bytes on fd %d\n", length, fd);
+
     if((response = write(fd, buffer, length)) < 0) {
         // update statistics
         zdb_rootsettings.stats.idxwritefailed += 1;
@@ -117,10 +119,15 @@ static int index_read(int fd, void *buffer, size_t length) {
     return 1;
 }
 
+static char *index_set_id_buffer(char *buffer, char *indexdir, uint16_t indexid) {
+    sprintf(buffer, "%s/zdb-index-%05u", indexdir, indexid);
+    return buffer;
+}
+
 // set global filename based on the index id
 void index_set_id(index_root_t *root, uint16_t fileid) {
     root->indexid = fileid;
-    sprintf(root->indexfile, "%s/zdb-index-%05u", root->indexdir, root->indexid);
+    index_set_id_buffer(root->indexfile, root->indexdir, root->indexid);
 }
 
 //
@@ -150,6 +157,7 @@ int index_open_file_readwrite(index_root_t *root, uint16_t fileid) {
 
 //
 // open index _with_ internal fd set
+//
 static int index_open_mode(index_root_t *root, uint16_t fileid, int mode) {
     #ifndef RELEASE
     char *roenabled = (mode == O_RDONLY) ? "yes" : "no";
@@ -173,6 +181,22 @@ int index_open_readonly(index_root_t *root, uint16_t fileid) {
 int index_open_readwrite(index_root_t *root, uint16_t fileid) {
     return index_open_mode(root, fileid, O_RDWR);
 }
+
+int index_open_readwrite_oneshot(index_root_t *root, uint16_t fileid) {
+    int fd;
+    char tempfile[2048];
+
+    index_set_id_buffer(tempfile, root->indexdir, fileid);
+    zdb_debug("[+] index: opening file (one shot): %s\n", root->indexfile);
+
+    if((fd = open(tempfile, O_RDWR)) < 0) {
+        zdb_verbosep("index_open_oneshot", tempfile);
+        return -1;
+    }
+
+    return fd;
+}
+
 
 // main function to call when you need to deal with multiple index id
 // this function takes care to open the right file id:
