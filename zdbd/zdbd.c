@@ -29,6 +29,7 @@ zdbd_settings_t zdbd_rootsettings = {
     .background = 0,
     .logfile = NULL,
     .protect = 0,
+    .dualnet = 0,
 };
 
 static struct option long_options[] = {
@@ -37,6 +38,7 @@ static struct option long_options[] = {
     {"listen",     required_argument, 0, 'l'},
     {"port",       required_argument, 0, 'p'},
     {"socket",     required_argument, 0, 'u'},
+    {"dualnet",    no_argument,       0, 'N'},
     {"verbose",    no_argument,       0, 'v'},
     {"sync",       no_argument,       0, 's'},
     {"synctime",   required_argument, 0, 't'},
@@ -268,7 +270,8 @@ void usage() {
     printf(" Network options:\n");
     printf("  --listen <addr>     listen address (default " ZDBD_DEFAULT_LISTENADDR ")\n");
     printf("  --port   <port>     listen port (default %s)\n", ZDBD_DEFAULT_PORT);
-    printf("  --socket <path>     unix socket path (override listen and port)\n\n");
+    printf("  --socket <path>     unix socket path (override listen and port without --dualnet)\n");
+    printf("  --dualnet           listen on unix socket and tcp socket\n\n");
 
     printf(" Administrative:\n");
     printf("  --hook     <file>   execute external hook script\n");
@@ -403,6 +406,10 @@ int main(int argc, char *argv[]) {
                 zdbd_settings->socket = optarg;
                 break;
 
+            case 'N':
+                zdbd_settings->dualnet = 1;
+                break;
+
             case 'D':
                 zdb_settings->datasize = atol(optarg);
                 size_t maxsize = 0xffffffff;
@@ -449,6 +456,11 @@ int main(int argc, char *argv[]) {
     // initialize daemon statistics
     memset(&zdbd_settings->stats, 0x00, sizeof(zdbd_stats_t));
     zdbd_settings->stats.boottime = time(NULL);
+
+    // update network listening settings to reflect
+    // if dualnet if set or not
+    if(zdbd_settings->socket && zdbd_settings->dualnet == 0)
+        zdbd_settings->listen = NULL;
 
     // let's go
     return proceed(zdb_settings, zdbd_settings);

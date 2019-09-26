@@ -157,8 +157,9 @@
     #define REDIS_MAX_PAYLOAD 8 * 1024 * 1024
 
     typedef struct redis_handler_t {
-        int mainfd;  // main socket handler
-        int evfd;    // event handler (epoll, kqueue, ...)
+        int *mainfd;  // main sockets handler (support multiple sockets)
+        int fdlen;    // amount of sockets on the list
+        int evfd;     // event handler (epoll, kqueue, ...)
 
     } redis_handler_t;
 

@@ -17,10 +17,45 @@
 #define MAXEVENTS 64
 #define EVTIMEOUT 200
 
+static int socket_client_accept(redis_handler_t *redis, int fd) {
+    int clientfd;
+
+    if((clientfd = accept(fd, NULL, NULL)) == -1) {
+        zdbd_verbosep("socket_event", "accept");
+        return 0;
+    }
+
+    socket_nonblock(clientfd);
+    socket_keepalive(clientfd);
+    socket_client_new(clientfd);
+
+    zdbd_verbose("[+] incoming connection (socket %d)\n", clientfd);
+
+    // adding client to the epoll list
+    struct epoll_event event;
+
+    memset(&event, 0, sizeof(struct epoll_event));
+
+    event.data.fd = clientfd;
+    event.events = EPOLLIN | EPOLLOUT | EPOLLET;
+
+    // we use edge-level because of how the
+    // upload works (need to be notified when client
+    // is ready to receive data, only one time)
+
+    if(epoll_ctl(redis->evfd, EPOLL_CTL_ADD, clientfd, &event) < 0) {
+        zdbd_verbosep("socket_event", "epoll_ctl");
+        return 0;
+    }
+
+    return 1;
+}
+
 static int socket_event(struct epoll_event *events, int notified, redis_handler_t *redis) {
     struct epoll_event *ev;
 
     for(int i = 0; i < notified; i++) {
+        int newclient = 0;
         ev = events + i;
 
         // epoll issue
@@ -33,39 +68,17 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 
         // main socket event: we have a new client
         // creating the new client and accepting it
-        if(ev->data.fd == redis->mainfd) {
-            int clientfd;
-
-            if((clientfd = accept(redis->mainfd, NULL, NULL)) == -1) {
-                zdbd_verbosep("socket_event", "accept");
-                continue;
+        for(int i = 0; i < redis->fdlen; i++) {
+            if(ev->data.fd == redis->mainfd[i]) {
+                socket_client_accept(redis, ev->data.fd);
+                newclient = 1;
             }
-
-            socket_nonblock(clientfd);
-            socket_keepalive(clientfd);
-            socket_client_new(clientfd);
-
-            zdbd_verbose("[+] incoming connection (socket %d)\n", clientfd);
-
-            // adding client to the epoll list
-            struct epoll_event event;
-
-            memset(&event, 0, sizeof(struct epoll_event));
-
-            event.data.fd = clientfd;
-            event.events = EPOLLIN | EPOLLOUT | EPOLLET;
-
-            // we use edge-level because of how the
-            // upload works (need to be notified when client
-            // is ready to receive data, only one time)
-
-            if(epoll_ctl(redis->evfd, EPOLL_CTL_ADD, clientfd, &event) < 0) {
-                zdbd_verbosep("socket_event", "epoll_ctl");
-                continue;
-            }
-
-            continue;
         }
+
+        // we don't need to proceed more if it's
+        // a new client connection
+        if(newclient)
+            continue;
 
         // data available for reading
         // let's read what'a available and checking
@@ -83,7 +96,10 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
             // (dirty) way the STOP event is handled
             if(ctrl == RESP_STATUS_SHUTDOWN) {
                 printf("[+] stopping daemon\n");
-                close(redis->mainfd);
+
+                for(int i = 0; i < redis->fdlen; i++)
+                    close(redis->mainfd[i]);
+
                 return 1;
             }
         }
@@ -108,11 +124,14 @@ int socket_handler(redis_handler_t *handler) {
     if((handler->evfd = epoll_create1(0)) < 0)
         zdbd_diep("epoll_create1");
 
-    event.data.fd = handler->mainfd;
-    event.events = EPOLLIN;
 
-    if(epoll_ctl(handler->evfd, EPOLL_CTL_ADD, handler->mainfd, &event) < 0)
-        zdbd_diep("epoll_ctl");
+    for(int i = 0; i < handler->fdlen; i++) {
+        event.data.fd = handler->mainfd[i];
+        event.events = EPOLLIN;
+
+        if(epoll_ctl(handler->evfd, EPOLL_CTL_ADD, handler->mainfd[i], &event) < 0)
+            zdbd_diep("epoll_ctl");
+    }
 
     events = calloc(MAXEVENTS, sizeof event);
 

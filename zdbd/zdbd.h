@@ -49,6 +49,7 @@
         int background;   // flag to run in background
         char *logfile;    // where to redirect logs in background mode
         int protect;      // flag default namespace to use admin password (for writing)
+        int dualnet;      // support for dual socket listening
 
         zdbd_stats_t stats;
 

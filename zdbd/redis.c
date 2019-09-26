@@ -1223,9 +1223,25 @@ static void redis_listen_hook() {
     hook_free(hook);
 }
 
+int redis_socket_init(redis_handler_t *redis, char *listenaddr, char *socket) {
+    redis->fdlen = 0;
+
+    if(listenaddr)
+        redis->fdlen += 1;
+
+    if(socket)
+        redis->fdlen += 1;
+
+    if(!(redis->mainfd = malloc(sizeof(int) * redis->fdlen)))
+        zdbd_diep("sockets malloc");
+
+    return redis->fdlen;
+}
+
 int redis_listen(char *listenaddr, char *port, char *socket) {
     zdb_settings_t *zdb_settings = zdb_settings_get();
     redis_handler_t redis;
+    int fdindex = 0;
 
     // allocating space for clients
     clients.length = REDIS_CLIENTS_INITIAL_LENGTH;
@@ -1233,19 +1249,35 @@ int redis_listen(char *listenaddr, char *port, char *socket) {
     if(!(clients.list = calloc(sizeof(redis_client_t *), clients.length)))
         zdbd_diep("clients malloc");
 
-    if(socket) {
-        redis.mainfd = redis_unix_listen(socket);
+    redis_socket_init(&redis, listenaddr, socket);
 
-    } else {
-        redis.mainfd = redis_tcp_listen(listenaddr, port);
+    // if unix socket is requested, adding it
+    if(socket) {
+        redis.mainfd[fdindex] = redis_unix_listen(socket);
+        zdbd_debug("[+] listen request: unix://%s (fd: %d)\n", socket, redis.mainfd[fdindex]);
+
+        socket_nonblock(redis.mainfd[fdindex]);
+        fdindex += 1;
     }
 
-    socket_nonblock(redis.mainfd);
+    // if tcp socket is requested, adding it
+    if(listenaddr) {
+        redis.mainfd[fdindex] = redis_tcp_listen(listenaddr, port);
+        zdbd_debug("[+] listen request: tcp://%s:%s (fd: %d)\n", listenaddr, port, redis.mainfd[fdindex]);
 
-    if(listen(redis.mainfd, SOMAXCONN) == -1)
-        zdbd_diep("listen");
+        socket_nonblock(redis.mainfd[fdindex]);
+        fdindex += 1;
+    }
 
-    zdbd_success("[+] listening on: %s", zdb_id());
+    // configuring each sockets
+    for(int i = 0; i < redis.fdlen; i++) {
+        socket_nonblock(redis.mainfd[i]);
+
+        if(listen(redis.mainfd[i], SOMAXCONN) == -1)
+            zdbd_diep("listen");
+
+        zdbd_success("[+] listening on socket %d", redis.mainfd[i]);
+    }
 
     if(zdbd_rootsettings.background)
         daemonize();

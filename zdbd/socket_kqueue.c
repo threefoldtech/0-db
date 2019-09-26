@@ -18,10 +18,40 @@
 #define EVTIMEOUT 150
 struct kevent evset;
 
+static int socket_client_accept(redis_handler_t *redis, int fd) {
+    int clientfd;
+
+    if((clientfd = accept(fd, NULL, NULL)) == -1) {
+        zdbd_warnp("accept");
+        return 1;
+    }
+
+    socket_nonblock(clientfd);
+    socket_keepalive(clientfd);
+    socket_client_new(clientfd);
+
+    zdbd_verbose("[+] incoming connection (socket %d)\n", clientfd);
+
+    EV_SET(&evset, clientfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+    if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1) {
+        zdbd_warnp("kevent: filter read");
+        return 1;
+    }
+
+    EV_SET(&evset, clientfd, EVFILT_WRITE, EV_ADD | EV_ONESHOT, 0, 0, NULL);
+    if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1) {
+        zdbd_warnp("kevent: filter write");
+        return 1;
+    }
+
+    return 1;
+}
+
 static int socket_event(struct kevent *events, int notified, redis_handler_t *redis) {
     struct kevent *ev;
 
     for(int i = 0; i < notified; i++) {
+        int newclient = 0;
         ev = events + i;
 
         if(ev->flags & EV_EOF) {
@@ -33,35 +63,21 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
             socket_client_free(ev->ident);
             continue;
 
-        } else if((int) ev->ident == redis->mainfd) {
-            int clientfd;
-
-            if((clientfd = accept(redis->mainfd, NULL, NULL)) == -1) {
-                zdbd_warnp("accept");
-                continue;
-            }
-
-            socket_nonblock(clientfd);
-            socket_keepalive(clientfd);
-            socket_client_new(clientfd);
-
-            zdbd_verbose("[+] incoming connection (socket %d)\n", clientfd);
-
-
-            EV_SET(&evset, clientfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
-            if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1) {
-                zdbd_warnp("kevent: filter read");
-                continue;
-            }
-
-            EV_SET(&evset, clientfd, EVFILT_WRITE, EV_ADD | EV_ONESHOT, 0, 0, NULL);
-            if(kevent(redis->evfd, &evset, 1, NULL, 0, NULL) == -1) {
-                zdbd_warnp("kevent: filter write");
-                continue;
-            }
-
-            continue;
         }
+
+        // main socket event: we have a new client
+        // creating the new client and accepting it
+        for(int i = 0; i < redis->fdlen; i++) {
+            if((int) ev->ident == redis->mainfd[i]) {
+                socket_client_accept(redis, (int) ev->ident);
+                newclient = 1;
+            }
+        }
+
+        // we don't need to proceed more if it's
+        // a new client connection
+        if(newclient)
+            continue;
 
         if(ev->filter == EVFILT_READ) {
             // calling the redis chunk event handler
@@ -76,7 +92,10 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
             // (dirty) way the STOP event is handled
             if(ctrl == RESP_STATUS_SHUTDOWN) {
                 printf("[+] stopping daemon\n");
-                close(redis->mainfd);
+
+                for(int i = 0; i < redis->fdlen; i++)
+                    close(redis->mainfd[i]);
+
                 return 1;
             }
         }
@@ -96,14 +115,17 @@ int socket_handler(redis_handler_t *handler) {
         .tv_nsec = EVTIMEOUT * 1000000
     };
 
-    // initialize empty struct
-    EV_SET(&evset, handler->mainfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
 
     if((handler->evfd = kqueue()) < 0)
         zdbd_diep("kqueue");
 
-    if(kevent(handler->evfd, &evset, 1, NULL, 0, NULL) == -1)
-        zdbd_diep("kevent");
+    for(int i = 0; i < handler->fdlen; i++) {
+        // initialize empty struct
+        EV_SET(&evset, handler->mainfd[i], EVFILT_READ, EV_ADD, 0, 0, NULL);
+
+        if(kevent(handler->evfd, &evset, 1, NULL, 0, NULL) == -1)
+            zdbd_diep("kevent");
+    }
 
     // waiting for clients
     // this is how we supports multi-client using a single thread
