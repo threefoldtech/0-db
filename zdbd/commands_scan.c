@@ -88,6 +88,10 @@ static int command_scan_send_scanlist(scan_list_t *scanlist, redis_client_t *cli
         return 0;
     }
 
+    for(size_t i = 0; i < scanlist->length; i++) {
+        scaninfo_dump(&scanlist->scansinfo[i]);
+    }
+
     // array response, with 2 arguments:
     //  - first one is the next SCAN key value
     //    (in our case, this is always the same value as the returned id)
@@ -325,6 +329,7 @@ int command_keycur(redis_client_t *client) {
 
     // building binary key
     index_bkey_t bkey = index_entry_serialize(entry);
+    index_entry_dump(entry);
 
     // building binary response string
     offset += snprintf(response, sizeof(response), "$%lu\r\n", sizeof(index_bkey_t));

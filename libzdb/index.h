@@ -251,6 +251,7 @@
     void index_release_fileid(index_root_t *root, uint16_t fileid, int fd);
 
     void index_item_header_dump(index_item_t *item);
+    void index_entry_dump(index_entry_t *entry);
 
     uint32_t index_key_hash(unsigned char *id, uint8_t idlength);
 

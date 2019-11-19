@@ -17,21 +17,42 @@
 //       since each namespace have their own index, now
 //       we need to pass the index to each function
 
-// dump an index entry item
+// dump an index_item_t
 void index_item_header_dump(index_item_t *item) {
 #ifdef RELEASE
     (void) item;
 #else
-    zdb_debug("[+] index: entry dump: id length  : %" PRIu8  "\n", item->idlength);
-    zdb_debug("[+] index: entry dump: data offset: %" PRIu32 "\n", item->offset);
-    zdb_debug("[+] index: entry dump: data length: %" PRIu32 "\n", item->length);
-    zdb_debug("[+] index: entry dump: previous   : %" PRIX32 "\n", item->previous);
-    zdb_debug("[+] index: entry dump: flags      : %" PRIu8  "\n", item->flags);
-    zdb_debug("[+] index: entry dump: timestamp  : %" PRIu32 "\n", item->timestamp);
-    zdb_debug("[+] index: entry dump: parent id  : %" PRIu16 "\n", item->parentid);
-    zdb_debug("[+] index: entry dump: parent offs: %" PRIu32 "\n", item->parentoff);
+    zdb_debug("[+] index: item dump: id length  : %" PRIu8  "\n", item->idlength);
+    zdb_debug("[+] index: item dump: data offset: %" PRIu32 "\n", item->offset);
+    zdb_debug("[+] index: item dump: data length: %" PRIu32 "\n", item->length);
+    zdb_debug("[+] index: item dump: previous   : %" PRIx32 "\n", item->previous);
+    zdb_debug("[+] index: item dump: flags      : %" PRIu8  "\n", item->flags);
+    zdb_debug("[+] index: item dump: timestamp  : %" PRIu32 "\n", item->timestamp);
+    zdb_debug("[+] index: item dump: parent id  : %" PRIu16 "\n", item->parentid);
+    zdb_debug("[+] index: item dump: parent offs: %" PRIu32 "\n", item->parentoff);
+    zdb_debug("[+] index: item dump: crc        : %" PRIx32 "\n", item->crc);
 #endif
 }
+
+// dump an index_entry_t
+void index_entry_dump(index_entry_t *entry) {
+#ifdef RELEASE
+    (void) entry;
+#else
+    zdb_debug("[+] index: entry dump: namespace  : %p\n", entry->namespace);
+    zdb_debug("[+] index: entry dump: id length  : %" PRIu8  "\n", entry->idlength);
+    zdb_debug("[+] index: entry dump: idx offset : %" PRIu8  "\n", entry->idxoffset);
+    zdb_debug("[+] index: entry dump: idx fileid : %" PRIu8  "\n", entry->indexid);
+    zdb_debug("[+] index: entry dump: data offset: %" PRIu32 "\n", entry->offset);
+    zdb_debug("[+] index: entry dump: data length: %" PRIu32 "\n", entry->length);
+    zdb_debug("[+] index: entry dump: flags      : %" PRIu8  "\n", entry->flags);
+    zdb_debug("[+] index: entry dump: timestamp  : %" PRIu32 "\n", entry->timestamp);
+    zdb_debug("[+] index: entry dump: parent id  : %" PRIu16 "\n", entry->parentid);
+    zdb_debug("[+] index: entry dump: parent offs: %" PRIu32 "\n", entry->parentoff);
+    zdb_debug("[+] index: entry dump: crc        : %" PRIx32 "\n", entry->crc);
+#endif
+}
+
 
 
 // force index to be sync'd with underlaying device
@@ -212,7 +233,7 @@ inline int index_grab_fileid(index_root_t *root, uint16_t fileid) {
     if(root->indexid != fileid) {
         // the requested datafile is not the current datafile opened
         // we will re-open the expected datafile temporary
-        zdb_debug("[-] index: switching file: %d, requested: %d\n", root->indexid, fileid);
+        zdb_debug("[-] index: switching file: current: %d, requested: %d\n", root->indexid, fileid);
         if((fd = index_open_file_readonly(root, fileid)) < 0)
             return -1;
     }
