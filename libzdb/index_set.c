@@ -119,7 +119,7 @@ index_item_t *index_item_from_set(index_root_t *root, index_set_t *set) {
     index_transition->offset = entry->offset;
     index_transition->length = entry->length;
     index_transition->flags = entry->flags;
-    index_transition->dataid = root->indexid;
+    index_transition->dataid = root->indexid; // WARNING: check this
     index_transition->timestamp = entry->timestamp;
     index_transition->previous = root->previous;
     index_transition->parentid = entry->parentid;
@@ -180,7 +180,8 @@ index_entry_t *index_insert_memory_handler_memkey(index_root_t *root, index_set_
     entry->namespace = root->namespace;
     entry->offset = new->offset;
     entry->length = new->length;
-    entry->dataid = root->indexid;
+    entry->dataid = root->indexid; // WARNING: check this
+    entry->indexid = new->indexid; // WARNING: check this
     entry->idxoffset = new->idxoffset;
     entry->flags = new->flags;
     entry->crc = new->crc;
@@ -245,7 +246,7 @@ index_entry_t *index_update_memory_handler_memkey(index_root_t *root, index_set_
     exists->length = new->length;
     exists->offset = new->offset;
     exists->flags = new->flags;
-    exists->dataid = root->indexid;
+    exists->dataid = root->indexid; // WARNING: check this
     exists->idxoffset = new->idxoffset;
     exists->crc = new->crc;
     exists->timestamp = new->timestamp;

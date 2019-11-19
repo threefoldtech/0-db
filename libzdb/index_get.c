@@ -40,6 +40,7 @@ static index_entry_t *index_get_handler_sequential(index_root_t *index, void *id
     index_reusable_entry->idlength = item->idlength;
     index_reusable_entry->offset = item->offset;
     index_reusable_entry->dataid = item->dataid;
+    index_reusable_entry->indexid = seqmap->fileid;
     index_reusable_entry->flags = item->flags;
     index_reusable_entry->idxoffset = offset;
     index_reusable_entry->crc = item->crc;

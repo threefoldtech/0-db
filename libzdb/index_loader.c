@@ -305,6 +305,8 @@ static size_t index_load_file(index_root_t *root) {
         // generic and clear
         index_entry_t source = {
             .idlength = entry->idlength,
+            .indexid = root->indexid,
+            // WARNING: missing dataid ?
             .length = entry->length,
             .offset = entry->offset,
             .flags = entry->flags,

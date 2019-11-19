@@ -530,10 +530,12 @@ int index_entry_delete(index_root_t *root, index_entry_t *entry) {
 
 // serialize into binary object a deserializable
 // object identifier
-index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset) {
+index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset, uint16_t idxfileid) {
+    zdb_debug("[+] index: item serialize: offset: %" PRIu32 ", fileid: %" PRIu16 "\n", idxoffset, idxfileid);
+
     index_bkey_t key = {
         .idlength = item->idlength,
-        .fileid = item->dataid,
+        .fileid = idxfileid,
         .length = item->length,
         .idxoffset = idxoffset,
         .crc = item->crc
@@ -543,9 +545,11 @@ index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset) {
 }
 
 index_bkey_t index_entry_serialize(index_entry_t *entry) {
+    zdb_debug("[+] index: entry serialize: offset: %" PRIu32 ", fileid: %" PRIu16 "\n", entry->idxoffset, entry->indexid);
+
     index_bkey_t key = {
         .idlength = entry->idlength,
-        .fileid = entry->dataid,
+        .fileid = entry->indexid,
         .length = entry->length,
         .idxoffset = entry->idxoffset,
         .crc = entry->crc
@@ -559,6 +563,8 @@ index_bkey_t index_entry_serialize(index_entry_t *entry) {
 // and ensure the key object seems legit with the requested key
 index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key) {
     index_item_t *item;
+
+    zdb_debug("[+] index: fetching from disk: fileid: %u, offset: %u\n", key->fileid, key->idxoffset);
 
     if(!(item = index_item_get_disk(root, key->fileid, key->idxoffset, key->idlength)))
         return NULL;
@@ -584,6 +590,7 @@ index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key) {
     entry->idlength = item->idlength;
     entry->offset = item->offset;
     entry->dataid = item->dataid;
+    entry->indexid = key->fileid;
     entry->flags = item->flags;
     entry->idxoffset = key->idxoffset;
     entry->crc = item->crc;

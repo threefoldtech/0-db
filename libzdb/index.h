@@ -45,6 +45,11 @@
         uint32_t offset;     // offset on the corresponding datafile
         uint32_t length;     // length of the payload on the datafile
         uint32_t previous;   // previous entry offset
+
+        // WARNING: 'previous' flag was buggy in early version, only in direct mode
+        //          the flag was updated on overwrite when it should not have changed
+        //          (previous entry in the file doesn't change even if new entries comes)
+
         uint8_t flags;       // key flags (eg: deleted)
         uint16_t dataid;     // datafile id where is stored the payload
         uint32_t timestamp;  // when was the key created (unix timestamp)
@@ -79,7 +84,8 @@
         uint32_t idxoffset;  // offset on the index file (index file id is the same as data file)
         uint32_t length;     // length of the payload on the datafile
         uint8_t flags;       // keep deleted flags (should be index_flags_t type)
-        uint16_t dataid;     // datafile id where is stored the payload
+        uint16_t dataid;     // datafile id where payload is located
+        uint16_t indexid;    // indexfile id where this index entry is located
         uint32_t crc;        // the data payload crc32
         uint16_t parentid;   // parent index file id (history)
         uint32_t parentoff;  // parent index file offset (history)
@@ -243,7 +249,7 @@
     size_t index_offset_objectid(uint32_t idobj);
     uint16_t index_indexid(index_root_t *root);
 
-    index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset);
+    index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset, uint16_t idxfileid);
     index_bkey_t index_entry_serialize(index_entry_t *entry);
     index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key);
 

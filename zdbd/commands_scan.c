@@ -31,19 +31,19 @@ uint64_t ustime() {
 // append one entry into the scanlist result
 // if the list is not large enough to contains the entry
 // growing it up a little bit
-static scan_list_t *scanlist_append(scan_list_t *scanlist, index_scan_t *scan) {
+static scan_list_t *scanlist_append(scan_list_t *scanlist, index_scan_t *scan, scan_info_t *info) {
     if(scanlist->length + 1 > scanlist->allocated) {
         scanlist->allocated += 32;
 
         if(!(scanlist->items = realloc(scanlist->items, scanlist->allocated * sizeof(index_item_t *))))
             return NULL;
 
-        if(!(scanlist->offsets = realloc(scanlist->offsets, scanlist->allocated * sizeof(uint32_t))))
+        if(!(scanlist->scansinfo = realloc(scanlist->scansinfo, scanlist->allocated * sizeof(scan_info_t))))
             return NULL;
     }
 
     scanlist->items[scanlist->length] = scan->header;
-    scanlist->offsets[scanlist->length] = scan->target;
+    scanlist->scansinfo[scanlist->length] = *info;
     scanlist->length += 1;
 
     return scanlist;
@@ -58,17 +58,27 @@ static void scanlist_free(scan_list_t *scanlist) {
         free(scanlist->items[i]);
 
     free(scanlist->items);
-    free(scanlist->offsets);
+    free(scanlist->scansinfo);
+}
+
+static void scaninfo_dump(scan_info_t *info) {
+    zdbd_debug("[+] scaninfo: idx: %u, offset: %lu, data: %u\n", info->idxid, info->idxoffset, info->dataid);
 }
 
 static void scaninfo_from_scan(scan_info_t *info, index_scan_t *scan) {
     info->dataid = scan->header->dataid;
+    info->idxid = scan->fileid;
     info->idxoffset = scan->target;
+
+    scaninfo_dump(info);
 }
 
 static void scaninfo_from_entry(scan_info_t *info, index_entry_t *entry) {
     info->dataid = entry->dataid;
+    info->idxid = entry->indexid;
     info->idxoffset = entry->idxoffset;
+
+    scaninfo_dump(info);
 }
 
 //
@@ -78,8 +88,8 @@ static int command_scan_send_scanlist(scan_list_t *scanlist, redis_client_t *cli
     char *response;
     size_t offset = 0;
     index_item_t *entry;
+    scan_info_t *scaninfo;
     index_bkey_t bkey;
-    uint32_t idxoffset;
 
     // if the list is empty, we have nothing
     // to send, obviously
@@ -102,8 +112,8 @@ static int command_scan_send_scanlist(scan_list_t *scanlist, redis_client_t *cli
 
     // converting the last object key into a binary serialized key
     entry = scanlist->items[scanlist->length - 1];
-    idxoffset = scanlist->offsets[scanlist->length - 1];
-    bkey = index_item_serialize(entry, idxoffset);
+    scaninfo = &scanlist->scansinfo[scanlist->length - 1];
+    bkey = index_item_serialize(entry, scaninfo->idxoffset, scaninfo->idxid);
 
     // get last entry for the next key value
     offset = sprintf(response, "*2\r\n$%ld\r\n", sizeof(index_bkey_t));
@@ -144,8 +154,8 @@ static scan_info_t *scan_initial_info(scan_info_t *info, scan_list_t *scanlist, 
     if(scan->status != INDEX_SCAN_SUCCESS)
         return NULL;
 
-    scanlist_append(scanlist, scan);
     scaninfo_from_scan(info, scan);
+    scanlist_append(scanlist, scan, info);
 
     return info;
 }
@@ -185,6 +195,7 @@ static scan_info_t *scan_initial_get(scan_info_t *info, redis_client_t *client) 
     #endif
 
     scaninfo_from_entry(info, entry);
+    // scaninfo_dump(info);
     free(entry);
 
     return info;
@@ -232,16 +243,17 @@ int command_scan(redis_client_t *client) {
         zdbd_debug("[+] scan: elapsed time: %" PRIu64 " us\n", ustime() - basetime);
 
         // reading entry and appending it
-        scan = index_next_header(client->ns->index, info.dataid, info.idxoffset);
+        scan = index_next_header(client->ns->index, info.idxid, info.idxoffset);
 
         // this scan failed, let's guess it's the end
         if(scan.status != INDEX_SCAN_SUCCESS)
             break;
 
-        scanlist_append(&scanlist, &scan);
-
         // preparing next call
         scaninfo_from_scan(&info, &scan);
+
+        // append object to the list
+        scanlist_append(&scanlist, &scan, &info);
     }
 
     zdbd_debug("[+] scan: retreived %lu entries in %" PRIu64 " us\n", scanlist.length, ustime() - basetime);
@@ -282,22 +294,23 @@ int command_rscan(redis_client_t *client) {
     uint64_t basetime = ustime();
 
     while(ustime() - basetime < SCAN_TIMESLICE_US) {
-        zdbd_debug("[+] scan: elapsed time: %" PRIu64 " us\n", ustime() - basetime);
+        zdbd_debug("[+] rscan: elapsed time: %" PRIu64 " us\n", ustime() - basetime);
 
         // reading entry and appending it
-        scan = index_previous_header(client->ns->index, info.dataid, info.idxoffset);
+        scan = index_previous_header(client->ns->index, info.idxid, info.idxoffset);
 
         // this scan failed, let's guess it's the end
         if(scan.status != INDEX_SCAN_SUCCESS)
             break;
 
-        scanlist_append(&scanlist, &scan);
-
         // preparing next call
         scaninfo_from_scan(&info, &scan);
+
+        // append object to the list
+        scanlist_append(&scanlist, &scan, &info);
     }
 
-    zdbd_debug("[+] scan: retreived %lu entries in %" PRIu64 " us\n", scanlist.length, ustime() - basetime);
+    zdbd_debug("[+] rscan: retreived %lu entries in %" PRIu64 " us\n", scanlist.length, ustime() - basetime);
 
     if(command_scan_send_scanlist(&scanlist, client))
         redis_hardsend(client, "-Internal Error");

@@ -6,20 +6,20 @@
     int command_keycur(redis_client_t *client);
     int command_kscan(redis_client_t *client);
 
-    typedef struct scan_list_t {
-        size_t length;
-        size_t allocated;
-        index_item_t **items;
-        uint32_t *offsets;
-
-    } scan_list_t;
-
     typedef struct scan_info_t {
         uint16_t dataid;
+        uint16_t idxid;
         size_t idxoffset;
 
     } scan_info_t;
 
+    typedef struct scan_list_t {
+        size_t length;
+        size_t allocated;
+        index_item_t **items;
+        scan_info_t *scansinfo;
+
+    } scan_list_t;
 
     typedef struct list_t {
         void **items;
