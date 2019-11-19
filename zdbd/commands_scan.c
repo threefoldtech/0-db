@@ -62,7 +62,11 @@ static void scanlist_free(scan_list_t *scanlist) {
 }
 
 static void scaninfo_dump(scan_info_t *info) {
+#ifdef RELEASE
+    (void) info;
+#else
     zdbd_debug("[+] scaninfo: idx: %u, offset: %lu, data: %u\n", info->idxid, info->idxoffset, info->dataid);
+#endif
 }
 
 static void scaninfo_from_scan(scan_info_t *info, index_scan_t *scan) {
