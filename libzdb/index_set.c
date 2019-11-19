@@ -54,6 +54,7 @@
 // special sequential function
 int index_seq_overwrite(index_root_t *root, index_set_t *set) {
     index_entry_t *entry = set->entry;
+    index_item_t original;
     int fd;
 
     // compute this object size on disk
@@ -80,9 +81,22 @@ int index_seq_overwrite(index_root_t *root, index_set_t *set) {
 
     index_item_t *item = index_item_from_set(root, set);
 
+    // reading original entry
+    if(read(fd, &original, sizeof(index_item_t)) != sizeof(index_item_t)) {
+        zdb_warnp("index_seq_overwrite re-read");
+        close(fd);
+        return 1;
+    }
+
+    // important fix: do not update previous field
+    // keeping original previous offset
+    item->previous = original.previous;
+
     // overwrite the key
+    lseek(fd, offset, SEEK_SET);
+
     if(write(fd, item, entrylength) != (ssize_t) entrylength) {
-        zdb_warnp("index_entry_delete write");
+        zdb_warnp("index_seq_overwrite re-write");
         close(fd);
         return 1;
     }
