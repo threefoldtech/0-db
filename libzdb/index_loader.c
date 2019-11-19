@@ -314,6 +314,17 @@ static size_t index_load_file(index_root_t *root) {
             .parentoff = entry->parentoff,
         };
 
+        // checking if we are in sequential mode
+        // and this if the first key, we need to populate
+        // our mapping with this key
+        //
+        // the set operation will update 'nextentry' counter
+        // we need to update seqid before inserting key
+        if(root->seqid && seeker == initseeker) {
+            index_seqid_push(root, root->nextentry, root->indexid);
+            // index_seqid_dump(root);
+        }
+
         // insert this entry like it was inserted by a user
         // this allows us to keep a generic way of inserting data and keeping a
         // single point of logic when adding data (logic for overwrite, resize bucket, ...)
@@ -327,17 +338,6 @@ static size_t index_load_file(index_root_t *root) {
         // inserted data won't be flagged as deleted
         if(index_entry_is_deleted(fresh))
             index_entry_delete_memory(root, fresh);
-
-        // checking if we are in sequential mode
-        // and this if the first key, we need to populate
-        // our mapping with this key
-        if(root->seqid && seeker == initseeker) {
-            uint32_t thisid;
-            memcpy(&thisid, entry->id, entry->idlength);
-
-            index_seqid_push(root, thisid, root->indexid);
-            // index_seqid_dump(root);
-        }
 
         // set the previous pointing to this entry
         // this is the last one we added
@@ -531,6 +531,11 @@ index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespa
         index_dump(root, settings->dump);
 
     index_dump_statistics(root);
+
+    #ifndef RELEASE
+    if(settings->mode == ZDB_MODE_SEQUENTIAL)
+        index_seqid_dump(root);
+    #endif
 
     return root;
 }
