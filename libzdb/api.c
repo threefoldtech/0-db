@@ -445,6 +445,10 @@ int zdb_index_open_readwrite(index_root_t *root, uint16_t fileid) {
     return index_open_readwrite(root, fileid);
 }
 
+uint64_t zdb_index_next_id(index_root_t *root) {
+    return index_next_id(root);
+}
+
 index_item_t *zdb_index_raw_fetch_entry(index_root_t *root) {
     return index_raw_fetch_entry(root);
 }

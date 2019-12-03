@@ -7,6 +7,7 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include <sys/statvfs.h>
+#include <byteswap.h>
 #include "libzdb.h"
 #include "zdbd.h"
 #include "redis.h"
@@ -240,6 +241,9 @@ int command_nsinfo(redis_client_t *client) {
         return 1;
     }
 
+    // value is hard-capped to 32 bits, even if internal uses 64 bits
+    uint32_t nextid = (uint32_t) zdb_index_next_id(namespace->index);
+
     sprintf(info, "# namespace\n");
     sprintf(info + strlen(info), "name: %s\n", namespace->name);
     sprintf(info + strlen(info), "entries: %lu\n", namespace->index->entries);
@@ -251,6 +255,7 @@ int command_nsinfo(redis_client_t *client) {
     sprintf(info + strlen(info), "data_limits_bytes: %lu\n", namespace->maxsize);
     sprintf(info + strlen(info), "index_size_bytes: %lu\n", namespace->index->indexsize);
     sprintf(info + strlen(info), "index_size_kb: %.2f\n", KB(namespace->index->indexsize));
+    sprintf(info + strlen(info), "next_internal_id: 0x%08x\n", bswap_32(nextid));
     sprintf(info + strlen(info), "mode: %s\n", index_modename(namespace->index));
 
     // underneath disk free space

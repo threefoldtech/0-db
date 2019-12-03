@@ -65,4 +65,5 @@
     // low level index
     index_item_t *zdb_index_raw_fetch_entry(index_root_t *root);
     off_t zdb_index_raw_offset(index_root_t *root);
+    uint64_t zdb_index_next_id(index_root_t *root);
 #endif
