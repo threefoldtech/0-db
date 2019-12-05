@@ -66,4 +66,14 @@
     index_item_t *zdb_index_raw_fetch_entry(index_root_t *root);
     off_t zdb_index_raw_offset(index_root_t *root);
     uint64_t zdb_index_next_id(index_root_t *root);
+
+    // internal checksum
+    uint32_t zdb_checksum_crc32(const uint8_t *bytes, ssize_t length);
+
+    // data loader
+    data_root_t *zdb_data_init_lazy(zdb_settings_t *settings, char *datapath, uint16_t dataid);
+    int zdb_data_open_readonly(data_root_t *root);
+
+    data_header_t *zdb_data_descriptor_load(data_root_t *root);
+    data_header_t *zdb_data_descriptor_validate(data_header_t *header, data_root_t *root);
 #endif

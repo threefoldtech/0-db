@@ -92,14 +92,12 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
 // open one datafile based on it's id
 // in case of error, the reason will be printed and -1 will be returned
 // otherwise the file descriptor is returned
-//
-// this function open the data file in read only and should
-// not be used to edit or open the current effective current file
-static int data_open_id_mode(data_root_t *root, uint16_t id, int mode) {
+int data_open_id_mode(data_root_t *root, uint16_t id, int mode) {
     char temp[ZDB_PATH_MAX];
     int fd;
 
     sprintf(temp, "%s/zdb-data-%05u", root->datadir, id);
+    zdb_debug("[+] data: opening file: %s (ro: %s)\n", temp, (mode & O_RDONLY) ? "yes" : "no");
 
     if((fd = open(temp, mode, 0600)) < 0) {
         zdb_warnp(temp);
@@ -125,6 +123,39 @@ static int data_get_dataid_rw(data_root_t *root, uint16_t id) {
 }
 #endif
 
+data_header_t *data_descriptor_load(data_root_t *root) {
+    data_header_t *header;
+    ssize_t length;
+
+    if(!(header = malloc(sizeof(data_header_t)))) {
+        zdb_warnp("data_descriptor_load: malloc");
+        return NULL;
+    }
+
+    lseek(root->datafd, 0, SEEK_SET);
+
+    if((length = read(root->datafd, header, sizeof(data_header_t))) != sizeof(data_header_t)) {
+        free(header);
+        return NULL;
+    }
+
+    return header;
+}
+
+data_header_t *data_descriptor_validate(data_header_t *header, data_root_t *root) {
+    if(memcmp(header->magic, "DAT0", 4)) {
+        zdb_danger("[-] %s: invalid header, wrong magic", root->datafile);
+        return NULL;
+    }
+
+    if(header->version != ZDB_DATAFILE_VERSION) {
+        zdb_danger("[-] %s: unsupported version detected", root->datafile);
+        zdb_danger("[-] file version: %d, supported version: %d", header->version, ZDB_DATAFILE_VERSION);
+        return NULL;
+    }
+
+    return header;
+}
 
 // main function to call when you need to deal with data id
 // this function takes care to open the right file id:
@@ -489,7 +520,7 @@ void data_destroy(data_root_t *root) {
     free(root);
 }
 
-data_root_t *data_init(zdb_settings_t *settings, char *datapath, uint16_t dataid) {
+data_root_t *data_init_lazy(zdb_settings_t *settings, char *datapath, uint16_t dataid) {
     data_root_t *root = (data_root_t *) malloc(sizeof(data_root_t));
 
     root->datadir = datapath;
@@ -501,6 +532,12 @@ data_root_t *data_init(zdb_settings_t *settings, char *datapath, uint16_t dataid
     root->previous = 0;
 
     data_set_id(root);
+
+    return root;
+}
+
+data_root_t *data_init(zdb_settings_t *settings, char *datapath, uint16_t dataid) {
+    data_root_t *root = data_init_lazy(settings, datapath, dataid);
 
     // opening the file and creating it if needed
     data_initialize(root->datafile, root);

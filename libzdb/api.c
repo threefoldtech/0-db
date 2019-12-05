@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
 
@@ -459,4 +460,25 @@ off_t zdb_index_raw_offset(index_root_t *root) {
 
 void zdb_index_close(index_root_t *root) {
     index_close(root);
+}
+
+// expose internal crc32 computing
+uint32_t zdb_checksum_crc32(const uint8_t *bytes, ssize_t length) {
+    return data_crc32(bytes, length);
+}
+
+data_root_t *zdb_data_init_lazy(zdb_settings_t *settings, char *datapath, uint16_t dataid) {
+    return data_init_lazy(settings, datapath, dataid);
+}
+
+int zdb_data_open_readonly(data_root_t *root) {
+    return data_open_id_mode(root, root->dataid, O_RDONLY);
+}
+
+data_header_t *zdb_data_descriptor_load(data_root_t *root) {
+    return data_descriptor_load(root);
+}
+
+data_header_t *zdb_data_descriptor_validate(data_header_t *header, data_root_t *root) {
+    return data_descriptor_validate(header, root);
 }

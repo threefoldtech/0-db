@@ -100,6 +100,12 @@
     } data_request_t;
 
     data_root_t *data_init(zdb_settings_t *settings, char *datapath, uint16_t dataid);
+    data_root_t *data_init_lazy(zdb_settings_t *settings, char *datapath, uint16_t dataid);
+    int data_open_id_mode(data_root_t *root, uint16_t id, int mode);
+
+    data_header_t *data_descriptor_load(data_root_t *root);
+    data_header_t *data_descriptor_validate(data_header_t *header, data_root_t *root);
+
     void data_destroy(data_root_t *root);
     size_t data_jump_next(data_root_t *root, uint16_t newid);
     void data_emergency(data_root_t *root);
