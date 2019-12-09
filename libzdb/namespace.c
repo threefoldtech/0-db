@@ -67,14 +67,16 @@ namespace_t *namespace_get(char *name) {
 }
 
 void namespace_descriptor_update(namespace_t *namespace, int fd) {
-    ns_header_t header;
+    ns_header_legacy_t header;
+    ns_header_extended_t extended;
 
     zdb_debug("[+] namespaces: updating header\n");
 
+    // legacy
     header.namelength = strlen(namespace->name);
     header.passlength = namespace->password ? strlen(namespace->password) : 0;
-    header.maxsize = namespace->maxsize;
-    header.flags = 0;
+    header.maxsize = 0; // not used anymore
+    header.flags = NS_FLAGS_EXTENDED;
 
     if(namespace->public)
         header.flags |= NS_FLAGS_PUBLIC;
@@ -82,16 +84,55 @@ void namespace_descriptor_update(namespace_t *namespace, int fd) {
     if(namespace->worm)
         header.flags |= NS_FLAGS_WORM;
 
-    if(write(fd, &header, sizeof(ns_header_t)) != sizeof(ns_header_t))
-        zdb_warnp("namespace header write");
+    if(write(fd, &header, sizeof(ns_header_legacy_t)) != sizeof(ns_header_legacy_t))
+        zdb_warnp("namespace legacy header write");
 
     if(write(fd, namespace->name, header.namelength) != (ssize_t) header.namelength)
         zdb_warnp("namespace header name write");
 
     if(namespace->password) {
         if(write(fd, namespace->password, header.passlength) != (ssize_t) header.passlength)
-            zdb_warnp("namespace header pass write");
+            zdb_warnp("namespace header password write");
     }
+
+    // extended
+    extended.version = namespace->version;
+    extended.maxsize = namespace->maxsize;
+
+    if(write(fd, &extended, sizeof(ns_header_extended_t)) != sizeof(ns_header_extended_t))
+        zdb_warnp("namespace extended header write");
+
+    // ensure metadata are written
+    fsync(fd);
+}
+
+// upgrade a descriptor to support extended fields
+void namespace_descriptor_upgrade(ns_header_legacy_t *header, int fd) {
+    ns_header_extended_t extended;
+
+    zdb_debug("[+] namespaces: upgrading header (extending)\n");
+
+    // enable extended flag
+    header->flags |= NS_FLAGS_EXTENDED;
+
+    // initialize extended settings
+    extended.version = NAMESPACE_CURRENT_VERSION;
+    extended.maxsize = 0;
+
+    // rollback to the beginin of the file
+    lseek(fd, 0, SEEK_SET);
+
+    // rewriting legacy struct with extended flag enabled
+    if(write(fd, header, sizeof(ns_header_legacy_t)) != sizeof(ns_header_legacy_t))
+        zdb_warnp("namespace legacy header write");
+
+    // jump to extended position
+    ssize_t skip = sizeof(ns_header_legacy_t) + header->namelength + header->passlength;
+    lseek(fd, skip, SEEK_SET);
+
+    // writing extended struct
+    if(write(fd, &extended, sizeof(ns_header_extended_t)) != sizeof(ns_header_extended_t))
+        zdb_warnp("namespace extended header write");
 
     // ensure metadata are written
     fsync(fd);
@@ -115,22 +156,42 @@ static int namespace_descriptor_open(namespace_t *namespace) {
 // namespace descriptor is a binary file containing namespace
 // specification such password, maxsize, etc. (see header)
 static void namespace_descriptor_load(namespace_t *namespace) {
-    ns_header_t header;
+    ns_header_legacy_t header;
+    ns_header_extended_t extended;
     int fd;
 
     if((fd = namespace_descriptor_open(namespace)) < 0)
         return;
 
-    if(read(fd, &header, sizeof(ns_header_t)) != sizeof(ns_header_t)) {
+    if(read(fd, &header, sizeof(ns_header_legacy_t)) != sizeof(ns_header_legacy_t)) {
         // probably new file, let's write initial namespace information
         namespace_descriptor_update(namespace, fd);
         close(fd);
         return;
     }
 
-    namespace->maxsize = header.maxsize;
+    // retro-compatibility with old format
+    if((header.flags & NS_FLAGS_EXTENDED) == 0) {
+        zdb_warning("[-] WARNING: updating namespace header");
+        zdb_warning("[-] WARNING: descriptor was created using old 0-db version");
+        zdb_warning("[-] WARNING: updates are retro-compatible");
+
+        namespace_descriptor_upgrade(&header, fd);
+    }
+
+    // extended is set, reading extended struct
+    ssize_t skip = sizeof(ns_header_legacy_t) + header.namelength + header.passlength;
+    lseek(fd, skip, SEEK_SET);
+
+    if(read(fd, &extended, sizeof(ns_header_extended_t)) != sizeof(ns_header_extended_t)) {
+        zdb_warnp("namespace extended read");
+        return;
+    }
+
+    namespace->maxsize = extended.maxsize;
     namespace->public = (header.flags & NS_FLAGS_PUBLIC);
     namespace->worm = (header.flags & NS_FLAGS_WORM);
+    namespace->version = extended.version;
 
     if(header.passlength) {
         if(!(namespace->password = calloc(sizeof(char), header.passlength + 1))) {
@@ -145,7 +206,8 @@ static void namespace_descriptor_load(namespace_t *namespace) {
             zdb_warnp("namespace password read");
     }
 
-    zdb_debug("[+] namespace '%s': maxsize: %lu\n", namespace->name, namespace->maxsize);
+    zdb_debug("[+] namespace: loaded: %s\n", namespace->name);
+    zdb_debug("[+] -> maxsize: %lu (%.2f MB)\n", namespace->maxsize, MB(namespace->maxsize));
     zdb_debug("[+] -> password protection: %s\n", namespace->password ? "yes" : "no");
     zdb_debug("[+] -> public access: %s\n", namespace->public ? "yes" : "no");
     zdb_debug("[+] -> worm mode: %s\n", namespace->worm ? "yes" : "no");
@@ -227,6 +289,7 @@ namespace_t *namespace_load_light(ns_root_t *nsroot, char *name) {
     namespace->worm = 0;    // by default, worm mode is disabled
     namespace->maxsize = 0; // by default, there is no limits
     namespace->idlist = 0;  // by default, no list set
+    namespace->version = NAMESPACE_CURRENT_VERSION;
 
     if(!namespace_ensure(namespace))
         return NULL;
