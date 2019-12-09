@@ -271,7 +271,7 @@ static int namespace_load_lazy(ns_root_t *nsroot, namespace_t *namespace) {
 
 // load (or create if it doesn't exists) a namespace
 
-namespace_t *namespace_load_light(ns_root_t *nsroot, char *name) {
+namespace_t *namespace_load_light(ns_root_t *nsroot, char *name, int ensure) {
     namespace_t *namespace;
 
     zdb_debug("[+] namespaces: loading '%s'\n", name);
@@ -291,8 +291,10 @@ namespace_t *namespace_load_light(ns_root_t *nsroot, char *name) {
     namespace->idlist = 0;  // by default, no list set
     namespace->version = NAMESPACE_CURRENT_VERSION;
 
-    if(!namespace_ensure(namespace))
-        return NULL;
+    if(ensure) {
+        if(!namespace_ensure(namespace))
+            return NULL;
+    }
 
     // load descriptor from disk
     namespace_descriptor_load(namespace);
@@ -304,7 +306,7 @@ namespace_t *namespace_load(ns_root_t *nsroot, char *name) {
     namespace_t *namespace;
 
     // basic namespace loader/creation
-    if(!(namespace = namespace_load_light(nsroot, name)))
+    if(!(namespace = namespace_load_light(nsroot, name, 1)))
         return NULL;
 
     // memory populating
