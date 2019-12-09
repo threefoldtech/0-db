@@ -1,16 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <string.h>
-#include <x86intrin.h>
-#include <stdint.h>
 #include <inttypes.h>
-#include <sys/stat.h>
-#include <time.h>
 #include "libzdb.h"
 
 int index_dump_files(index_root_t *zdbindex, uint64_t maxfile) {
