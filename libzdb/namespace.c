@@ -145,7 +145,7 @@ static int namespace_descriptor_open(namespace_t *namespace) {
     snprintf(pathname, ZDB_PATH_MAX, "%s/zdb-namespace", namespace->indexpath);
 
     if((fd = open(pathname, O_CREAT | O_RDWR, 0600)) < 0) {
-        zdb_warning("[-] cannot create or open in read-write the namespace file\n");
+        zdb_warning("[-] cannot create or open in read-write the namespace file");
         return -1;
     }
 
@@ -155,19 +155,19 @@ static int namespace_descriptor_open(namespace_t *namespace) {
 // read (or create) a namespace descriptor
 // namespace descriptor is a binary file containing namespace
 // specification such password, maxsize, etc. (see header)
-static void namespace_descriptor_load(namespace_t *namespace) {
+static int namespace_descriptor_load(namespace_t *namespace) {
     ns_header_legacy_t header;
     ns_header_extended_t extended;
     int fd;
 
     if((fd = namespace_descriptor_open(namespace)) < 0)
-        return;
+        return fd;
 
     if(read(fd, &header, sizeof(ns_header_legacy_t)) != sizeof(ns_header_legacy_t)) {
         // probably new file, let's write initial namespace information
         namespace_descriptor_update(namespace, fd);
         close(fd);
-        return;
+        return 0;
     }
 
     // retro-compatibility with old format
@@ -185,7 +185,7 @@ static void namespace_descriptor_load(namespace_t *namespace) {
 
     if(read(fd, &extended, sizeof(ns_header_extended_t)) != sizeof(ns_header_extended_t)) {
         zdb_warnp("namespace extended read");
-        return;
+        return 0;
     }
 
     namespace->maxsize = extended.maxsize;
@@ -196,37 +196,41 @@ static void namespace_descriptor_load(namespace_t *namespace) {
     if(header.passlength) {
         if(!(namespace->password = calloc(sizeof(char), header.passlength + 1))) {
             zdb_warnp("namespace password malloc");
-            return;
+            return 0;
         }
 
         // skipping the namespace name, jumping to password
-        lseek(fd, header.namelength, SEEK_CUR);
+        lseek(fd, skip - header.passlength, SEEK_SET);
 
         if(read(fd, namespace->password, header.passlength) != (ssize_t) header.passlength)
             zdb_warnp("namespace password read");
     }
 
-    zdb_debug("[+] namespace: loaded: %s\n", namespace->name);
+    zdb_success("[+] namespace: loaded: %s", namespace->name);
     zdb_debug("[+] -> maxsize: %lu (%.2f MB)\n", namespace->maxsize, MB(namespace->maxsize));
     zdb_debug("[+] -> password protection: %s\n", namespace->password ? "yes" : "no");
     zdb_debug("[+] -> public access: %s\n", namespace->public ? "yes" : "no");
     zdb_debug("[+] -> worm mode: %s\n", namespace->worm ? "yes" : "no");
 
     close(fd);
+
+    return 1;
 }
 
 // update persistance data of a namespace
 // basicly, this rewrite it's metadata on disk
-void namespace_commit(namespace_t *namespace) {
+int namespace_commit(namespace_t *namespace) {
     int fd;
 
     if((fd = namespace_descriptor_open(namespace)) < 0)
-        return;
+        return fd;
 
     // update metadata
     namespace_descriptor_update(namespace, fd);
 
     close(fd);
+
+    return 0;
 }
 
 static char *namespace_path(char *prefix, char *name) {
@@ -297,7 +301,10 @@ namespace_t *namespace_load_light(ns_root_t *nsroot, char *name, int ensure) {
     }
 
     // load descriptor from disk
-    namespace_descriptor_load(namespace);
+    if(namespace_descriptor_load(namespace) < 0) {
+        namespace_free(namespace);
+        return NULL;
+    }
 
     return namespace;
 }
@@ -507,7 +514,7 @@ int namespaces_init(zdb_settings_t *settings) {
     return 0;
 }
 
-static void namespace_free(namespace_t *namespace) {
+void namespace_free(namespace_t *namespace) {
     free(namespace->name);
     free(namespace->indexpath);
     free(namespace->datapath);
