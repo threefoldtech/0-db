@@ -8,6 +8,7 @@ all release:
 	cp -f tools/index-dump/index-dump bin/zdb-index-dump
 	# cp -f tools/compaction/compaction bin/zdb-compaction
 	cp -f tools/namespace-editor/namespace-editor bin/zdb-namespace-editor
+	cp -f tools/namespace-dump/namespace-dump bin/zdb-namespace-dump
 
 clean:
 	$(MAKE) -C libzdb $@
