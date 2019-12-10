@@ -1,14 +1,8 @@
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <errno.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <time.h>
+#include <stdint.h>
 #include <getopt.h>
 #include "libzdb.h"
 
@@ -18,86 +12,75 @@ static struct option long_options[] = {
     {"password",  required_argument, 0, 'p'},
     {"maxsize",   required_argument, 0, 'm'},
     {"public",    required_argument, 0, 'P'},
+    {"worm"  ,    required_argument, 0, 'w'},
     {"help",      no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
 
-void *warnp(char *str) {
-    fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
-    return NULL;
-}
-
-void diep(char *str) {
-    warnp(str);
-    exit(EXIT_FAILURE);
-}
-
-void dies(char *str) {
-    fprintf(stderr, "[-] %s\n", str);
-    exit(EXIT_FAILURE);
-}
-
-int directory_check(char *target) {
-    struct stat sb;
-
-    if(stat(target, &sb) != 0)
-        return 1;
-
-    if(!S_ISDIR(sb.st_mode))
-        return 2;
-
-    return 0;
-}
-
-int namespace_edit(namespace_t *namespace) {
-    char *fullpath;
-    ns_header_t header;
-    int fd;
-
-    if(asprintf(&fullpath, "%s/%s/zdb-namespace", namespace->indexpath, namespace->name) < 0)
-        diep("asprintf");
-
-    if((fd = open(fullpath, O_WRONLY | O_TRUNC | O_CREAT, 0600)) < 0)
-        diep(fullpath);
-
-    // fill-in the struct
-    header.namelength = strlen(namespace->name);
-    header.passlength = namespace->password ? strlen(namespace->password) : 0;
-    header.maxsize = namespace->maxsize;
-    header.flags = namespace->public ? NS_FLAGS_PUBLIC : 0;
-
-    if(write(fd, &header, sizeof(ns_header_t)) != sizeof(ns_header_t))
-        diep("write struct");
-
-    ssize_t length = (ssize_t) strlen(namespace->name);
-
-    if(write(fd, namespace->name, length) != length)
-        diep("write name");
-
-    if(namespace->password) {
-        length = strlen(namespace->password);
-
-        if(write(fd, namespace->password, length) != length)
-            diep("write password");
+int namespace_edit(char *dirname, char *nsname, namespace_t *namespace) {
+    if(zdb_dir_exists(dirname) != ZDB_DIRECTORY_EXISTS) {
+        fprintf(stderr, "[-] namespace-dump: could not reach index directory\n");
+        exit(EXIT_FAILURE);
     }
 
-    length = lseek(fd, SEEK_CUR, 0);
+    // initializing database
+    zdb_settings_t *zdb_settings = zdb_initialize();
+    zdb_settings->indexpath = dirname;
 
-    printf("[+] namespace descriptor written (%ld bytes)\n", length);
+    zdb_id_set("namespace-editor");
 
-    close(fd);
+    // lazy load namespace
+    ns_root_t *nsroot = namespaces_allocate(zdb_settings);
+    namespace_t *ns = namespace_load_light(nsroot, nsname, 0);
+
+    if(!ns) {
+        fprintf(stderr, "[-] could not load namespace\n");
+        return 1;
+    }
+
+    printf("[+] ----------------------------------------\n");
+    printf("[+]     current values    ------------------\n");
+    printf("[+] ----------------------------------------\n");
+    printf("[+] name        : %s\n", ns->name);
+    printf("[+] password    : %s\n", ns->password ? ns->password : "<no password set>");
+    printf("[+] public flag : %d\n", ns->public);
+    printf("[+] worm mode   : %d\n", ns->worm);
+    printf("[+] maximum size: %lu bytes (%.2f MB)\n", ns->maxsize, MB(ns->maxsize));
+    printf("[+] -----------------------------------------\n");
+    printf("[+]\n");
+    printf("[+] writing new values\n");
+
+    ns->name = nsname;
+    ns->password = namespace->password;
+    ns->public = namespace->public;
+    ns->worm = namespace->worm;
+    ns->maxsize = namespace->maxsize;
+
+    // writing changes
+    namespace_commit(ns);
+
+    printf("[+]\n");
+    printf("[+] ----------------------------------------\n");
+    printf("[+]     updated values    ------------------\n");
+    printf("[+] ----------------------------------------\n");
+    printf("[+] name        : %s\n", ns->name);
+    printf("[+] password    : %s\n", ns->password ? ns->password : "<no password set>");
+    printf("[+] public flag : %d\n", ns->public);
+    printf("[+] worm mode   : %d\n", ns->worm);
+    printf("[+] maximum size: %lu bytes (%.2f MB)\n", ns->maxsize, MB(ns->maxsize));
 
     return 0;
 }
 
 void usage() {
-    printf("Index rebuild tool arguments:\n\n");
+    printf("Namespace editor tool arguments:\n\n");
 
     printf("  --index      <dir>      index root directory path (required)\n");
     printf("  --namespace  <name>     name of the namespace (required)\n");
     printf("  --password   <pass>     password (default, empty)\n");
     printf("  --maxsize    <size>     maximum size in bytes (default, no limit)\n");
     printf("  --public     <bool>     does the namespace is public or not (yes or no, default yes)\n");
+    printf("  --worm       <bool>     does the namespace use WORM mode (yes or no, default no)\n");
     printf("  --help                  print this message\n");
 
     exit(EXIT_FAILURE);
@@ -106,7 +89,8 @@ void usage() {
 int main(int argc, char *argv[]) {
     int option_index = 0;
     namespace_t namespace;
-    char *nspath;
+    char *dirname = NULL;
+    char *nsname = NULL;
 
     // initializing everything to zero
     memset(&namespace, 0x00, sizeof(namespace_t));
@@ -123,11 +107,11 @@ int main(int argc, char *argv[]) {
 
         switch(i) {
             case 'f':
-                namespace.indexpath = optarg;
+                dirname = optarg;
                 break;
 
             case 'n':
-                namespace.name = optarg;
+                nsname = optarg;
                 break;
 
             case 'p':
@@ -152,6 +136,21 @@ int main(int argc, char *argv[]) {
 
                 break;
 
+            case 'w':
+                if(strcmp(optarg, "yes") == 0) {
+                    namespace.worm = 1;
+
+                } else if(strcmp(optarg, "no") == 0) {
+                    namespace.worm = 0;
+
+                } else {
+                    fprintf(stderr, "[-] invalid value for --worm (yes or no expected)\n");
+                    usage();
+                }
+
+                break;
+
+
             case 'h':
                 usage();
                 break;
@@ -162,35 +161,17 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if(!namespace.indexpath) {
+    if(!dirname) {
         fprintf(stderr, "[-] missing index root directory\n");
         usage();
     }
 
-    if(!namespace.name) {
+    if(!nsname) {
         fprintf(stderr, "[-] missing namespace name, you need to specify a name\n");
         usage();
     }
 
-    if(directory_check(namespace.indexpath)) {
-        if(mkdir(namespace.indexpath, 0775) < 0)
-            diep(namespace.indexpath);
-    }
-
-    if(asprintf(&nspath, "%s/%s", namespace.indexpath, namespace.name) < 0)
-        diep("asprintf");
-
-    if(directory_check(nspath)) {
-        if(mkdir(nspath, 0775) < 0)
-            diep(nspath);
-    }
-
     printf("[+] zdb namespace editor\n");
-    printf("[+] directory: %s\n", namespace.indexpath);
-    printf("[+] namespace: %s\n", namespace.name);
-    printf("[+] public   : %s\n", namespace.public ? "yes" : "no");
-    printf("[+] password : %s\n", namespace.password ? "<protected>" : "<not set>");
-    printf("[+] max size : %.2f MB\n", MB(namespace.maxsize));
 
-    return namespace_edit(&namespace);
+    return namespace_edit(dirname, nsname, &namespace);
 }
