@@ -119,6 +119,12 @@ void namespace_descriptor_upgrade(ns_header_legacy_t *header, int fd) {
     extended.version = NAMESPACE_CURRENT_VERSION;
     extended.maxsize = 0;
 
+    // port old maxsize to new extended header
+    // only if the value is less than 2 GB, which was
+    // the previous hard limit
+    if(header->maxsize < (((uint32_t) 1 << 31)))
+        extended.maxsize = header->maxsize;
+
     // rollback to the beginin of the file
     lseek(fd, 0, SEEK_SET);
 
