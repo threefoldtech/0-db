@@ -384,7 +384,7 @@ uint64_t index_availity_check(index_root_t *root) {
 
 // load all the index found
 // if no index files exists, we create the original one
-static void index_load(index_root_t *root) {
+void index_internal_load(index_root_t *root) {
     uint64_t maxfile = index_availity_check(root);
     uint64_t fileid;
 
@@ -527,7 +527,7 @@ index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespa
     // but this is the 'main entry' of index loading, so doing this
     // here makes sens
     index_allocate_single();
-    index_load(root);
+    index_internal_load(root);
 
     if(settings->mode == ZDB_MODE_KEY_VALUE)
         index_dump(root, settings->dump);

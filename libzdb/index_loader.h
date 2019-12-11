@@ -8,6 +8,9 @@
     index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches);
     index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir, void *namespace);
 
+    // internal functions
+    void index_internal_load(index_root_t *root);
+
     // sanity check
     uint64_t index_availity_check(index_root_t *root);
     index_header_t *index_descriptor_load(index_root_t *root);
