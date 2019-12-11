@@ -4,11 +4,6 @@
     void zdb_hexdump(void *buffer, size_t length);
     void zdb_fulldump(void *data, size_t len);
 
-    #define zdb_danger(fmt, ...)  { printf(COLOR_RED    fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define zdb_warning(fmt, ...) { printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define zdb_success(fmt, ...) { printf(COLOR_GREEN  fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define zdb_notice(fmt, ...)  { printf(COLOR_CYAN   fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-
     #ifndef RELEASE
         #define zdb_verbose(...) { printf(__VA_ARGS__); }
         #define zdb_debug(...) { printf(__VA_ARGS__); }

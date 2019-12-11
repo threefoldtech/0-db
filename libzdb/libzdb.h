@@ -115,6 +115,11 @@
     #define COLOR_CYAN   "\033[36;1m"
     #define COLOR_RESET  "\033[0m"
 
+    #define zdb_danger(fmt, ...)  { printf(COLOR_RED    fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdb_warning(fmt, ...) { printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdb_success(fmt, ...) { printf(COLOR_GREEN  fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdb_notice(fmt, ...)  { printf(COLOR_CYAN   fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+
     #define KB(x)   (x / (1024.0))
     #define MB(x)   (x / (1024 * 1024.0))
     #define GB(x)   (x / (1024 * 1024 * 1024.0))
