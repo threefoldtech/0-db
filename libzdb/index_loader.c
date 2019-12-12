@@ -437,7 +437,7 @@ void index_internal_load(index_root_t *root) {
     index_open_final(root);
 }
 
-static void index_allocate_single() {
+void index_internal_allocate_single() {
     // if variables are already allocated
     // this process is silently skipped
 
@@ -526,7 +526,7 @@ index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespa
     // we will not allocate all the time the reusable variables
     // but this is the 'main entry' of index loading, so doing this
     // here makes sens
-    index_allocate_single();
+    index_internal_allocate_single();
     index_internal_load(root);
 
     if(settings->mode == ZDB_MODE_KEY_VALUE)

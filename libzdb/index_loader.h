@@ -10,6 +10,7 @@
 
     // internal functions
     void index_internal_load(index_root_t *root);
+    void index_internal_allocate_single();
 
     // sanity check
     uint64_t index_availity_check(index_root_t *root);
