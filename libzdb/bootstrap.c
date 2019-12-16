@@ -4,16 +4,17 @@
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
 
 static uint32_t zdb_instanceid_generate() {
-    struct timespec ts;
+    struct timeval tv;
 
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    srand((time_t) ts.tv_nsec);
+    // generating 'random id', greater than zero
+    gettimeofday(&tv, NULL);
+    srand((time_t) tv.tv_usec);
 
-    // generating random id, greater than zero
     return (uint32_t) ((rand() % (1 << 30)) + 1);
 }
 
