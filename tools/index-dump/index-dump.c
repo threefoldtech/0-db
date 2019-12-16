@@ -40,7 +40,7 @@ int index_dump_files(index_root_t *zdbindex, uint64_t maxfile) {
 
             zdb_header_date(entry->timestamp, datestr, sizeof(datestr));
 
-            printf("[+] index entry: %lu, offset: %lu\n", entrycount, curoff);
+            printf("[+] index entry: %lu, offset: %" PRId64 "\n", entrycount, (int64_t) curoff);
             printf("[+]   id length  : %" PRIu8 "\n", entry->idlength);
             printf("[+]   data length: %" PRIu32 "\n", entry->length);
             printf("[+]   data offset: %" PRIu32 "\n", entry->offset);

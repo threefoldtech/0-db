@@ -41,8 +41,8 @@ void index_entry_dump(index_entry_t *entry) {
 #else
     zdb_debug("[+] index: entry dump: namespace  : %p\n", entry->namespace);
     zdb_debug("[+] index: entry dump: id length  : %" PRIu8  "\n", entry->idlength);
-    zdb_debug("[+] index: entry dump: idx offset : %" PRIu8  "\n", entry->idxoffset);
-    zdb_debug("[+] index: entry dump: idx fileid : %" PRIu8  "\n", entry->indexid);
+    zdb_debug("[+] index: entry dump: idx offset : %" PRIu32 "\n", entry->idxoffset);
+    zdb_debug("[+] index: entry dump: idx fileid : %" PRIu32 "\n", entry->indexid);
     zdb_debug("[+] index: entry dump: data offset: %" PRIu32 "\n", entry->offset);
     zdb_debug("[+] index: entry dump: data length: %" PRIu32 "\n", entry->length);
     zdb_debug("[+] index: entry dump: flags      : %" PRIu8  "\n", entry->flags);

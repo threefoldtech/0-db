@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <string.h>
 #include <libgen.h>
+#include <inttypes.h>
 #ifdef SHADUMP
 #include <openssl/sha.h>
 #endif
@@ -70,7 +71,7 @@ int data_integrity(data_root_t *zdbdata) {
         entrycount += 1;
 
         printf("[+] data entry: %lu, id length: %d\n", entrycount, entry->idlength);
-        printf("[+]   expected length: %u, current offset: %ld\n", entry->datalength, current);
+        printf("[+]   expected length: %u, current offset: %" PRId64 "\n", entry->datalength, (int64_t) current);
         printf("[+]   previous offset: %u\n", entry->previous);
         printf("[+]   expected crc: %08x\n", entry->integrity);
         printf("[+]   entry key: ");

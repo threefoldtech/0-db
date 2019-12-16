@@ -7,7 +7,6 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include <sys/statvfs.h>
-#include <byteswap.h>
 #include "libzdb.h"
 #include "zdbd.h"
 #include "redis.h"
