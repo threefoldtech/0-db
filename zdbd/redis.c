@@ -10,6 +10,7 @@
 #include <sys/un.h>
 #include <fcntl.h>
 #include <time.h>
+#include <sys/time.h>
 #include <inttypes.h>
 #include <errno.h>
 #include "sockets.h"
@@ -1027,7 +1028,7 @@ void redis_client_set_watcher(redis_client_t *client, command_t *handler, size_t
     client->watching = handler;
 
     // set initial waiting time and timeout
-    clock_gettime(CLOCK_MONOTONIC, &client->watchtime);
+    gettimeofday(&client->watchtime, NULL);
     client->watchtimeout = timeoutms;
 }
 
@@ -1041,9 +1042,9 @@ void redis_client_unset_watcher(redis_client_t *client) {
     memset(&client->watchtime, 0, sizeof(client->watchtime));
 }
 
-uint64_t timespec_delta_ms(struct timespec *begin, struct timespec *end) {
+uint64_t timeval_delta_ms(struct timeval *begin, struct timeval *end) {
     uint64_t deltams = (end->tv_sec - begin->tv_sec) * 1000;
-    deltams += (end->tv_nsec - begin->tv_nsec) / 1000000;
+    deltams += (end->tv_usec - begin->tv_usec) / 1000;
 
     return deltams;
 }
@@ -1052,7 +1053,7 @@ uint64_t timespec_delta_ms(struct timespec *begin, struct timespec *end) {
 // when the server is in idle state (no clients action
 // for a certain amount of time)
 void redis_idle_process() {
-    struct timespec timecheck;
+    struct timeval timecheck;
     char response[64];
 
     for(size_t i = 0; i < clients.length; i++) {
@@ -1064,9 +1065,9 @@ void redis_idle_process() {
 
         // checking if watching timeout is reached
         if(checking->watching) {
-            clock_gettime(CLOCK_MONOTONIC, &timecheck);
+            gettimeofday(&timecheck, NULL);
 
-            uint64_t deltams = timespec_delta_ms(&checking->watchtime, &timecheck);
+            uint64_t deltams = timeval_delta_ms(&checking->watchtime, &timecheck);
             if(deltams > checking->watchtimeout) {
                 zdbd_debug("[+] redis: trigger: client %d waiting timeout\n", checking->fd);
 

@@ -1,6 +1,8 @@
 #ifndef __ZDB_REDIS_H
     #define __ZDB_REDIS_H
 
+    #include <sys/time.h>
+
     // redis_hardsend is a macro which allows us to send
     // easily a hardcoded message to the client, without needing to
     // specify the size, but keeping the size computed at compile time
@@ -125,7 +127,7 @@
         // we keep track if a client wants to monitor some event
         // and a pointer to the last command executed
         size_t watchtimeout;          // watch command timeout
-        struct timespec watchtime;    // tracker for timeout
+        struct timeval watchtime;     // tracker for timeout
         command_t *watching;
         command_t *executed;
 
