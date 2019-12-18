@@ -17,12 +17,24 @@ static struct option long_options[] = {
     {0, 0, 0, 0}
 };
 
-int index_rebuild(index_root_t *zdbindex, data_root_t *zdbdata) {
+int index_data_jump_to(uint16_t fileid, index_root_t *zdbindex, data_root_t *zdbdata) {
     data_header_t *header;
     char datestr[64];
 
+    // only take care of next index id we it's not the first
+    if(fileid > 0)
+        index_jump_next(zdbindex);
+
+    // closing previous data fd
+    if(zdbdata->datafd)
+        close(zdbdata->datafd);
+
+    printf("[+] index-rebuild: opening datafile id: %d\n", fileid);
+
     // opening data file
-    zdbdata->datafd = zdb_data_open_readonly(zdbdata);
+    zdbdata->dataid = fileid;
+    if((zdbdata->datafd = zdb_data_open_readonly(zdbdata)) < 0)
+        return 1;
 
     // validating header
     if(!(header = zdb_data_descriptor_load(zdbdata)))
@@ -35,15 +47,19 @@ int index_rebuild(index_root_t *zdbindex, data_root_t *zdbdata) {
     printf("[+] index-rebuild: data created at: %s\n", zdb_header_date(header->created, datestr, sizeof(datestr)));
     printf("[+] index-rebuild: data last open: %s\n", zdb_header_date(header->opened, datestr, sizeof(datestr)));
 
+    return 0;
+}
+
+size_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata) {
+    size_t entrycount = 0;
+    uint8_t idlength;
+    data_entry_header_t *entry = NULL;
 
     // now it's time to read each entries
     // each time, one entry starts by the entry-header
     // then entry payload.
     // the entry headers starts with the amount of bytes
     // of the key, which is needed to read the full header
-    uint8_t idlength;
-    data_entry_header_t *entry = NULL;
-    size_t entrycount = 0;
 
     while(read(zdbdata->datafd, &idlength, sizeof(idlength)) == sizeof(idlength)) {
         // we have the length of the key
@@ -93,6 +109,26 @@ int index_rebuild(index_root_t *zdbindex, data_root_t *zdbdata) {
     }
 
     free(entry);
+
+    printf("[+] index-rebuild: index pass entries: %lu\n", entrycount);
+
+    return entrycount;
+}
+
+
+int index_rebuild(index_root_t *zdbindex, data_root_t *zdbdata) {
+    uint16_t fileid = 0;
+    size_t entrycount = 0;
+
+    // prorcessing all files
+    for(fileid = 0; ; fileid += 1) {
+        // setting index and data id to new id
+        if(index_data_jump_to(fileid, zdbindex, zdbdata))
+            break;
+
+        // processing this file
+        entrycount += index_rebuild_pass(zdbindex, zdbdata);
+    }
 
     zdb_success("[+] index rebuilt (%lu entries inserted)", entrycount);
 
@@ -195,7 +231,14 @@ int main(int argc, char *argv[]) {
     }
 
     // initializing database
+    // and setting target mode
     zdb_settings_t *zdb_settings = zdb_initialize();
+    zdb_settings->mode = mode;
+
+    // WARNING: if the correct mode is not set
+    // rebuild will lead to incorrect consistancy
+    // with data and is undefined behavoior
+
     zdb_id_set("index-rebuild");
 
     zdb_settings->indexpath = indexpath;
@@ -230,8 +273,6 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "[-] index-rebuild: cannot initialize index\n");
         exit(EXIT_FAILURE);
     }
-
-    index_internal_load(zdbindex);
 
     return index_rebuild(zdbindex, zdbdata);
 }
