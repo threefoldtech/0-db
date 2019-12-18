@@ -523,6 +523,7 @@ void data_destroy(data_root_t *root) {
 data_root_t *data_init_lazy(zdb_settings_t *settings, char *datapath, uint16_t dataid) {
     data_root_t *root = (data_root_t *) malloc(sizeof(data_root_t));
 
+    root->datafd = 0;
     root->datadir = datapath;
     root->datafile = malloc(sizeof(char) * (ZDB_PATH_MAX + 1));
     root->dataid = dataid;
