@@ -66,14 +66,11 @@ int index_rebuild(index_root_t *zdbindex, data_root_t *zdbdata) {
         index_entry_t idxreq = {
             .idlength = entry->idlength,
             .offset = current,
-            .idxoffset = 0,
             .length = entry->datalength,
             .flags = entry->flags,
             .dataid = zdbdata->dataid,
             .indexid = zdbindex->indexid,
             .crc = entry->integrity,
-            .parentid = 0,
-            .parentoff = 0,
             .timestamp = entry->timestamp,
         };
 
@@ -82,7 +79,11 @@ int index_rebuild(index_root_t *zdbindex, data_root_t *zdbdata) {
             .id = entry->id,
         };
 
-        if(index_append_entry_on_disk(zdbindex, &setter) != 0) {
+        // fetching existing if any
+        // this is needed to keep track of the history
+        index_entry_t *existing = index_get(zdbindex, entry->id, entry->idlength);
+
+        if(!index_set(zdbindex, &setter, existing)) {
             fprintf(stderr, "[-] index-rebuild: could not insert index item\n");
             return 1;
         }
@@ -225,13 +226,12 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    if(!(zdbindex = zdb_index_init_lazy(zdb_settings, namespace->indexpath, NULL))) {
+    if(!(zdbindex = zdb_index_init(zdb_settings, namespace->indexpath, namespace, nsroot->branches))) {
         fprintf(stderr, "[-] index-rebuild: cannot initialize index\n");
         exit(EXIT_FAILURE);
     }
 
     index_internal_load(zdbindex);
-    index_internal_allocate_single();
 
     return index_rebuild(zdbindex, zdbdata);
 }
