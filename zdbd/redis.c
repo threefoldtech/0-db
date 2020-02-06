@@ -718,7 +718,7 @@ go_again:
     buffer->remain -= length;
 
     #ifdef PROTOCOL_DEBUG
-    fulldump((uint8_t *) buffer->buffer, buffer->length);
+    zdbd_fulldump((uint8_t *) buffer->buffer, buffer->length);
     #endif
 
     // ensure string (needed for testing later)
