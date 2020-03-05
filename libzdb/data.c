@@ -316,8 +316,10 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
     if(length == 0) {
         zdb_debug("[+] data: fetching length from datafile\n");
 
-        if((length = data_length_from_offset(fd, offset)) == 0)
+        if((length = data_length_from_offset(fd, offset)) == 0) {
+            payload.buffer = malloc(0);
             return payload;
+        }
 
         zdb_debug("[+] data: length from datafile: %zu\n", length);
     }
