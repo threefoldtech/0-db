@@ -243,19 +243,31 @@ int command_nsinfo(redis_client_t *client) {
     // value is hard-capped to 32 bits, even if internal uses 64 bits
     uint32_t nextid = (uint32_t) zdb_index_next_id(namespace->index);
 
+    // compute free space available
+    size_t available = namespace->maxsize - namespace->index->stats.datasize;
+
     sprintf(info, "# namespace\n");
     sprintf(info + strlen(info), "name: %s\n", namespace->name);
-    sprintf(info + strlen(info), "entries: %lu\n", namespace->index->entries);
+    sprintf(info + strlen(info), "entries: %lu\n", namespace->index->stats.entries);
     sprintf(info + strlen(info), "public: %s\n", namespace->public ? "yes" : "no");
     sprintf(info + strlen(info), "worm: %s\n", namespace->worm ? "yes" : "no");
     sprintf(info + strlen(info), "password: %s\n", namespace->password ? "yes" : "no");
-    sprintf(info + strlen(info), "data_size_bytes: %lu\n", namespace->index->datasize);
-    sprintf(info + strlen(info), "data_size_mb: %.2f\n", MB(namespace->index->datasize));
+    sprintf(info + strlen(info), "data_size_bytes: %lu\n", namespace->index->stats.datasize);
+    sprintf(info + strlen(info), "data_size_mb: %.2f\n", MB(namespace->index->stats.datasize));
     sprintf(info + strlen(info), "data_limits_bytes: %lu\n", namespace->maxsize);
-    sprintf(info + strlen(info), "index_size_bytes: %lu\n", namespace->index->indexsize);
-    sprintf(info + strlen(info), "index_size_kb: %.2f\n", KB(namespace->index->indexsize));
+    sprintf(info + strlen(info), "index_size_bytes: %lu\n", namespace->index->stats.size);
+    sprintf(info + strlen(info), "index_size_kb: %.2f\n", KB(namespace->index->stats.size));
     sprintf(info + strlen(info), "next_internal_id: 0x%08x\n", bswap_32(nextid));
     sprintf(info + strlen(info), "mode: %s\n", index_modename(namespace->index));
+    sprintf(info + strlen(info), "stats_index_io_errors: %lu\n", namespace->index->stats.errors);
+    sprintf(info + strlen(info), "stats_index_io_error_last: %ld\n", namespace->index->stats.lasterr);
+    sprintf(info + strlen(info), "stats_index_faults: %lu\n", namespace->index->stats.faults);
+    sprintf(info + strlen(info), "stats_data_io_errors: %lu\n", namespace->data->stats.errors);
+    sprintf(info + strlen(info), "stats_data_io_error_last: %ld\n", namespace->data->stats.lasterr);
+    sprintf(info + strlen(info), "stats_data_faults: %lu\n", namespace->data->stats.faults);
+
+    if(namespace->maxsize > 0)
+        sprintf(info + strlen(info), "space_available: %lu\n", available);
 
     // underneath disk free space
     struct statvfs buf;
@@ -407,7 +419,7 @@ int command_nsset(redis_client_t *client) {
 int command_dbsize(redis_client_t *client) {
     char response[64];
 
-    sprintf(response, ":%lu\r\n", client->ns->index->entries);
+    sprintf(response, ":%lu\r\n", client->ns->index->stats.entries);
     redis_reply_stack(client, response, strlen(response));
 
     return 0;

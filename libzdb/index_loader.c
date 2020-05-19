@@ -52,7 +52,7 @@ static void index_dump(index_root_t *root, int fulldump) {
     }
 
     if(fulldump) {
-        if(root->entries == 0)
+        if(root->stats.entries == 0)
             printf("[+] index is empty\n");
 
         printf("[+] ===========================\n");
@@ -70,13 +70,13 @@ static void index_dump(index_root_t *root, int fulldump) {
 }
 
 static void index_dump_statistics(index_root_t *root) {
-    zdb_verbose("[+] index: load: %lu entries\n", root->entries);
+    zdb_verbose("[+] index: load: %lu entries\n", root->stats.entries);
 
-    double datamb = MB(root->datasize);
-    double indexkb = KB(root->indexsize);
+    double datamb = MB(root->stats.datasize);
+    double indexkb = KB(root->stats.size);
 
-    zdb_verbose("[+] index: datasize: " COLOR_CYAN "%.2f MB" COLOR_RESET " (%lu bytes)\n", datamb, root->datasize);
-    zdb_verbose("[+] index: raw usage: %.1f KB (%lu bytes)\n", indexkb, root->indexsize);
+    zdb_verbose("[+] index: datasize: " COLOR_CYAN "%.2f MB" COLOR_RESET " (%lu bytes)\n", datamb, root->stats.datasize);
+    zdb_verbose("[+] index: raw usage: %.1f KB (%lu bytes)\n", indexkb, root->stats.size);
 }
 
 //

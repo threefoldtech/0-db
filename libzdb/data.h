@@ -4,17 +4,28 @@
     // split datafile after 256 MB
     #define ZDB_DEFAULT_DATA_MAXSIZE  256 * 1024 * 1024
 
+    // data statistics
+    typedef struct data_stats_t {
+        size_t hits;     // amount of data hit requested (not used yet)
+        size_t faults;   // amount of data hit missed (not used yet)
+        size_t errors;   // amount of io (read/write) error
+        time_t lasterr;  // last error timestamp
+
+    } data_stats_t;
+
+
     // root point of the memory handler
     // used by the data manager
     typedef struct data_root_t {
-        char *datadir;    // root path of the data files
-        char *datafile;   // pointer to the current datafile used
-        uint16_t dataid;  // id of the datafile currently in use
-        int datafd;       // file descriptor of the current datafile used
-        int sync;         // flag to force data write sync
-        int synctime;     // force to sync data after this timeout (on next write)
-        time_t lastsync;  // keep track when the last sync was explictly made
-        size_t previous;  // keep latest offset inserted to the datafile
+        char *datadir;      // root path of the data files
+        char *datafile;     // pointer to the current datafile used
+        uint16_t dataid;    // id of the datafile currently in use
+        int datafd;         // file descriptor of the current datafile used
+        int sync;           // flag to force data write sync
+        int synctime;       // force to sync data after this timeout (on next write)
+        time_t lastsync;    // keep track when the last sync was explictly made
+        size_t previous;    // keep latest offset inserted to the datafile
+        data_stats_t stats; // data statistics (session time)
 
     } data_root_t;
 

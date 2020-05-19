@@ -289,7 +289,7 @@ zdb_api_t *zdb_api_set(namespace_t *ns, void *key, size_t ksize, void *payload, 
         size_t limits = ns->maxsize + floating;
 
         // check if there is still enough space
-        if(ns->index->datasize + psize > limits)
+        if(ns->index->stats.datasize + psize > limits)
             return zdb_api_reply_error("No space left on this namespace");
     }
 

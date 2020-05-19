@@ -54,6 +54,11 @@ void index_entry_dump(index_entry_t *entry) {
 }
 
 
+// update internal statistics error
+void index_io_error(index_root_t *root) {
+    root->stats.errors += 1;
+    root->stats.lasterr = time(NULL);
+}
 
 // force index to be sync'd with underlaying device
 static inline int index_sync(index_root_t *root, int fd) {
@@ -94,6 +99,10 @@ int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
     if((response = write(fd, buffer, length)) < 0) {
         // update statistics
         zdb_rootsettings.stats.idxwritefailed += 1;
+
+        // update namespace statistics
+        root->stats.errors += 1;
+        root->stats.lasterr = time(NULL);
 
         zdb_warnp("index write");
         return 0;
@@ -460,9 +469,9 @@ int index_entry_delete_memory(index_root_t *root, index_entry_t *entry) {
     index_branch_remove(branch, entry, previous);
 
     // updating statistics
-    root->entries -= 1;
-    root->datasize -= entry->length;
-    root->indexsize -= sizeof(index_entry_t) + entry->idlength;
+    root->stats.entries -= 1;
+    root->stats.datasize -= entry->length;
+    root->stats.size -= sizeof(index_entry_t) + entry->idlength;
 
     // cleaning memory object
     free(entry);
@@ -505,8 +514,14 @@ int index_entry_delete_disk(index_root_t *root, index_entry_t *entry) {
     lseek(fd, entry->idxoffset, SEEK_SET);
 
     // overwrite the key
+    // FIXME: why not using index_write ?
     if(write(fd, index_transition, entrylength) != (ssize_t) entrylength) {
         zdb_warnp("index_entry_delete write");
+
+        // FIXME: not needed if using index_write
+        root->stats.errors += 1;
+        root->stats.lasterr = time(NULL);
+
         close(fd);
         return 1;
     }

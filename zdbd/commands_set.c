@@ -290,7 +290,7 @@ int command_set(redis_client_t *client) {
         size_t limits = client->ns->maxsize + floating;
 
         // check if there is still enough space
-        if(index->datasize + request->argv[2]->length > limits) {
+        if(index->stats.datasize + request->argv[2]->length > limits) {
             redis_hardsend(client, "-No space left on this namespace");
             return 1;
         }
