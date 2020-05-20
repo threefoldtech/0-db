@@ -140,6 +140,18 @@
 
     } index_seqid_t;
 
+    // index statistics
+    typedef struct index_stats_t {
+        size_t size;     // in memory index size usage (in bytes)
+        size_t datasize; // data payload size
+        size_t entries;  // keys count
+        size_t hits;     // amount of index hit requested (not used yet)
+        size_t faults;   // amount of index hit missed (not used yet)
+        size_t errors;   // amount of io (read/write) error
+        time_t lasterr;  // last error timestamp
+
+    } index_stats_t;
+
     //
     // global root memory structure of the index
     //
@@ -160,10 +172,7 @@
         index_seqid_t *seqid;      // sequential fileid mapping
         index_branch_t **branches; // list of branches explained later
         index_status_t status;     // index health
-
-        size_t datasize;    // statistics about size of data on disk
-        size_t indexsize;   // statistics about index in-memory size
-        size_t entries;     // statistics about number of keys for this index
+        index_stats_t stats;       // index statistics
 
         size_t previous;    // keep latest offset inserted to the indexfile
 
@@ -273,4 +282,7 @@
     void index_close(index_root_t *root);
 
     const char *index_modename(index_root_t *index);
+
+    // statistics management
+    void index_io_error(index_root_t *root);
 #endif

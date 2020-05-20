@@ -196,9 +196,9 @@ index_entry_t *index_insert_memory_handler_memkey(index_root_t *root, index_set_
 
     // update statistics (if the key exists)
     // maybe it doesn't exists if it comes from a replay
-    root->entries += 1;
-    root->datasize += new->length;
-    root->indexsize += entrysize;
+    root->stats.entries += 1;
+    root->stats.datasize += new->length;
+    root->stats.size += entrysize;
 
     // update next entry id
     root->nextentry += 1;
@@ -212,8 +212,8 @@ index_entry_t *index_insert_memory_handler_sequential(index_root_t *root, index_
 
     // update statistics (if the key exists)
     // maybe it doesn't exists if it comes from a replay
-    root->entries += 1;
-    root->datasize += new->length;
+    root->stats.entries += 1;
+    root->stats.datasize += new->length;
 
     // update next entry id
     root->nextentry += 1;
@@ -233,8 +233,8 @@ index_entry_t *index_update_memory_handler_memkey(index_root_t *root, index_set_
     zdb_debug("[+] index: updating current entry in memory\n");
 
     // update statistics
-    root->datasize -= exists->length;
-    root->datasize += new->length;
+    root->stats.datasize -= exists->length;
+    root->stats.datasize += new->length;
 
     // updating parent id and parent offset
     // to the previous item itself, which
@@ -269,16 +269,16 @@ index_entry_t *index_update_memory_handler_sequential(index_root_t *root, index_
         // blindly if exists is NULL (that means we comes from
         // 'index_set_memory' and we are not really doing some update
         // but more a replay from the index_loader
-        root->datasize += new->length;
-        root->entries += 1;
+        root->stats.datasize += new->length;
+        root->stats.entries += 1;
         return new;
     }
 
     // we have a previous key, this is a real
     // update and we need to reflect that on the statistics
     // there are no new entry, since it's an update
-    root->datasize -= exists->length;
-    root->datasize += new->length;
+    root->stats.datasize -= exists->length;
+    root->stats.datasize += new->length;
 
     return new;
 }

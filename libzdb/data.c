@@ -71,6 +71,10 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
         // update statistics
         zdb_rootsettings.stats.datawritefailed += 1;
 
+        // update namespace statistics
+        root->stats.errors += 1;
+        root->stats.lasterr = time(NULL);
+
         zdb_warnp("data write");
         return 0;
     }
@@ -533,6 +537,8 @@ data_root_t *data_init_lazy(zdb_settings_t *settings, char *datapath, uint16_t d
     root->synctime = settings->synctime;
     root->lastsync = 0;
     root->previous = 0;
+
+    memset(&root->stats, 0x00, sizeof(data_stats_t));
 
     data_set_id(root);
 
