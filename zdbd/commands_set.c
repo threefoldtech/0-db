@@ -263,6 +263,7 @@ int command_set(redis_client_t *client) {
     // shortcut to data
     index_root_t *index = client->ns->index;
     index_entry_t *entry = NULL;
+    index_mode_t mode = client->ns->index->mode;
     size_t floating = 0;
 
     // if the user want to override an existing key
@@ -309,7 +310,7 @@ int command_set(redis_client_t *client) {
         data_jump_next(client->ns->data, newid);
     }
 
-    size_t offset = redis_set_handlers[zdb_settings->mode](client, entry);
+    size_t offset = redis_set_handlers[mode](client, entry);
     if(offset == 0)
         return 0;
 
