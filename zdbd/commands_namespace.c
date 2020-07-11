@@ -401,6 +401,40 @@ int command_nsset(redis_client_t *client) {
         namespace->worm = (value[0] == '1') ? 1 : 0;
         zdbd_debug("[+] command: nsset: changing worm mode to: %d\n", namespace->worm);
 
+    } else if(strcmp(command, "mode") == 0) {
+        zdb_settings_t *settings = zdb_settings_get();
+
+        if(settings->mode != ZDB_MODE_MIX) {
+            zdbd_debug("[-] command: nsset: runtime mode switcher disabled\n");
+            redis_hardsend(client, "-This server instance is configured to use a single runtime mode");
+            return 1;
+        }
+
+        // checking if mode still can be changed
+        // this is only possible for an empty namespace
+        if(namespace_is_fresh(namespace) != 1) {
+            zdbd_debug("[-] command: nsset: mode: namespace not fresh\n");
+            redis_hardsend(client, "-Cannot change mode of used namespace");
+            return 1;
+        }
+
+        if(strcmp(value, "user") == 0) {
+            zdbd_debug("[+] command: nsset: switching to user mode\n");
+            namespace->index->mode = ZDB_MODE_KEY_VALUE;
+            index_switch_mode(namespace->index);
+            index_rehash(namespace->index);
+
+        } else if(strcmp(value, "seq") == 0) {
+            zdbd_debug("[+] command: nsset: switching to sequential mode\n");
+            namespace->index->mode = ZDB_MODE_SEQUENTIAL;
+            index_switch_mode(namespace->index);
+            index_rehash(namespace->index);
+
+        } else {
+            zdbd_debug("[-] command: nsset: unknown mode '%s'\n", value);
+            redis_hardsend(client, "-Invalid property value (expected: user, seq)");
+        }
+
     } else {
         zdbd_debug("[-] command: nsset: unknown property '%s'\n", command);
         redis_hardsend(client, "-Invalid property");

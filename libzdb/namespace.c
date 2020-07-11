@@ -582,6 +582,33 @@ static void namespace_kick_slot(namespace_t *namespace) {
     }
 }
 
+// return 1 or 0 if namespace is fresh
+// a fresh namespace is a completly empty namespace
+// without any data/keys, not only an empty namespace
+// but even an namespace without any deleted keys
+//
+// it's important to know if a namespace is 'fresh' in order
+// to change it's mode after it's creation, the mode cannot
+// be changed if any keys have been written
+int namespace_is_fresh(namespace_t *namespace) {
+    if(namespace->index->nextentry != 0) {
+        zdb_debug("[-] namespace: not fresh: nextentry not zero\n");
+        return 0;
+    }
+
+    if(namespace->index->nextid != 0) {
+        zdb_debug("[-] namespace: not fresh: nextif not zero\n");
+        return 0;
+    }
+
+    if(namespace->index->indexid != 0) {
+        zdb_debug("[-] namespace: not fresh: indexid not zero\n");
+        return 0;
+    }
+
+    return 1;
+}
+
 // trigger hook when namespace is reloaded
 static void namespace_reload_hook(namespace_t *namespace) {
     if(!zdb_rootsettings.hook)

@@ -87,6 +87,7 @@
     int namespace_commit(namespace_t *namespace);
     int namespace_flush(namespace_t *namespace);
     int namespace_reload(namespace_t *namespace);
+    int namespace_is_fresh(namespace_t *namespace);
     void namespace_free(namespace_t *namespace);
     namespace_t *namespace_get(char *name);
 
