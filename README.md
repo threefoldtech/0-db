@@ -94,6 +94,8 @@ On runtime, you can choose between multiple mode:
 **Warning**: in any case, please ensure data and index directories used by 0-db are empty, or
 contains only valid database namespaces directories.
 
+FIXME: ADD DOCUMENTATION ABOUT MIXED MODE.
+
 ## User Key
 This is a default mode, a simple key-value store. User can `SET` their own keys, like any key-value store.
 
