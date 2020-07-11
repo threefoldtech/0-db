@@ -24,6 +24,10 @@
 
     } index_mode_t;
 
+    // define default mode when mixed mode is enabled
+    // and a new namespace is created
+    #define ZDB_DEFAULT_MIX_MODE ZDB_MODE_KEY_VALUE
+
     // when adding or removing some modes
     // don't forget to adapt correctly the handlers
     // function pointers (basicly for GET and SET)

@@ -28,7 +28,15 @@ zdb_settings_t *zdb_initialize() {
     s->datapath = ZDB_DEFAULT_DATAPATH;
     s->indexpath = ZDB_DEFAULT_INDEXPATH;
     s->datasize = ZDB_DEFAULT_DATA_MAXSIZE;
-    s->mode = ZDB_MODE_KEY_VALUE;
+
+    // running 0-db in mixed mode by default
+    //
+    // this flag can be used on runtime to specify
+    // if mixed mode is allowed or not, if a specific
+    // mode is set here, you could restrict instance to
+    // a single mode, but this is up to caller to enable
+    // restriction, library doesn't restrict anything
+    s->mode = ZDB_MODE_MIX;
 
     // resetting values
     s->verbose = 0;

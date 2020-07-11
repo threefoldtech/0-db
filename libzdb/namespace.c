@@ -66,6 +66,7 @@ namespace_t *namespace_get(char *name) {
     return NULL;
 }
 
+// FIXME: no error handled externally
 void namespace_descriptor_update(namespace_t *namespace, int fd) {
     ns_header_legacy_t header;
     ns_header_extended_t extended;
@@ -492,7 +493,7 @@ ns_root_t *namespaces_allocate(zdb_settings_t *settings) {
         zdb_diep("namespace malloc");
 
     // allocating (if needed, only some modes needs it) the big (single) index branches
-    if(settings->mode == ZDB_MODE_KEY_VALUE) {
+    if(settings->mode == ZDB_MODE_KEY_VALUE || settings->mode == ZDB_MODE_MIX) {
         zdb_debug("[+] namespaces: pre-allocating index (%d lazy branches)\n", buckets_branches);
 
         // allocating minimal branches array
