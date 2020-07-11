@@ -12,6 +12,7 @@ static char *zdb_modes[] = {
     "sequential keys",
     "direct key position",
     "direct key fixed block length",
+    "mixed mode",
 };
 
 //

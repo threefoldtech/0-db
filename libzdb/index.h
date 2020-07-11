@@ -14,6 +14,11 @@
         // fixed-block length
         ZDB_MODE_DIRECTBLOCK = 3,
 
+        // allow to mix modes within the same instance
+        // this is not a mode itself, just a flag
+        // to know global possibilities
+        ZDB_MODE_MIX = 4,
+
         // amount of modes available
         ZDB_MODES
 
