@@ -264,7 +264,7 @@ void usage() {
     printf("                       > user: default user key-value mode\n");
     printf("                       > seq: sequential keys generated\n");
     printf("                       > direct: direct position by key\n");
-    printf("                       > block: fixed blocks length (smaller direct)\n");
+    printf("                      note: if not specified, zdb will run in mixed mode\n");
     printf("  --datasize <size>   maximum datafile size before split (default: %.2f MB)\n\n", MB(ZDB_DEFAULT_DATA_MAXSIZE));
 
     printf(" Network options:\n");
@@ -391,8 +391,10 @@ int main(int argc, char *argv[]) {
                     zdbd_warning("[!] WARNING: direct mode will not be supported at all anymore");
                     zdbd_warning("[!] WARNING: in futur release");
 
+                /*
                 } else if(strcmp(optarg, "block") == 0) {
                     zdb_settings->mode = ZDB_MODE_DIRECTBLOCK;
+                */
 
                 } else {
                     zdbd_danger("[-] invalid mode '%s'", optarg);
