@@ -93,6 +93,7 @@ void zdb_tools_hexdump(void *input, size_t length) {
 // global warning and fatal message
 //
 void *zdb_warnp(char *str) {
+    zdb_timelog();
     fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
     return NULL;
 }

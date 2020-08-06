@@ -108,6 +108,7 @@ void zdbd_hexdump(void *input, size_t length) {
 // global warning and fatal message
 //
 void *zdbd_warnp(char *str) {
+    zdbd_timelog();
     fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
     return NULL;
 }
