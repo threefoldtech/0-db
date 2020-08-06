@@ -67,6 +67,8 @@ static inline int data_sync_check(data_root_t *root, int fd) {
 static int data_write(int fd, void *buffer, size_t length, int syncer, data_root_t *root) {
     ssize_t response;
 
+    zdb_debug("[+] data: writing %lu bytes to fd %d\n", length, fd);
+
     if((response = write(fd, buffer, length)) < 0) {
         // update statistics
         zdb_rootsettings.stats.datawritefailed += 1;
@@ -83,6 +85,8 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
         zdb_logerr("[-] data write: partial write\n");
         return 0;
     }
+
+    zdb_debug("[+] data: wrote %lu bytes to fd %d\n", response, fd);
 
     // update statistics
     zdb_rootsettings.stats.datadiskwrite += length;
