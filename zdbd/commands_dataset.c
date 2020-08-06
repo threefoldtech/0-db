@@ -26,7 +26,6 @@ int command_exists(redis_client_t *client) {
 
     zdbd_debug("[+] command: exists: lookup key: ");
     zdbd_debughex(request->argv[1]->buffer, request->argv[1]->length);
-    zdbd_debug("\n");
 
     index_root_t *index = client->ns->index;
     index_entry_t *entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length);
@@ -63,7 +62,6 @@ int command_check(redis_client_t *client) {
 
     zdbd_debug("[+] command: check: lookup key: ");
     zdbd_debughex(request->argv[1]->buffer, request->argv[1]->length);
-    zdbd_debug("\n");
 
     index_root_t *index = client->ns->index;
     index_entry_t *entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length);

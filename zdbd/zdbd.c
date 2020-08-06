@@ -100,7 +100,7 @@ void zdbd_hexdump(void *input, size_t length) {
         *writer++ = __hex[buffer[i] & 0x0F];
     }
 
-    printf("0x%s", output);
+    printf("0x%s\n", output);
     free(output);
 }
 

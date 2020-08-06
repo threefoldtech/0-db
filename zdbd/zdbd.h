@@ -71,7 +71,7 @@
     #ifndef RELEASE
         #define zdbd_verbose(...)  { zdbd_timelog(); printf(__VA_ARGS__); }
         #define zdbd_debug(...)    { zdbd_timelog(); printf(__VA_ARGS__); }
-        #define zdbd_debughex(...) { zdbd_timelog(); zdbd_hexdump(__VA_ARGS__); }
+        #define zdbd_debughex(...) { zdbd_hexdump(__VA_ARGS__); }
     #else
         #define zdbd_verbose(...) { if(zdbd_rootsettings.verbose) { zdbd_timelog(); printf(__VA_ARGS__); } }
         #define zdbd_debug(...) ((void)0)

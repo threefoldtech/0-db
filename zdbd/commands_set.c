@@ -81,7 +81,6 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
 
     zdbd_debug("[+] command: set: userkey: ");
     zdbd_debughex(id, idlength);
-    zdbd_debug("\n");
 
     zdbd_debug("[+] command: set: offset: %lu\n", offset);
 
@@ -185,7 +184,6 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
 
     zdbd_debug("[+] command: set: sequential-key: ");
     zdbd_debughex(&id, idlength);
-    zdbd_debug("\n");
 
     zdbd_debug("[+] command: set: offset: %lu\n", offset);
 
