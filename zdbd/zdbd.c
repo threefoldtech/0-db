@@ -145,7 +145,7 @@ void zdbd_timelog() {
     gettimeofday(&n, NULL);
     value = (double)(n.tv_usec - b->tv_usec) / 1000000 + (double)(n.tv_sec - b->tv_sec);
 
-    printf("[% 15.7f]", value);
+    printf("[% 15.6f]", value);
 }
 
 // internal id generatir
