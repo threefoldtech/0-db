@@ -306,7 +306,12 @@ size_t index_jump_next(index_root_t *root) {
         hook_append(hook, root->indexfile);
     }
 
+    // flushing current index file
+    zdb_log("[+] index: flushing file before closing\n");
+    fsync(root->indexfd);
+
     // closing current file descriptor
+    zdb_log("[+] index: closing current index file\n");
     index_close(root);
 
     // moving to the next file

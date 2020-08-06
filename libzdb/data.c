@@ -269,7 +269,12 @@ static void data_open_final(data_root_t *root) {
 size_t data_jump_next(data_root_t *root, uint16_t newid) {
     zdb_verbose("[+] data: jumping to the next file\n");
 
+    // flushing data
+    zdb_log("[+] data: flushing file before closing\n");
+    fsync(root->datafd);
+
     // closing current file descriptor
+    zdb_log("[+] data: closing current datafile\n");
     close(root->datafd);
 
     // moving to the next file
