@@ -84,7 +84,7 @@ size_t index_seq_offset(uint32_t relative) {
 void index_seqid_dump(index_root_t *root) {
     for(uint16_t i = 0; i < root->seqid->length; i++) {
         index_seqmap_t *item = &root->seqid->seqmap[i];
-        printf("[+] index seq: seqid %d -> file %d\n", item->seqid, item->fileid);
+        zdb_log("[+] index seq: seqid %d -> file %d\n", item->seqid, item->fileid);
     }
 }
 

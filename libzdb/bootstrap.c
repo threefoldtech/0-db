@@ -48,7 +48,7 @@ zdb_settings_t *zdb_initialize() {
 
     // initialize stats and init time
     memset(&s->stats, 0x00, sizeof(zdb_stats_t));
-    s->stats.inittime = time(NULL);
+    gettimeofday(&s->stats.inittime, NULL);
 
     // initialize instance id
     s->iid = zdb_instanceid_generate();

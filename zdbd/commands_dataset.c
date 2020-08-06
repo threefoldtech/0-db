@@ -19,7 +19,7 @@ int command_exists(redis_client_t *client) {
         return 1;
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
-        printf("[-] invalid key size\n");
+        zdb_log("[-] command: exists: invalid key size\n");
         redis_hardsend(client, "-Invalid key");
         return 1;
     }
@@ -56,7 +56,7 @@ int command_check(redis_client_t *client) {
         return 1;
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
-        printf("[-] invalid key size\n");
+        zdb_log("[-] command: check: invalid key size\n");
         redis_hardsend(client, "-Invalid key");
         return 1;
     }
@@ -104,7 +104,7 @@ int command_del(redis_client_t *client) {
         return 1;
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
-        printf("[-] command: del: invalid key size\n");
+        zdb_log("[-] command: del: invalid key size\n");
         redis_hardsend(client, "-Invalid key");
         return 1;
     }

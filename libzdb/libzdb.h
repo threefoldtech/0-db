@@ -43,7 +43,7 @@
     #define ZDB_VERSION     "1.1.0"
 
     typedef struct zdb_stats_t {
-        time_t inittime;          // timestamp when zdb started (used for uptime)
+        struct timeval inittime;  // timestamp when zdb started (used for uptime)
 
         // index
         uint64_t idxreadfailed;   // amount of index disk read failure
@@ -107,6 +107,7 @@
     void zdb_tools_hexdump(void *input, size_t length);
     char *zdb_header_date(uint32_t epoch, char *target, size_t length);
 
+    void zdb_timelog();
     void *zdb_warnp(char *str);
     void zdb_diep(char *str);
 
@@ -116,10 +117,13 @@
     #define COLOR_CYAN   "\033[36;1m"
     #define COLOR_RESET  "\033[0m"
 
-    #define zdb_danger(fmt, ...)  { printf(COLOR_RED    fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define zdb_warning(fmt, ...) { printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define zdb_success(fmt, ...) { printf(COLOR_GREEN  fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define zdb_notice(fmt, ...)  { printf(COLOR_CYAN   fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdb_log(fmt, ...)     { zdb_timelog(); printf(fmt, ##__VA_ARGS__); }
+    #define zdb_logerr(fmt, ...)  { zdb_timelog(); fprintf(stderr, fmt, ##__VA_ARGS__); }
+
+    #define zdb_danger(fmt, ...)  { zdb_timelog(); printf(COLOR_RED    fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdb_warning(fmt, ...) { zdb_timelog(); printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdb_success(fmt, ...) { zdb_timelog(); printf(COLOR_GREEN  fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdb_notice(fmt, ...)  { zdb_timelog(); printf(COLOR_CYAN   fmt COLOR_RESET "\n", ##__VA_ARGS__); }
 
     #define KB(x)   (x / (1024.0))
     #define MB(x)   (x / (1024 * 1024.0))

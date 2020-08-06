@@ -334,7 +334,7 @@ zdb_api_t *zdb_api_get(namespace_t *ns, void *key, size_t ksize) {
     data_payload_t payload = data_get(data, entry->offset, entry->length, entry->dataid, entry->idlength);
 
     if(!payload.buffer) {
-        printf("[-] api: get: cannot read payload\n");
+        zdb_log("[-] api: get: cannot read payload\n");
         free(payload.buffer);
         return zdb_api_reply(ZDB_API_INTERNAL_ERROR, NULL);
     }

@@ -109,7 +109,7 @@ int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
     }
 
     if(response != (ssize_t) length) {
-        fprintf(stderr, "[-] index write: partial write\n");
+        zdb_logerr("[-] index write: partial write\n");
         return 0;
     }
 
@@ -134,12 +134,12 @@ static int index_read(int fd, void *buffer, size_t length) {
     }
 
     if(response == 0) {
-        fprintf(stderr, "[-] index read: eof reached\n");
+        zdb_logerr("[-] index read: eof reached\n");
         return 0;
     }
 
     if(response != (ssize_t) length) {
-        fprintf(stderr, "[-] index read: partial read\n");
+        zdb_logerr("[-] index read: partial read\n");
         return 0;
     }
 
@@ -281,11 +281,11 @@ void index_open_final(index_root_t *root) {
 
     if((root->indexfd = open(root->indexfile, flags, 0600)) < 0) {
         zdb_warnp(root->indexfile);
-        fprintf(stderr, "[-] index: could not open index file\n");
+        zdb_logerr("[-] index: could not open index file\n");
         return;
     }
 
-    printf("[+] index: active file: %s\n", root->indexfile);
+    zdb_log("[+] index: active file: %s\n", root->indexfile);
 }
 
 void index_close(index_root_t *root) {
@@ -669,9 +669,9 @@ static inline size_t index_clean_namespace_branch(index_branch_t *branch, void *
         }
 
         #ifndef RELEASE
-        printf("[+] index: namespace cleaner: free: ");
+        zdb_log("[+] index: namespace cleaner: free: ");
         zdb_hexdump(entry->id, entry->idlength);
-        printf("\n");
+        printf("\n"); // FIXME
         #endif
 
         // okay, we need to remove this key

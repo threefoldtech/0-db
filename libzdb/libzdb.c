@@ -9,7 +9,7 @@
 #include <execinfo.h>
 #include <getopt.h>
 #include <ctype.h>
-#include <time.h>
+#include <sys/time.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
 
@@ -112,6 +112,19 @@ void zdb_verbosep(char *prefix, char *str) {
 void zdb_diep(char *str) {
     zdb_warnp(str);
     exit(EXIT_FAILURE);
+}
+
+void zdb_timelog() {
+    struct timeval n, *b;
+    double value = 0;
+
+    // boot time
+    b = &zdb_rootsettings.stats.inittime;
+
+    gettimeofday(&n, NULL);
+    value = (double)(n.tv_usec - b->tv_usec) / 1000000 + (double)(n.tv_sec - b->tv_sec);
+
+    printf("[% 15.7f]", value);
 }
 
 char *zdb_header_date(uint32_t epoch, char *target, size_t length) {

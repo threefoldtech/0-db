@@ -108,7 +108,7 @@ int history_send(redis_client_t *client, index_item_t *item, index_ekey_t *ekey)
     response.payload = data_get(data, item->offset, item->length, item->dataid, item->idlength);
 
     if(!response.payload.buffer) {
-        printf("[-] command: history: cannot read payload\n");
+        zdb_log("[-] command: history: cannot read payload\n");
         redis_hardsend(client, "-Internal Error");
         free(response.payload.buffer);
         return 0;

@@ -80,7 +80,7 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
     }
 
     if(response != (ssize_t) length) {
-        fprintf(stderr, "[-] data write: partial write\n");
+        zdb_logerr("[-] data write: partial write\n");
         return 0;
     }
 
@@ -257,7 +257,7 @@ static void data_open_final(data_root_t *root) {
     }
 
     zdb_debug("[+] data: entries read: %d, last offset: %lu\n", entries, root->previous);
-    printf("[+] data: active file: %s\n", root->datafile);
+    zdb_log("[+] data: active file: %s\n", root->datafile);
 }
 
 // jumping to the next id close the current data file

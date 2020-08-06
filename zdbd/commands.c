@@ -149,7 +149,7 @@ int redis_dispatcher(redis_client_t *client) {
     }
 
     // unknown command
-    printf("[-] command: unsupported redis command\n");
+    zdb_log("[-] command: unsupported redis command\n");
     zdbd_rootsettings.stats.cmdsfailed += 1;
 
     // reset executed flag, this was a non-existing command

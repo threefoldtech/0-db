@@ -725,10 +725,10 @@ int namespaces_emergency() {
     namespace_t *ns;
 
     for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
-        printf("[+] namespaces: flushing index [%s]\n", ns->name);
+        zdb_log("[+] namespaces: flushing index [%s]\n", ns->name);
 
         if(index_emergency(ns->index)) {
-            printf("[+] namespaces: flushing data [%s]\n", ns->name);
+            zdb_log("[+] namespaces: flushing data [%s]\n", ns->name);
             // only flusing data if index flush was accepted
             // if index flush returns 0, we are probably in an initializing stage
             data_emergency(ns->data);
