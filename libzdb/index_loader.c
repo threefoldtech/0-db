@@ -17,9 +17,9 @@
 // index initializer and dumper
 //
 static inline void index_dump_entry(index_entry_t *entry) {
-    printf("[+] key [");
+    zdb_log("[+] key [");
     zdb_hexdump(entry->id, entry->idlength);
-    printf("] offset %" PRIu32 ", length: %" PRIu32 "\n", entry->offset, entry->length);
+    zdb_log("] offset %" PRIu32 ", length: %" PRIu32 "\n", entry->offset, entry->length);
 }
 
 // dumps the current index load
@@ -27,10 +27,10 @@ static inline void index_dump_entry(index_entry_t *entry) {
 static void index_dump(index_root_t *root, int fulldump) {
     size_t branches = 0;
 
-    printf("[+] index: verifyfing populated keys\n");
+    zdb_log("[+] index: verifyfing populated keys\n");
 
     if(fulldump)
-        printf("[+] ===========================\n");
+        zdb_log("[+] ===========================\n");
 
     // iterating over each buckets
     for(uint32_t b = 0; b < buckets_branches; b++) {
@@ -53,9 +53,9 @@ static void index_dump(index_root_t *root, int fulldump) {
 
     if(fulldump) {
         if(root->stats.entries == 0)
-            printf("[+] index is empty\n");
+            zdb_log("[+] index is empty\n");
 
-        printf("[+] ===========================\n");
+        zdb_log("[+] ===========================\n");
     }
 
     zdb_verbose("[+] index: uses: %lu branches\n", branches);
@@ -203,8 +203,8 @@ static size_t index_load_file(index_root_t *root) {
             // we read something, but not the expected header, at least
             // not this amount of data, which is a completly undefined behavior
             // let's just stopping here
-            fprintf(stderr, "[-] index: header corrupted or incomplete\n");
-            fprintf(stderr, "[-] index: expected %lu bytes, %ld read\n", sizeof(index_header_t), length);
+            zdb_logerr("[-] index: header corrupted or incomplete\n");
+            zdb_logerr("[-] index: expected %lu bytes, %ld read\n", sizeof(index_header_t), length);
             exit(EXIT_FAILURE);
         }
 
@@ -225,12 +225,12 @@ static size_t index_load_file(index_root_t *root) {
         // and it's empty, there is no goal to do anything
         // let's crash
         if(root->status & INDEX_READ_ONLY) {
-            fprintf(stderr, "[-] no index found and readonly filesystem\n");
-            fprintf(stderr, "[-] cannot starts correctly\n");
+            zdb_logerr("[-] no index found and readonly filesystem\n");
+            zdb_logerr("[-] cannot starts correctly\n");
             exit(EXIT_FAILURE);
         }
 
-        printf("[+] index: creating empty file\n");
+        zdb_log("[+] index: creating empty file\n");
         header = index_initialize(root->indexfd, root->indexid, root);
     }
 
@@ -265,7 +265,7 @@ static size_t index_load_file(index_root_t *root) {
         }
     }
 
-    printf("[+] index: populating: %s\n", root->indexfile);
+    zdb_log("[+] index: populating: %s\n", root->indexfile);
 
     // index seems in a good state
     // let's load it completely in memory now

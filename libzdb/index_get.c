@@ -67,7 +67,6 @@ index_entry_t *index_get(index_root_t *index, void *id, uint8_t idlength) {
 
     zdb_debug("[+] index: get: lookup key: ");
     zdb_debughex(id, idlength);
-    zdb_debug("\n");
 
     if(!(entry = index_get_handlers[index->mode](index, id, idlength))) {
         zdb_debug("[-] index: get: key not found\n");

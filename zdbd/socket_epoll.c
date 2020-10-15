@@ -95,7 +95,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 
             // (dirty) way the STOP event is handled
             if(ctrl == RESP_STATUS_SHUTDOWN) {
-                printf("[+] stopping daemon\n");
+                zdb_log("[+] stopping daemon\n");
 
                 for(int i = 0; i < redis->fdlen; i++)
                     close(redis->mainfd[i]);

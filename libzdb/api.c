@@ -143,7 +143,6 @@ static zdb_api_t *api_set_handler_userkey(namespace_t *ns, void *key, size_t ksi
 
     zdb_debug("[+] api: set: userkey: ");
     zdb_debughex(key, ksize);
-    zdb_debug("\n");
 
     zdb_debug("[+] api: set: offset: %lu\n", offset);
 
@@ -225,7 +224,6 @@ static zdb_api_t *api_set_handler_sequential(namespace_t *ns, void *key, size_t 
 
     zdb_debug("[+] api: set: sequential-key: ");
     zdb_debughex(&id, idlength);
-    zdb_debug("\n");
 
     zdb_debug("[+] api: set: offset: %lu\n", offset);
 
@@ -334,7 +332,7 @@ zdb_api_t *zdb_api_get(namespace_t *ns, void *key, size_t ksize) {
     data_payload_t payload = data_get(data, entry->offset, entry->length, entry->dataid, entry->idlength);
 
     if(!payload.buffer) {
-        printf("[-] api: get: cannot read payload\n");
+        zdb_log("[-] api: get: cannot read payload\n");
         free(payload.buffer);
         return zdb_api_reply(ZDB_API_INTERNAL_ERROR, NULL);
     }

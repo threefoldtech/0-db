@@ -88,17 +88,19 @@ int command_stop(redis_client_t *client) {
 
 int command_info(redis_client_t *client) {
     char info[4096];
+    struct timeval current;
     zdb_settings_t *zdb_settings = zdb_settings_get();
     zdb_stats_t *lstats = &zdb_settings->stats;
     zdbd_stats_t *dstats = &zdbd_rootsettings.stats;
+    gettimeofday(&current, NULL);
 
     sprintf(info, "# server\n");
     sprintf(info + strlen(info), "server_name: 0-db (zdb)\n");
     sprintf(info + strlen(info), "server_revision: " ZDBD_REVISION "\n");
     sprintf(info + strlen(info), "engine_revision: %s\n", zdb_revision());
     sprintf(info + strlen(info), "instance_id: %u\n", zdb_instanceid_get());
-    sprintf(info + strlen(info), "boot_time: %ld\n", dstats->boottime);
-    sprintf(info + strlen(info), "uptime: %ld\n", time(NULL) - dstats->boottime);
+    sprintf(info + strlen(info), "boot_time: %ld\n", dstats->boottime.tv_sec);
+    sprintf(info + strlen(info), "uptime: %ld\n", current.tv_sec - dstats->boottime.tv_sec);
 
 
     sprintf(info + strlen(info), "\n# clients\n");

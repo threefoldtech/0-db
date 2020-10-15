@@ -47,7 +47,7 @@ int command_get(redis_client_t *client) {
     data_payload_t payload = data_get(data, entry->offset, entry->length, entry->dataid, entry->idlength);
 
     if(!payload.buffer) {
-        printf("[-] command: get: cannot read payload\n");
+        zdb_log("[-] command: get: cannot read payload\n");
         redis_hardsend(client, "-Internal Error");
         free(payload.buffer);
         return 0;

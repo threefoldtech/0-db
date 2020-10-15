@@ -67,6 +67,8 @@ static inline int data_sync_check(data_root_t *root, int fd) {
 static int data_write(int fd, void *buffer, size_t length, int syncer, data_root_t *root) {
     ssize_t response;
 
+    zdb_debug("[+] data: writing %lu bytes to fd %d\n", length, fd);
+
     if((response = write(fd, buffer, length)) < 0) {
         // update statistics
         zdb_rootsettings.stats.datawritefailed += 1;
@@ -80,9 +82,11 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
     }
 
     if(response != (ssize_t) length) {
-        fprintf(stderr, "[-] data write: partial write\n");
+        zdb_logerr("[-] data write: partial write\n");
         return 0;
     }
+
+    zdb_debug("[+] data: wrote %lu bytes to fd %d\n", response, fd);
 
     // update statistics
     zdb_rootsettings.stats.datadiskwrite += length;
@@ -257,7 +261,7 @@ static void data_open_final(data_root_t *root) {
     }
 
     zdb_debug("[+] data: entries read: %d, last offset: %lu\n", entries, root->previous);
-    printf("[+] data: active file: %s\n", root->datafile);
+    zdb_log("[+] data: active file: %s\n", root->datafile);
 }
 
 // jumping to the next id close the current data file
@@ -265,7 +269,12 @@ static void data_open_final(data_root_t *root) {
 size_t data_jump_next(data_root_t *root, uint16_t newid) {
     zdb_verbose("[+] data: jumping to the next file\n");
 
+    // flushing data
+    zdb_log("[+] data: flushing file before closing\n");
+    fsync(root->datafd);
+
     // closing current file descriptor
+    zdb_log("[+] data: closing current datafile\n");
     close(root->datafd);
 
     // moving to the next file
