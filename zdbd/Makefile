@@ -16,7 +16,7 @@ ifeq ($(STATIC),1)
 endif
 
 ifeq ($(COVERAGE),1)
-	CFLAGS += -coverage -fprofile-arcs -ftest-coverage
+	CFLAGS += -pg -coverage -fprofile-arcs -ftest-coverage
 	LDFLAGS += -lgcov --coverage
 endif
 
