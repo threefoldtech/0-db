@@ -27,11 +27,11 @@ but 0-db is not a redis replacement and never will.
 
 # Build targets
 Currently supported system:
-* Linux (using `epoll`)
+* Linux (using `epoll`), kernel 3.17, glibc 2.25
 * MacOS and FreeBSD (using `kqueue`)
 
 Currently supported hardware:
-* Any processor supporting `SSE 4.2`
+* Any CPU supporting `SSE 4.2`
 
 This project won't compile on something else (for now).
 
