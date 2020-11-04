@@ -858,6 +858,7 @@ redis_client_t *socket_client_new(int fd) {
     client->watching = NULL;
     client->mirror = 0;
     client->master = 0;
+    client->nonce = NULL;
 
     // initialize wait timeout
     memset(&client->watchtime, 0, sizeof(struct timespec));

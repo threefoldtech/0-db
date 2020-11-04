@@ -120,6 +120,7 @@
         int admin;        // does the client is admin
         int mirror;       // does this client needs a mirroring
         int master;       // does this client is a 'master' (forwarder)
+        char *nonce;      // nonce challenge used by secure auth
         buffer_t buffer;  // per-client buffer
 
         // each client can request to wait for an event
