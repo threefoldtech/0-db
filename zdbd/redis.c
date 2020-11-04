@@ -922,6 +922,7 @@ void socket_client_free(int fd) {
     redis_free_request(client->request);
     buffer_free(&client->buffer);
 
+    free(client->nonce);
     free(client->request);
     free(client);
 
