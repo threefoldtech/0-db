@@ -184,6 +184,7 @@ This mode is not possible if you don't have any data/index already available.
 - `DBSIZE`
 - `TIME`
 - `AUTH password`
+- `AUTH SECURE`
 - `SCAN [optional cursor]`
 - `SCANX [optional cursor]` (this is just an alias for `SCAN`)
 - `RSCAN [optional cursor]`
@@ -309,7 +310,36 @@ to add the password as extra parameter. If the namespace is `public` and you don
 any password, the namespace will be accessible in read-only.
 
 ## AUTH
-If an admin account is set, use `AUTH` command to authentificate yourself as `ADMIN`.
+If an administrator password is set, use `AUTH` command to authentificate yourself as `ADMIN`.
+There is two way possible to request authentication.
+
+### Legacy plain-text authentication
+You can authenticate yourself using the simple `AUTH <password>` way. This is still supported and valid.
+In the futur this will be probably disabled for security reason.
+
+There is no encryption between client and 0-db server, any network monitor could leak
+administration password.
+
+### Secure authentication
+There is a more advanced two-step authentication made to avoid plain-text password leak and safe
+against replay-attack.
+
+You can authenticate yourself using the `AUTH SECURE` command, in two step.
+- First you request a challenge using `AUTH SECURE CHALLENGE`
+- Then you authenticate yourself using `AUTH SECURE sha1(challenge:password)`
+
+The challenge is session-specific random nonce. It can be used only 1 time.
+Let assume the password is `helloworld`, the authentication workflow is:
+```
+>> AUTH SECURE CHALLENGE
+708f109fbef4d656
+>> AUTH SECURE 5af26c9c8bf4db0b342c42fc47e3bdae58da4578
+OK
+```
+
+The secure password is constructed via `sha1(708f109fbef4d656:helloworld)`
+
+This is the prefered method to use.
 
 ## WAIT
 Blocking wait on command execution by someone else. This allows you to wait somebody else
