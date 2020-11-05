@@ -144,4 +144,5 @@
     #include "settings.h"
     #include "bootstrap.h"
     #include "api.h"
+    #include "sha1.h"
 #endif

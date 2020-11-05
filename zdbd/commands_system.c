@@ -13,7 +13,6 @@
 #include "zdbd.h"
 #include "redis.h"
 #include "commands.h"
-#include "sha1.h"
 
 int command_ping(redis_client_t *client) {
     redis_hardsend(client, "+PONG");

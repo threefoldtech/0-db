@@ -208,7 +208,7 @@ static void SHA1Final(unsigned char digest[20], SHA1_CTX * context) {
     memset(&finalcount, '\0', sizeof(finalcount));
 }
 
-void sha1(char *hash, const char *str, unsigned int len) {
+void zdb_sha1(char *hash, const char *str, unsigned int len) {
     SHA1_CTX ctx;
     unsigned int ii;
 
