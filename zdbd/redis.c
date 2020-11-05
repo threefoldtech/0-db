@@ -1297,6 +1297,10 @@ int redis_listen(char *listenaddr, char *port, char *socket) {
         if(clients.list[i])
             socket_client_free(i);
 
+    for(int i = 0; i < fdindex; i++)
+        close(redis.mainfd[i]);
+
+    free(redis.mainfd);
     free(clients.list);
 
     // notifing source that we are done
