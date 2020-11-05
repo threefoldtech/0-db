@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,4 +33,28 @@ char *zdb_challenge() {
     return string;
 }
 
+// generate an allocated string, which contains hexahash of
+// sha1 concatenated with password with colon
+//   sha1(salt:password)
+// string needs to be free'd after use
+char *zdb_hash_password(char *salt, char *password) {
+    char *hashmatch;
 
+    if(asprintf(&hashmatch, "%s:%s", salt, password) < 0) {
+        zdb_warnp("asprintf");
+        return NULL;
+    }
+
+    char buffer[ZDB_SHA1_DIGEST_LENGTH];
+    char bufferstr[ZDB_SHA1_DIGEST_STR_LENGTH];
+
+    // compute sha1 and build hex-string
+    zdb_sha1(buffer, hashmatch, strlen(hashmatch));
+
+    for(int i = 0; i < ZDB_SHA1_DIGEST_LENGTH; i++)
+        sprintf(bufferstr + (i * 2), "%02x", buffer[i] & 0xff);
+
+    free(hashmatch);
+
+    return strdup(bufferstr);
+}
