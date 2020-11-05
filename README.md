@@ -180,7 +180,7 @@ This mode is not possible if you don't have any data/index already available.
 - `NSINFO namespace`
 - `NSLIST`
 - `NSSET namespace property value`
-- `SELECT namespace`
+- `SELECT namespace [SECURE password]`
 - `DBSIZE`
 - `TIME`
 - `AUTH password`
@@ -306,8 +306,18 @@ Properties:
 
 ## SELECT
 Change your current namespace. If the requested namespace is password-protected, you need
-to add the password as extra parameter. If the namespace is `public` and you don't provide
-any password, the namespace will be accessible in read-only.
+to add the password as extra parameter. If the namespace is `public` but password protected,
+and you don't provide any password, the namespace will be accessible in read-only.
+
+You can use SECURE password, like authentication (see below). A challenge is required first
+(using `AUTH SECURE CHALLENGE` command).
+
+```
+>> AUTH SECURE CHALLENGE
+749e5be04ca0471e
+>> SELECT hello SECURE 632ef9246e9f01a3453aec8f133d1f652cccebbb
+OK
+```
 
 ## AUTH
 If an administrator password is set, use `AUTH` command to authentificate yourself as `ADMIN`.
