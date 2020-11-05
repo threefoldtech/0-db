@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <unistd.h>
 #include <stdint.h>
 #include "tests_user.h"
 #include "tests.h"
 #include "zdb_utils.h"
+#include "security.h"
 
 runtest_prio(101, simple_ping) {
     redisReply *reply;
@@ -393,6 +395,35 @@ runtest_prio(122, default_auth_maybe_correct) {
 
     return TEST_SUCCESS;
 }
+
+runtest_prio(123, default_auth_secure_not_hash) {
+    const char *argv[] = {"AUTH", "SECURE", "bipbap"};
+    zdb_command(test, argvsz(argv), argv);
+    return TEST_SUCCESS;
+}
+
+runtest_prio(123, default_auth_secure_wrong_hash) {
+    const char *argv[] = {"AUTH", "SECURE", "0000000000000000000000000000000000000000"};
+    zdb_command(test, argvsz(argv), argv);
+    return TEST_SUCCESS;
+}
+
+runtest_prio(123, default_auth_secure_right_hash) {
+    char *challenge = zdb_auth_challenge(test);
+    log("Challenge: %s\n", challenge);
+
+    char *hash = zdb_hash_password(challenge, "root");
+    log("Password: %s\n", hash);
+
+    const char *argv[] = {"AUTH", "SECURE", hash};
+    zdb_command(test, argvsz(argv), argv);
+
+    free(challenge);
+    free(hash);
+
+    return TEST_SUCCESS;
+}
+
 
 runtest_prio(125, default_asterisk) {
     const char *argv[] = {"*"};
