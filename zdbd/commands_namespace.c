@@ -500,12 +500,6 @@ int command_nsset(redis_client_t *client) {
     sprintf(command, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
     sprintf(value, "%.*s", request->argv[3]->length, (char *) request->argv[3]->buffer);
 
-    // default namespace cannot be changed
-    if(strcmp(target, NAMESPACE_DEFAULT) == 0) {
-        redis_hardsend(client, "-Cannot update default namespace");
-        return 1;
-    }
-
     // checking for existing namespace
     if(!(namespace = namespace_get(target))) {
         zdbd_debug("[-] command: nsset: namespace not found\n");
@@ -514,9 +508,29 @@ int command_nsset(redis_client_t *client) {
     }
 
     //
-    // testing properties
+    // testing properties which can be applied
+    // to any namespace, including default one
     //
-    if(strcmp(command, "maxsize") == 0) {
+
+    if(strcmp(command, "mode") == 0) {
+        if(command_nsset_mode(client, namespace, value) == 1)
+            return 1;
+
+    } else if(strcmp(command, "lock") == 0) {
+        if(command_nsset_lock(namespace, value) == 1)
+            return 1;
+
+    // checking if we try to change settings on
+    // the default namespace, after this point, we
+    // deny any changes on default namespace
+    } else if(strcmp(target, NAMESPACE_DEFAULT) == 0) {
+        redis_hardsend(client, "-Cannot update default namespace");
+        return 1;
+
+    //
+    // testing properties, excluding default namespace
+    //
+    } else if(strcmp(command, "maxsize") == 0) {
         if(command_nsset_maxsize(namespace, value) == 1)
             return 1;
 
@@ -532,15 +546,7 @@ int command_nsset(redis_client_t *client) {
         if(command_nsset_worm(namespace, value) == 1)
             return 1;
 
-    } else if(strcmp(command, "mode") == 0) {
-        if(command_nsset_mode(client, namespace, value) == 1)
-            return 1;
-
-    } else if(strcmp(command, "lock") == 0) {
-        if(command_nsset_lock(namespace, value) == 1)
-            return 1;
-
-   } else {
+    } else {
         zdbd_debug("[-] command: nsset: unknown property '%s'\n", command);
         redis_hardsend(client, "-Invalid property");
         return 1;
