@@ -6,7 +6,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/random.h>
 #include <inttypes.h>
 #include <time.h>
 #include "libzdb.h"

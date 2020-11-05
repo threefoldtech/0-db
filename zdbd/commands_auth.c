@@ -13,27 +13,15 @@
 #include "zdbd.h"
 #include "redis.h"
 #include "commands.h"
+#include "auth.h"
 
 static int command_auth_challenge(redis_client_t *client) {
-    char buffer[8];
     char *string;
 
-    if(getentropy(buffer, sizeof(buffer)) < 0) {
-        zdbd_warnp("getentropy");
-        redis_hardsend(client, "-Internal random error");
+    if(!(string = zdb_challenge())) {
+        redis_hardsend(client, "-Internal generator error");
         return 1;
     }
-
-    if(!(string = malloc((sizeof(buffer) * 2) + 1))) {
-        zdbd_warnp("challenge: malloc");
-        redis_hardsend(client, "-Internal memory error");
-        return 1;
-    }
-
-    for(unsigned int i = 0; i < sizeof(buffer); i++)
-        sprintf(string + (i * 2), "%02x", buffer[i] & 0xff);
-
-    zdbd_debug("[+] auth: challenge generated: %s\n", string);
 
     // free (possible) previously allocated nonce
     free(client->nonce);
@@ -64,15 +52,15 @@ static int command_auth_regular(redis_client_t *client) {
         return 1;
     }
 
-    char password[192];
-    sprintf(password, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
+    resp_object_t *user = request->argv[1];
 
-    if(strcmp(password, zdbd_rootsettings.adminpwd) == 0) {
+    if(zdbd_password_check(user->buffer, user->length, zdbd_rootsettings.adminpwd)) {
         zdbd_debug("[+] auth: regular authentication granted\n");
 
         client->admin = 1;
         redis_hardsend(client, "+OK");
         return 0;
+
     }
 
     redis_hardsend(client, "-Access denied");
@@ -114,48 +102,38 @@ static int command_auth_secure(redis_client_t *client) {
         return 1;
     }
 
-    char password[64];
-    sprintf(password, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
+    char *expected;
 
-    char *hashmatch;
-    if(asprintf(&hashmatch, "%s:%s", client->nonce, zdbd_rootsettings.adminpwd) < 0) {
-        zdbd_warnp("asprintf");
-        redis_hardsend(client, "-Internal memory error");
+    if(!(expected = zdb_hash_password(client->nonce, zdbd_rootsettings.adminpwd))) {
+        redis_hardsend(client, "-Internal generator error");
         return 1;
     }
 
-    // compute sha1 and build hex-string
-    char buffer[ZDB_SHA1_DIGEST_LENGTH];
-    char bufferstr[ZDB_SHA1_DIGEST_STR_LENGTH];
+    zdbd_debug("[+] auth: expected hash: %s\n", expected);
 
-    zdb_sha1(buffer, hashmatch, strlen(hashmatch));
-    for(int i = 0; i < ZDB_SHA1_DIGEST_LENGTH; i++)
-        sprintf(bufferstr + (i * 2), "%02x", buffer[i] & 0xff);
+    resp_object_t *user = request->argv[2];
+    int granted = 0;
 
-    zdbd_debug("[+] auth: expected hash: %s\n", bufferstr);
-    zdbd_debug("[+] auth: user hash: %s\n", password);
-
-    if(strcmp(password, bufferstr) == 0) {
+    if(zdbd_password_check(user->buffer, user->length, expected)) {
         zdbd_debug("[+] auth: secure authentication granted\n");
 
-        free(client->nonce);
-        free(hashmatch);
-
-        client->nonce = NULL;
+        // flag user as authenticated
         client->admin = 1;
+        granted = 1;
 
         redis_hardsend(client, "+OK");
-        return 0;
+
+    } else {
+        // wrong password
+        redis_hardsend(client, "-Access denied");
     }
 
-    // reset nonce
+    // free and reset nonce
+    free(expected);
     free(client->nonce);
-    free(hashmatch);
     client->nonce = NULL;
 
-    redis_hardsend(client, "-Access denied");
-
-    return 1;
+    return granted;
 }
 
 int command_auth(redis_client_t *client) {

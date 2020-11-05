@@ -143,6 +143,7 @@
     #include "namespace.h"
     #include "settings.h"
     #include "bootstrap.h"
-    #include "api.h"
     #include "sha1.h"
+    #include "security.h"
+    #include "api.h"
 #endif
