@@ -113,6 +113,11 @@ int command_del(redis_client_t *client) {
         return 1;
     }
 
+    if(namespace_is_locked(client->ns)) {
+        redis_hardsend(client, "-Namespace is temporarily locked (read-only)");
+        return 1;
+    }
+
     index_root_t *index = client->ns->index;
     data_root_t *data = client->ns->data;
     index_entry_t *entry;

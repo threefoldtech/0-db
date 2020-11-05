@@ -258,6 +258,11 @@ int command_set(redis_client_t *client) {
         return 1;
     }
 
+    if(namespace_is_locked(client->ns)) {
+        redis_hardsend(client, "-Namespace is temporarily locked (read-only)");
+        return 1;
+    }
+
     // shortcut to data
     index_root_t *index = client->ns->index;
     index_entry_t *entry = NULL;

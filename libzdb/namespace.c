@@ -300,6 +300,7 @@ namespace_t *namespace_load_light(ns_root_t *nsroot, char *name, int ensure) {
     namespace->worm = 0;    // by default, worm mode is disabled
     namespace->maxsize = 0; // by default, there is no limits
     namespace->idlist = 0;  // by default, no list set
+    namespace->locked = 0;  // by default, namespace are unlocked, lock are not persistant
     namespace->version = NAMESPACE_CURRENT_VERSION;
 
     if(ensure) {
@@ -736,4 +737,27 @@ int namespaces_emergency() {
     }
 
     return 0;
+}
+
+// lock a namespace, which set read-only mode for everybody
+// this mode is useful when namespace goes in maintenance without
+// making namespace unavailable
+int namespace_lock(namespace_t *namespace) {
+    zdb_debug("[+] namespace: locking namespace: %s\n", namespace->name);
+    namespace->locked = 1;
+    return 0;
+}
+
+// set namespace back in normal state
+int namespace_unlock(namespace_t *namespace) {
+    zdb_debug("[+] namespace: unlocking namespace: %s\n", namespace->name);
+    namespace->locked = 0;
+    return 0;
+
+}
+
+// check lock status of a namespace (0 is unlocked, 1 is locked)
+int namespace_is_locked(namespace_t *namespace) {
+    zdb_debug("[+] namespace: lock status: %s [%d]\n", namespace->name, namespace->locked);
+    return namespace->locked;
 }
