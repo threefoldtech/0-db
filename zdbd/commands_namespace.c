@@ -11,6 +11,7 @@
 #include "zdbd.h"
 #include "redis.h"
 #include "commands.h"
+#include "auth.h"
 
 // create a new namespace
 //   NSNEW [namespace]
@@ -110,7 +111,7 @@ int command_nsdel(redis_client_t *client) {
 
 
 // change user active namespace
-//   SELECT [namespace]
+//   SELECT namespace [SECURE] <password>
 int command_select(redis_client_t *client) {
     resp_request_t *request = client->request;
     char target[COMMAND_MAXLEN];
@@ -157,24 +158,77 @@ int command_select(redis_client_t *client) {
             writable = 0;
 
         } else {
-            char password[256];
-
-            if(request->argv[2]->length > (ssize_t) sizeof(password) - 1) {
-                redis_hardsend(client, "-Password too long");
+            if(request->argc > 4) {
+                redis_hardsend(client, "-Too many arguments");
                 return 1;
             }
 
-            // copy password to a temporary variable
-            // to check password match using strcmp and no any strncmp
-            // to ensure we check exact password
-            sprintf(password, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
+            // SELECT namespace password
+            if(request->argc == 3) {
+                char password[256];
 
-            if(strcmp(password, namespace->password) != 0) {
-                redis_hardsend(client, "-Access denied");
-                return 1;
+                if(request->argv[2]->length > (ssize_t) sizeof(password) - 1) {
+                    redis_hardsend(client, "-Password too long");
+                    return 1;
+                }
+
+                // copy password to a temporary variable
+                // to check password match using strcmp and no any strncmp
+                // to ensure we check exact password
+                sprintf(password, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
+
+                if(strcmp(password, namespace->password) != 0) {
+                    redis_hardsend(client, "-Access denied");
+                    return 1;
+                }
+
+                zdbd_debug("[-] command: select: protected and password match, access granted\n");
             }
 
-            zdbd_debug("[-] command: select: protected and password match, access granted\n");
+            // SELECT namespace SECURE password
+            if(request->argc == 4) {
+                // only accept <SELECT namespace SECURE password>
+                if(strncasecmp(request->argv[2]->buffer, "SECURE", request->argv[2]->length) != 0) {
+                    redis_hardsend(client, "-Only SECURE extra method supported");
+                    return 1;
+                }
+
+                // only accept client which previously requested nonce challenge
+                if(client->nonce == NULL) {
+                    redis_hardsend(client, "-No CHALLENGE requested, secure authentication not available");
+                    return 1;
+                }
+
+                zdbd_debug("[+] namespace: auth: challenge: %s\n", client->nonce);
+
+                // expecting sha1 hexa-string input
+                if(request->argv[3]->length != ZDB_SHA1_DIGEST_STR_LENGTH) {
+                    redis_hardsend(client, "-Invalid hash length");
+                    return 1;
+                }
+
+                char *expected;
+
+                if(!(expected = zdb_hash_password(client->nonce, namespace->password))) {
+                    redis_hardsend(client, "-Internal generator error");
+                    return 1;
+                }
+
+                zdbd_debug("[+] namespace: auth: expected hash: %s\n", expected);
+
+                resp_object_t *user = request->argv[3];
+
+                if(zdbd_password_check(user->buffer, user->length, expected) == 0) {
+                    free(expected);
+                    zdbd_debug("[-] namespace: auth: secure authentication denied\n");
+                    redis_hardsend(client, "-Access denied");
+                    return 1;
+                }
+
+                free(expected);
+
+                // nothing to do, granted
+            }
 
             // password provided and match
         }
