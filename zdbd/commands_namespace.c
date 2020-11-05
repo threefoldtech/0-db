@@ -450,6 +450,16 @@ static int command_nsset_mode(redis_client_t *client, namespace_t *namespace, ch
     return 0;
 }
 
+
+// NSSET lock
+static int command_nsset_lock(namespace_t *namespace, char *value) {
+    namespace->locked = (value[0] == '1') ? 1 : 0;
+    zdbd_debug("[+] command: nsset: changing lock mode to: %d\n", namespace->locked);
+
+    return 0;
+}
+
+
 // change namespace settings
 //   NSSET [namespace] password *        -> clear password
 //   NSSET [namespace] password [foobar] -> set password to 'foobar'
@@ -524,6 +534,10 @@ int command_nsset(redis_client_t *client) {
 
     } else if(strcmp(command, "mode") == 0) {
         if(command_nsset_mode(client, namespace, value) == 1)
+            return 1;
+
+    } else if(strcmp(command, "lock") == 0) {
+        if(command_nsset_lock(namespace, value) == 1)
             return 1;
 
    } else {
