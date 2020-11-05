@@ -5,6 +5,8 @@
 #include "libzdb.h"
 #include "zdbd.h"
 
+// check if user input (buffer with buffer length)
+// does match with expected password string, unified way
 int zdbd_password_check(char *input, int length, char *expected) {
     char password[192];
     sprintf(password, "%.*s", length, input);
@@ -18,6 +20,10 @@ int zdbd_password_check(char *input, int length, char *expected) {
     return 0;
 }
 
+// generate an allocated string, which contains hexahash of
+// sha1 concatenated with password with colon
+//   sha1(salt:password)
+// string needs to be free'd after use
 char *zdb_hash_password(char *salt, char *password) {
     char *hashmatch;
 

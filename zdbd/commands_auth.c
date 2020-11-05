@@ -15,6 +15,7 @@
 #include "commands.h"
 #include "auth.h"
 
+// AUTH SECURE CHALLENGE
 static int command_auth_challenge(redis_client_t *client) {
     char *string;
 
@@ -38,10 +39,17 @@ static int command_auth_challenge(redis_client_t *client) {
     return 0;
 }
 
+// AUTH <password>
 static int command_auth_regular(redis_client_t *client) {
     resp_request_t *request = client->request;
 
     zdbd_debug("[+] auth: regular authentication requested\n");
+
+    // authentication not enabled, nothing to do
+    if(!zdbd_rootsettings.adminpwd) {
+        redis_hardsend(client, "-Authentication disabled");
+        return 0;
+    }
 
     // generic args validation
     if(!command_args_validate(client, 2))
@@ -67,6 +75,8 @@ static int command_auth_regular(redis_client_t *client) {
     return 1;
 }
 
+// AUTH SECURE <password>
+// AUTH SECURE CHALLENGE
 static int command_auth_secure(redis_client_t *client) {
     resp_request_t *request = client->request;
 
@@ -86,6 +96,14 @@ static int command_auth_secure(redis_client_t *client) {
     if(strncasecmp(request->argv[2]->buffer, "CHALLENGE", request->argv[2]->length) == 0) {
         zdbd_debug("[+] auth: challenge requested\n");
         return command_auth_challenge(client);
+    }
+
+    // only process authentication if there are any authentication
+    // we don't test before, we need to be able to request a CHALLENGE
+    // for other authentication (like SELECT)
+    if(!zdbd_rootsettings.adminpwd) {
+        redis_hardsend(client, "-Authentication disabled");
+        return 0;
     }
 
     // only accept client which previously requested nonce challenge
@@ -137,11 +155,6 @@ static int command_auth_secure(redis_client_t *client) {
 }
 
 int command_auth(redis_client_t *client) {
-    if(!zdbd_rootsettings.adminpwd) {
-        redis_hardsend(client, "-Authentication disabled");
-        return 0;
-    }
-
     // AUTH <password>
     if(client->request->argc == 2)
         return command_auth_regular(client);
