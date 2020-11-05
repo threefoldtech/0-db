@@ -4,6 +4,7 @@
 #include "tests_user.h"
 #include "zdb_utils.h"
 #include "tests.h"
+#include "security.h"
 
 // sequential priority
 #define sp 160
@@ -157,6 +158,49 @@ runtest_prio(sp, namespace_select_protected_correct_pass) {
     const char *argv[] = {"SELECT", namespace_protected, namespace_password};
     return zdb_command(test, argvsz(argv), argv);
 }
+
+// try select secure without challenge
+runtest_prio(sp, namespace_select_protected_secure_no_challenge) {
+    const char *argv[] = {"SELECT", namespace_protected, "SECURE", "9444a8840596815e66829db9a2c7a71b442ceeeb"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// try select secure password (not a hash)
+runtest_prio(sp, namespace_select_protected_secure_not_hash) {
+    char *challenge = zdb_auth_challenge(test);
+    free(challenge); // we don't use it, just generate it
+
+    const char *argv[] = {"SELECT", namespace_protected, "SECURE", "abcdef"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// try select secure password (wrong hash)
+runtest_prio(sp, namespace_select_protected_secure_wrong_hash) {
+    char *challenge = zdb_auth_challenge(test);
+    free(challenge); // we don't use it, just generate it
+
+    const char *argv[] = {"SELECT", namespace_protected, "SECURE", "0000000000000000000000000000000000000000"};
+    return zdb_command_error(test, argvsz(argv), argv);
+}
+
+// try select secure password (correct hash)
+runtest_prio(sp, namespace_select_protected_secure_correct) {
+    char *challenge = zdb_auth_challenge(test);
+    log("Challenge: %s\n", challenge);
+
+    char *hash = zdb_hash_password(challenge, namespace_password);
+    log("Secure password: %s\n", hash);
+
+    const char *argv[] = {"SELECT", namespace_protected, "SECURE", hash};
+    int value = zdb_command(test, argvsz(argv), argv);
+
+    free(challenge);
+    free(hash);
+
+    return value;
+}
+
+
 
 // write on protected, but authentificated
 runtest_prio(sp, namespace_write_protected_authentificated) {

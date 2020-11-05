@@ -2,8 +2,8 @@ EXEC = zdbtests
 SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 
-CFLAGS += -g -std=gnu99 -O0 -W -Wall -Wextra -msse4.2 -Wno-implicit-fallthrough
-LDFLAGS += -lhiredis -lpthread
+CFLAGS += -g -std=gnu99 -O0 -W -Wall -Wextra -msse4.2 -Wno-implicit-fallthrough -I../libzdb
+LDFLAGS += -lhiredis -lpthread ../libzdb/libzdb.a
 
 CFLAGS += $(shell pkg-config --cflags hiredis)
 

@@ -251,6 +251,20 @@ long long zdb_command_integer(test_t *test, int argc, const char *argv[]) {
     return value;
 }
 
+// request secure challenge (AUTH SECURE CHALLENGE)
+char *zdb_auth_challenge(test_t *test) {
+    const char *argv[] = {"AUTH", "SECURE", "CHALLENGE"};
+    redisReply *reply;
+
+    if(!(reply = redisCommandArgv(test->zdb, argvsz(argv), argv, NULL)))
+        return NULL;
+
+    char *nonce = strdup(reply->str);
+    freeReplyObject(reply);
+
+    return nonce;
+}
+
 // test different scenario (needs to be run after default_del_deleted)
 //  - non-existing key
 //  - deleted key
