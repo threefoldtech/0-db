@@ -453,7 +453,7 @@ static int command_nsset_mode(redis_client_t *client, namespace_t *namespace, ch
 
 // NSSET lock
 static int command_nsset_lock(namespace_t *namespace, char *value) {
-    namespace->locked = (value[0] == '1') ? 1 : 0;
+    namespace->locked = (value[0] == '1') ? NS_LOCK_READ_ONLY : NS_LOCK_UNLOCKED;
     zdbd_debug("[+] command: nsset: changing lock mode to: %d\n", namespace->locked);
 
     return 0;
