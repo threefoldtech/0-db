@@ -459,6 +459,15 @@ static int command_nsset_lock(namespace_t *namespace, char *value) {
     return 0;
 }
 
+// NSSET freeze
+static int command_nsset_freeze(namespace_t *namespace, char *value) {
+    namespace->locked = (value[0] == '1') ? NS_LOCK_READ_WRITE : NS_LOCK_UNLOCKED;
+    zdbd_debug("[+] command: nsset: changing lock mode to: %d\n", namespace->locked);
+
+    return 0;
+}
+
+
 
 // change namespace settings
 //   NSSET [namespace] password *        -> clear password
@@ -518,6 +527,10 @@ int command_nsset(redis_client_t *client) {
 
     } else if(strcmp(command, "lock") == 0) {
         if(command_nsset_lock(namespace, value) == 1)
+            return 1;
+
+    } else if(strcmp(command, "freeze") == 0) {
+        if(command_nsset_freeze(namespace, value) == 1)
             return 1;
 
     // checking if we try to change settings on

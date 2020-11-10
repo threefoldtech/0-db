@@ -24,6 +24,9 @@ int command_exists(redis_client_t *client) {
         return 1;
     }
 
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
     zdbd_debug("[+] command: exists: lookup key: ");
     zdbd_debughex(request->argv[1]->buffer, request->argv[1]->length);
 
@@ -59,6 +62,9 @@ int command_check(redis_client_t *client) {
         redis_hardsend(client, "-Invalid key");
         return 1;
     }
+
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
 
     zdbd_debug("[+] command: check: lookup key: ");
     zdbd_debughex(request->argv[1]->buffer, request->argv[1]->length);
@@ -113,10 +119,11 @@ int command_del(redis_client_t *client) {
         return 1;
     }
 
-    if(namespace_is_locked(client->ns)) {
-        redis_hardsend(client, "-Namespace is temporarily locked (read-only)");
-        return 1;
-    }
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
+    if(namespace_is_locked(client->ns))
+        return command_error_locked(client);
 
     index_root_t *index = client->ns->index;
     data_root_t *data = client->ns->data;

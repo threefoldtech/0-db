@@ -152,6 +152,9 @@ int command_history(redis_client_t *client) {
         return 1;
     }
 
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
     // requesting a previous data, without any exact offset
     // this basicly request the first older entry of a specific key
     if(client->request->argc == 2) {
