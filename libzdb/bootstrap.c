@@ -24,6 +24,9 @@ static uint32_t zdb_instanceid_generate() {
 zdb_settings_t *zdb_initialize() {
     zdb_settings_t *s = &zdb_rootsettings;
 
+    if(s->initialized == 1)
+        return NULL;
+
     // apply default settings
     s->datapath = ZDB_DEFAULT_DATAPATH;
     s->indexpath = ZDB_DEFAULT_INDEXPATH;
@@ -53,7 +56,10 @@ zdb_settings_t *zdb_initialize() {
     // initialize instance id
     s->iid = zdb_instanceid_generate();
 
-    return &zdb_rootsettings;
+    // set a global lock, already initialized
+    s->initialized = 1;
+
+    return s;
 }
 
 zdb_settings_t *zdb_open(zdb_settings_t *zdb_settings) {
@@ -90,5 +96,6 @@ void zdb_close(zdb_settings_t *zdb_settings) {
     zdb_debug("[+] bootstrap: cleaning library\n");
     free(zdb_settings->zdbid);
     zdb_settings->zdbid = NULL;
+    zdb_settings->initialized = 0;
 }
 
