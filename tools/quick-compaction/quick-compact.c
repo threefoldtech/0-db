@@ -5,6 +5,9 @@
 #include <inttypes.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "libzdb.h"
 
 static struct option long_options[] = {
@@ -17,8 +20,14 @@ static struct option long_options[] = {
     {0, 0, 0, 0}
 };
 
+void diep(char *str) {
+    perror(str);
+    exit(EXIT_FAILURE);
+}
+
 typedef struct instance_t {
-    zdb_settings_t *zdbsettings;
+    zdb_settings_t *zdbsettings;    // only available for input
+    char *nsname;                   // used for output since zdb not avaible
 
     char *indexpath;
     index_root_t *zdbindex;
@@ -60,6 +69,48 @@ int index_data_jump_to(uint16_t fileid, index_root_t *zdbindex, data_root_t *zdb
     printf("[+] quick-compact: data header seems correct\n");
     printf("[+] quick-compact: data created at: %s\n", zdb_header_date(header->created, datestr, sizeof(datestr)));
     printf("[+] quick-compact: data last open: %s\n", zdb_header_date(header->opened, datestr, sizeof(datestr)));
+
+    return 0;
+}
+
+static int quick_dir_ensure(char *root, char *subdir) {
+    char buffer[512];
+
+    snprintf(buffer, sizeof(buffer), "%s/%s", root, subdir);
+
+    if(zdb_dir_exists(buffer) != ZDB_DIRECTORY_EXISTS) {
+        if(zdb_dir_create(buffer) < 0) {
+            diep(buffer);
+        }
+    }
+
+    return 0;
+}
+
+static int quick_descriptor_copy(instance_t *input, instance_t *output) {
+    char pathname[ZDB_PATH_MAX];
+    int fd;
+
+    snprintf(pathname, ZDB_PATH_MAX, "%s/%s/zdb-namespace", output->indexpath, output->nsname);
+
+    if((fd = open(pathname, O_CREAT | O_RDWR, 0600)) < 0)
+        diep(pathname);
+
+    namespace_descriptor_update(input->namespace, fd);
+    close(fd);
+
+    return 0;
+}
+
+static int quick_initialize(instance_t *input, instance_t *output) {
+    printf("[+] quick-compact: initialize output environment\n");
+
+    // create output directories
+    quick_dir_ensure(output->indexpath, output->nsname);
+    quick_dir_ensure(output->datapath, output->nsname);
+
+    // copy namespace descriptor
+    quick_descriptor_copy(input, output);
 
     return 0;
 }
@@ -135,11 +186,15 @@ int quick_compaction(instance_t *input, instance_t *output) {
     uint16_t fileid = 0;
     size_t entrycount = 0;
 
+    quick_initialize(input, output);
+
     // prorcessing all files
     for(fileid = 0; ; fileid += 1) {
         // setting index and data id to new id
         if(index_data_jump_to(fileid, input->zdbindex, input->zdbdata))
             break;
+
+
 
         // processing this file
         // entrycount += index_rebuild_pass(zdbindex, zdbdata);
@@ -299,6 +354,8 @@ int main(int argc, char *argv[]) {
     //
     // output
     //
+    output.nsname = nsname;
+
     /*
     output.nsroot = namespaces_allocate(output.zdbsettings);
 

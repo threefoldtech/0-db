@@ -85,6 +85,7 @@
 
     size_t namespace_length();
     int namespace_valid_name(char *name);
+    void namespace_descriptor_update(namespace_t *namespace, int fd);
 
     namespace_t *namespace_iter();
     namespace_t *namespace_iter_next(namespace_t *namespace);
