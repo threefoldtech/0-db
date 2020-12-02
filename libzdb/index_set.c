@@ -232,6 +232,9 @@ index_entry_t *index_update_memory_handler_memkey(index_root_t *root, index_set_
 
     zdb_debug("[+] index: updating current entry in memory\n");
 
+    // dump to compare before/after
+    // index_entry_dump(exists);
+
     // update statistics
     root->stats.datasize -= exists->length;
     root->stats.datasize += new->length;
@@ -250,6 +253,8 @@ index_entry_t *index_update_memory_handler_memkey(index_root_t *root, index_set_
     exists->idxoffset = new->idxoffset;
     exists->crc = new->crc;
     exists->timestamp = new->timestamp;
+
+    // index_entry_dump(exists);
 
     return exists;
 }
