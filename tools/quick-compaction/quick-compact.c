@@ -40,17 +40,31 @@ typedef struct instance_t {
 
 } instance_t;
 
+typedef struct session_t {
+    // keep track of the previous offset
+    // across files
+    uint32_t dataprev;
+
+} session_t;
+
 int index_data_jump_to(uint16_t fileid, index_root_t *zdbindex, data_root_t *zdbdata) {
     data_header_t *header;
     char datestr[64];
 
-    // only take care of next index id we it's not the first
-    if(fileid > 0)
-        index_jump_next(zdbindex);
+    // closing previoud index fd
+    if(zdbindex->indexfd)
+        close(zdbindex->indexfd);
 
     // closing previous data fd
     if(zdbdata->datafd)
         close(zdbdata->datafd);
+
+    printf("[+] quick-compact: opening indexfile id: %d\n", fileid);
+
+    // opening index file
+    zdbindex->indexid = fileid;
+    if(index_open_readonly(zdbindex, fileid) < 0)
+        return 1;
 
     printf("[+] quick-compact: opening datafile id: %d\n", fileid);
 
@@ -115,76 +129,143 @@ static int quick_initialize(instance_t *input, instance_t *output) {
     return 0;
 }
 
-#if 0
-size_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata) {
+size_t quick_compact_pass(instance_t *input, instance_t *output, uint16_t fileid, session_t *session) {
     size_t entrycount = 0;
-    uint8_t idlength;
-    data_entry_header_t *entry = NULL;
+    int indexfd, datafd;
+    char buffer[2048];
+    char id[512];
 
-    // now it's time to read each entries
-    // each time, one entry starts by the entry-header
-    // then entry payload.
-    // the entry headers starts with the amount of bytes
-    // of the key, which is needed to read the full header
+    // original data offset
+    uint32_t dataoffset = sizeof(data_header_t);
 
-    while(read(zdbdata->datafd, &idlength, sizeof(idlength)) == sizeof(idlength)) {
-        // we have the length of the key
-        ssize_t entrylength = sizeof(data_entry_header_t) + idlength;
-        if(!(entry = realloc(entry, entrylength)))
-            zdb_diep("realloc");
+    // create target index and data files
+    snprintf(buffer, sizeof(buffer), "%s/%s/zdb-index-%05d", output->indexpath, output->nsname, fileid);
 
-        // rollback the 1 byte read for the id length
-        off_t current = lseek(zdbdata->datafd, -1, SEEK_CUR);
+    printf("[+] quick-compact: creating target index: %s\n", buffer);
+    if((indexfd = open(buffer, O_CREAT | O_RDWR, 0600)) < 0)
+        diep(buffer);
 
-        if(read(zdbdata->datafd, entry, entrylength) != entrylength)
-            zdb_diep("data header read failed");
+    snprintf(buffer, sizeof(buffer), "%s/%s/zdb-data-%05d", output->datapath, output->nsname, fileid);
 
-        entrycount += 1;
+    printf("[+] quick-compact: creating target data: %s\n", buffer);
+    if((datafd = open(buffer, O_CREAT | O_RDWR, 0600)) < 0)
+        diep(buffer);
 
-        printf("[+] processing key: ");
-        zdb_tools_hexdump(entry->id, entry->idlength);
-        printf("\n");
+    // ensure all fd are in the begining of files
+    lseek(input->zdbindex->indexfd, 0, SEEK_SET);
+    lseek(input->zdbdata->datafd, 0, SEEK_SET);
 
-        index_entry_t idxreq = {
-            .idlength = entry->idlength,
-            .offset = current,
-            .length = entry->datalength,
-            .flags = entry->flags,
-            .dataid = zdbdata->dataid,
-            .indexid = zdbindex->indexid,
-            .crc = entry->integrity,
-            .timestamp = entry->timestamp,
-        };
+    // copy index header
+    printf("[+] quick-compact: copying index header\n");
+    if(read(input->zdbindex->indexfd, buffer, sizeof(index_header_t)) != sizeof(index_header_t))
+        diep("index header read");
 
-        index_set_t setter = {
-            .entry = &idxreq,
-            .id = entry->id,
-        };
+    if(write(indexfd, buffer, sizeof(index_header_t)) != sizeof(index_header_t))
+        diep("index header write");
 
-        // fetching existing if any
-        // this is needed to keep track of the history
-        index_entry_t *existing = index_get(zdbindex, entry->id, entry->idlength);
+    // copy data header
+    printf("[+] quick-compact: copying data header\n");
+    if(read(input->zdbdata->datafd, buffer, sizeof(data_header_t)) != sizeof(data_header_t))
+        diep("data header read");
 
-        if(!index_set(zdbindex, &setter, existing)) {
-            fprintf(stderr, "[-] index-rebuild: could not insert index item\n");
-            return 1;
+    if(write(datafd, buffer, sizeof(data_header_t)) != sizeof(data_header_t))
+        diep("data header write");
+
+
+    // processing each entries in index
+    // FIXME: read the whole index in memory and parse it in memory
+    //        this will be way much faster
+    while(read(input->zdbindex->indexfd, buffer, sizeof(index_item_t)) == sizeof(index_item_t)) {
+        index_item_t *item = (index_item_t *) buffer;
+        uint32_t truelen = item->length;
+        uint32_t trueoff = item->offset;
+
+        // fetch id
+        if(read(input->zdbindex->indexfd, id, item->idlength) != item->idlength)
+            diep("index read id");
+
+        printf("[+] quick-compact: processing new entry\n");
+        index_item_header_dump(item);
+
+        if(item->flags & INDEX_ENTRY_DELETED) {
+            printf(">> DISCARD THIS ENTRY\n");
+            item->length = 0;
         }
 
-        // skipping data payload
-        lseek(zdbdata->datafd, entry->datalength, SEEK_CUR);
+        // update offset which could be modified by
+        // previous truncation
+        item->offset = dataoffset;
+
+        // copy item to destination
+        if(write(indexfd, buffer, sizeof(index_item_t)) != sizeof(index_item_t))
+            diep("write index entry");
+
+        if(write(indexfd, id, item->idlength) != item->idlength)
+            diep("write index id");
+
+        //
+        // transfert data (or truncate it)
+        //
+
+        data_entry_header_t *dataentry;
+        ssize_t datalen = sizeof(data_entry_header_t) + item->idlength + truelen;
+
+        if(!(dataentry = malloc(datalen)))
+            diep("data entry malloc");
+
+        // moving datafile to the expected location
+        // when we delete entries, we add a new entry on the datafile
+        // so walking over datafile doesn't mean we are reading the
+        // expected key, we need to jump to the expected offset from index
+        lseek(input->zdbdata->datafd, trueoff, SEEK_SET);
+
+        if(read(input->zdbdata->datafd, dataentry, datalen) != datalen)
+            diep("data payload read");
+
+        printf("original previous = %d\n", dataentry->previous);
+        printf("original id len = %d\n", dataentry->idlength);
+        printf("original data len = %d\n", dataentry->datalength);
+
+        if(item->length == 0) {
+            dataentry->datalength = 0;
+            dataentry->flags |= DATA_ENTRY_TRUNCATED;
+            dataentry->integrity = 0;
+        }
+
+        // always update previous
+        dataentry->previous = session->dataprev;
+        printf("new previous = %d\n", dataentry->previous);
+
+        ssize_t writelen = sizeof(data_entry_header_t) + item->idlength + item->length;
+
+        // saving current position as previous entry
+        session->dataprev = lseek(datafd, 0, SEEK_CUR);
+        dataoffset = session->dataprev;
+
+        // writing new data
+        if(write(datafd, dataentry, writelen) != writelen)
+            diep("data payload write");
+
+        printf("<<<< new next offset: %lu\n", lseek(datafd, 0, SEEK_CUR));
+        free(dataentry);
+
+        entrycount += 1;
     }
 
-    free(entry);
+    close(indexfd);
+    close(datafd);
 
-    printf("[+] index-rebuild: index pass entries: %lu\n", entrycount);
+    printf("[+] quick-compact: index pass entries: %lu\n", entrycount);
 
     return entrycount;
 }
-#endif
 
 int quick_compaction(instance_t *input, instance_t *output) {
     uint16_t fileid = 0;
     size_t entrycount = 0;
+    session_t session = {
+        .dataprev = 0,
+    };
 
     quick_initialize(input, output);
 
@@ -194,13 +275,11 @@ int quick_compaction(instance_t *input, instance_t *output) {
         if(index_data_jump_to(fileid, input->zdbindex, input->zdbdata))
             break;
 
-
-
         // processing this file
-        // entrycount += index_rebuild_pass(zdbindex, zdbdata);
+        entrycount += quick_compact_pass(input, output, fileid, &session);
     }
 
-    zdb_success("[+] index rebuilt (%lu entries inserted)", entrycount);
+    printf("[+] compaction done (%lu entries inserted)\n", entrycount);
 
     return 0;
 }
