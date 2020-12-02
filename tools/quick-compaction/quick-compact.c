@@ -133,23 +133,28 @@ size_t quick_compact_pass(instance_t *input, instance_t *output, uint16_t fileid
     size_t entrycount = 0;
     int indexfd, datafd;
     char buffer[2048];
+    char filebuf[512];
     char id[512];
+
+    // temporarily fd
+    int transfd = 0;
+    int bkfd = 0;
 
     // original data offset
     uint32_t dataoffset = sizeof(data_header_t);
 
     // create target index and data files
-    snprintf(buffer, sizeof(buffer), "%s/%s/zdb-index-%05d", output->indexpath, output->nsname, fileid);
+    snprintf(filebuf, sizeof(filebuf), "%s/%s/zdb-index-%05d", output->indexpath, output->nsname, fileid);
 
-    printf("[+] quick-compact: creating target index: %s\n", buffer);
-    if((indexfd = open(buffer, O_CREAT | O_RDWR, 0600)) < 0)
-        diep(buffer);
+    printf("[+] quick-compact: creating target index: %s\n", filebuf);
+    if((indexfd = open(filebuf, O_CREAT | O_RDWR, 0600)) < 0)
+        diep(filebuf);
 
-    snprintf(buffer, sizeof(buffer), "%s/%s/zdb-data-%05d", output->datapath, output->nsname, fileid);
+    snprintf(filebuf, sizeof(filebuf), "%s/%s/zdb-data-%05d", output->datapath, output->nsname, fileid);
 
-    printf("[+] quick-compact: creating target data: %s\n", buffer);
-    if((datafd = open(buffer, O_CREAT | O_RDWR, 0600)) < 0)
-        diep(buffer);
+    printf("[+] quick-compact: creating target data: %s\n", filebuf);
+    if((datafd = open(filebuf, O_CREAT | O_RDWR, 0600)) < 0)
+        diep(filebuf);
 
     // ensure all fd are in the begining of files
     lseek(input->zdbindex->indexfd, 0, SEEK_SET);
@@ -179,6 +184,7 @@ size_t quick_compact_pass(instance_t *input, instance_t *output, uint16_t fileid
         index_item_t *item = (index_item_t *) buffer;
         uint32_t truelen = item->length;
         uint32_t trueoff = item->offset;
+        uint32_t truedid = item->dataid;
 
         // fetch id
         if(read(input->zdbindex->indexfd, id, item->idlength) != item->idlength)
@@ -195,6 +201,12 @@ size_t quick_compact_pass(instance_t *input, instance_t *output, uint16_t fileid
         // update offset which could be modified by
         // previous truncation
         item->offset = dataoffset;
+
+        // always reset dataid to this fileid
+        // it's possible that in sequential mode, data are not
+        // on the same id that this index id (old key overwritten)
+        // but we rewrite it to this id for sure
+        item->dataid = fileid;
 
         // copy item to destination
         if(write(indexfd, buffer, sizeof(index_item_t)) != sizeof(index_item_t))
@@ -213,6 +225,19 @@ size_t quick_compact_pass(instance_t *input, instance_t *output, uint16_t fileid
         if(!(dataentry = malloc(datalen)))
             diep("data entry malloc");
 
+        // opening new datafile if expected one is not the right one
+        if(truedid != fileid) {
+            printf("[+] quick-compact: opening another datafile\n");
+
+            snprintf(filebuf, sizeof(filebuf), "%s/%s/zdb-data-%05d", input->datapath, output->nsname, truedid);
+
+            if((transfd = open(filebuf, O_RDONLY, 0600)) < 0)
+                diep(buffer);
+
+            bkfd = input->zdbdata->datafd;
+            input->zdbdata->datafd = transfd;
+        }
+
         // moving datafile to the expected location
         // when we delete entries, we add a new entry on the datafile
         // so walking over datafile doesn't mean we are reading the
@@ -221,6 +246,14 @@ size_t quick_compact_pass(instance_t *input, instance_t *output, uint16_t fileid
 
         if(read(input->zdbdata->datafd, dataentry, datalen) != datalen)
             diep("data payload read");
+
+        // closing temporarily opened dataid if any
+        if(transfd == input->zdbdata->datafd) {
+            printf("[+] quick-compact: rollback to original datafile\n");
+            input->zdbdata->datafd = bkfd;
+            close(transfd);
+            transfd = 0;
+        }
 
         printf("original previous = %d\n", dataentry->previous);
         printf("original id len = %d\n", dataentry->idlength);
