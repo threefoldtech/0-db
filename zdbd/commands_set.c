@@ -89,6 +89,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
         .offset = offset,
         .length = request->argv[2]->length,
         .crc = dreq.crc,
+        // .dataid = data->dataid,
         .flags = 0,
         .timestamp = timestamp,
     };
@@ -192,6 +193,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
         .offset = offset,
         .length = request->argv[2]->length,
         .crc = dreq.crc,
+        .dataid = data->dataid,
         .flags = 0,
         .timestamp = timestamp,
     };

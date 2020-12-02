@@ -176,7 +176,7 @@ int command_history(redis_client_t *client) {
         ekey.indexid = entry->parentid;
         ekey.offset = entry->parentoff;
 
-        index_item_t *item = index_item_get_disk(index, entry->dataid, entry->idxoffset, entry->idlength);
+        index_item_t *item = index_item_get_disk(index, entry->indexid, entry->idxoffset, entry->idlength);
 
         return history_send(client, item, &ekey);
     }

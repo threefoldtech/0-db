@@ -119,7 +119,7 @@ index_item_t *index_item_from_set(index_root_t *root, index_set_t *set) {
     index_transition->offset = entry->offset;
     index_transition->length = entry->length;
     index_transition->flags = entry->flags;
-    index_transition->dataid = root->indexid; // WARNING: check this
+    index_transition->dataid = entry->dataid;
     index_transition->timestamp = entry->timestamp;
     index_transition->previous = root->previous;
     index_transition->parentid = entry->parentid;
@@ -140,6 +140,8 @@ int index_append_entry_on_disk(index_root_t *root, index_set_t *set) {
     // updating entry with the real offset
     // we used to insert this object
     entry->idxoffset = curoffset;
+    entry->indexid = root->indexid;
+
     index_item_t *item = index_item_from_set(root, set);
 
     // updating global previous
@@ -181,7 +183,7 @@ index_entry_t *index_insert_memory_handler_memkey(index_root_t *root, index_set_
     entry->offset = new->offset;
     entry->length = new->length;
     entry->dataid = root->indexid; // WARNING: check this
-    entry->indexid = new->indexid; // WARNING: check this
+    entry->indexid = new->indexid;
     entry->idxoffset = new->idxoffset;
     entry->flags = new->flags;
     entry->crc = new->crc;
@@ -242,14 +244,15 @@ index_entry_t *index_update_memory_handler_memkey(index_root_t *root, index_set_
     // updating parent id and parent offset
     // to the previous item itself, which
     // will be used to keep track of the history
-    exists->parentid = exists->dataid;
+    exists->parentid = exists->indexid;
     exists->parentoff = exists->idxoffset;
 
     // re-use existing entry
     exists->length = new->length;
     exists->offset = new->offset;
     exists->flags = new->flags;
-    exists->dataid = root->indexid; // WARNING: check this
+    exists->dataid = root->indexid;
+    exists->indexid = new->indexid;
     exists->idxoffset = new->idxoffset;
     exists->crc = new->crc;
     exists->timestamp = new->timestamp;
