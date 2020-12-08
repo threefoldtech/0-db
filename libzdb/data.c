@@ -369,6 +369,8 @@ data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_
         .length = 0
     };
 
+    zdb_debug("[+] data: request data: id %u, offset %lu, length: %lu\n", dataid, offset, length);
+
     // acquire data id fd
     if((fd = data_grab_dataid(root, dataid)) < 0)
         return payload;
