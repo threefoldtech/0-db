@@ -14,6 +14,7 @@
 
     hook_t *hook_new(char *name, size_t argc);
     int hook_append(hook_t *hook, char *argument);
-    int hook_execute(hook_t *hook);
+    pid_t hook_execute(hook_t *hook);
+    int hook_execute_wait(hook_t *hook);
     void hook_free(hook_t *hook);
 #endif

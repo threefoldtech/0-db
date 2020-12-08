@@ -303,7 +303,7 @@ size_t index_jump_next(index_root_t *root) {
     zdb_verbose("[+] index: jumping to the next file\n");
 
     if(zdb_rootsettings.hook) {
-        hook = hook_new("jump", 4);
+        hook = hook_new("jump-index", 4);
         hook_append(hook, zdb_rootsettings.zdbid);
         hook_append(hook, root->indexfile);
     }

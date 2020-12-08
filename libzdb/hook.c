@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <stdint.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
@@ -47,14 +48,16 @@ int hook_append(hook_t *hook, char *argument) {
     return (int) hook->argidx;
 }
 
-int hook_execute(hook_t *hook) {
+pid_t hook_execute(hook_t *hook) {
     pid_t pid;
 
     if((pid = fork()) != 0) {
-        if(pid < 0)
+        if(pid < 0) {
             zdb_warnp("hook: fork");
+            pid = 0;
+        }
 
-        return 0;
+        return pid;
     }
 
     // child process now
@@ -63,7 +66,20 @@ int hook_execute(hook_t *hook) {
     execv(zdb_rootsettings.hook, hook->argv);
     zdb_warnp("hook: execv");
 
-    return 1;
+    return 0;
+}
+
+int hook_execute_wait(hook_t *hook) {
+    pid_t child;
+    int status;
+
+    child = hook_execute(hook);
+    zdb_debug("[+] hook: waiting for hook to finish: %d\n", child);
+
+    if(waitpid(child, &status, 0) < 0)
+        zdb_warnp("waitpid");
+
+    return WEXITSTATUS(status);
 }
 
 void hook_free(hook_t *hook) {

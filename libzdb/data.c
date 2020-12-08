@@ -100,19 +100,59 @@ static int data_write(int fd, void *buffer, size_t length, int syncer, data_root
     return 1;
 }
 
+// if one datafile is not found while trying to open it
+// this can call external hook to request that missing file
+//
+// if the hook can fetch the datafile back, script should returns 0
+// otherwise returns anything else
+int data_open_notfound_hook(char *filename) {
+    int retval = 0;
+    hook_t *hook = NULL;
+
+    // if hook is disabled, just return an error
+    if(zdb_rootsettings.hook == NULL)
+        return 1;
+
+    zdb_debug("[+] data: trying to fetch missing datafile: %s\n", filename);
+
+    hook = hook_new("missing-data", 3);
+    hook_append(hook, zdb_rootsettings.zdbid);
+    hook_append(hook, filename);
+    retval = hook_execute_wait(hook);
+    hook_free(hook);
+
+    return retval;
+}
+
 // open one datafile based on it's id
 // in case of error, the reason will be printed and -1 will be returned
 // otherwise the file descriptor is returned
 int data_open_id_mode(data_root_t *root, uint16_t id, int mode) {
     char temp[ZDB_PATH_MAX];
+    int retried = 0;
     int fd;
 
     sprintf(temp, "%s/zdb-data-%05u", root->datadir, id);
     zdb_debug("[+] data: opening file: %s (ro: %s)\n", temp, (mode & O_RDONLY) ? "yes" : "no");
 
-    if((fd = open(temp, mode, 0600)) < 0) {
-        zdb_warnp(temp);
-        return -1;
+    while((fd = open(temp, mode, 0600)) < 0) {
+        if(errno != ENOENT || retried) {
+            // not supported error
+            zdb_warnp(temp);
+            return -1;
+        }
+
+        // try to call hook and request missing datafile
+        // if no hook are defined, this will just fail,
+        // otherwise there is a chance that hook will restore
+        // the missing data file if this is supported by
+        // called hook program
+        if(data_open_notfound_hook(temp) != 0) {
+            zdb_warnp(temp);
+            return -1;
+        }
+
+        retried = 1;
     }
 
     return fd;
@@ -270,7 +310,15 @@ static void data_open_final(data_root_t *root) {
 // jumping to the next id close the current data file
 // and open the next id file, it will create the new file
 size_t data_jump_next(data_root_t *root, uint16_t newid) {
+    hook_t *hook = NULL;
+
     zdb_verbose("[+] data: jumping to the next file\n");
+
+    if(zdb_rootsettings.hook) {
+        hook = hook_new("jump-data", 4);
+        hook_append(hook, zdb_rootsettings.zdbid);
+        hook_append(hook, root->datafile);
+    }
 
     // flushing data
     zdb_log("[+] data: flushing file before closing\n");
@@ -286,6 +334,12 @@ size_t data_jump_next(data_root_t *root, uint16_t newid) {
 
     data_initialize(root->datafile, root);
     data_open_final(root);
+
+    if(zdb_rootsettings.hook) {
+        hook_append(hook, root->datafile);
+        hook_execute(hook);
+        hook_free(hook);
+    }
 
     return root->dataid;
 }
