@@ -96,9 +96,6 @@ rm -rf /tmp/zdbtest
 ./zdbd/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --mode nonexist || true
 rm -rf /tmp/zdbtest
 
-./zdbd/zdb --data /tmp/zdbtest --index /tmp/zdbtest --dump --mode block
-rm -rf /tmp/zdbtest
-
 # run tests in sequential mode
 ./zdbd/zdb --background --socket /tmp/zdb.sock --data /tmp/zdbtest --index /tmp/zdbtest --mode seq
 ./tests/zdbtests

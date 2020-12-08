@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,35 +42,6 @@ int command_time(redis_client_t *client) {
     return 0;
 }
 
-int command_auth(redis_client_t *client) {
-    resp_request_t *request = client->request;
-
-    if(!command_args_validate(client, 2))
-        return 1;
-
-    if(!zdbd_rootsettings.adminpwd) { // FIXME
-        redis_hardsend(client, "-Authentification disabled");
-        return 0;
-    }
-
-    if(request->argv[1]->length > 128) {
-        redis_hardsend(client, "-Password too long");
-        return 1;
-    }
-
-    char password[192];
-    sprintf(password, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
-
-    if(strcmp(password, zdbd_rootsettings.adminpwd) == 0) { // FIXME
-        client->admin = 1;
-        redis_hardsend(client, "+OK");
-        return 0;
-    }
-
-    redis_hardsend(client, "-Access denied");
-    return 1;
-}
-
 // STOP will be only compiled in debug mode
 // this will force to exit listen loop in order to call
 // all destructors, this is useful to ensure every memory allocation
@@ -88,17 +60,19 @@ int command_stop(redis_client_t *client) {
 
 int command_info(redis_client_t *client) {
     char info[4096];
+    struct timeval current;
     zdb_settings_t *zdb_settings = zdb_settings_get();
     zdb_stats_t *lstats = &zdb_settings->stats;
     zdbd_stats_t *dstats = &zdbd_rootsettings.stats;
+    gettimeofday(&current, NULL);
 
     sprintf(info, "# server\n");
     sprintf(info + strlen(info), "server_name: 0-db (zdb)\n");
     sprintf(info + strlen(info), "server_revision: " ZDBD_REVISION "\n");
     sprintf(info + strlen(info), "engine_revision: %s\n", zdb_revision());
     sprintf(info + strlen(info), "instance_id: %u\n", zdb_instanceid_get());
-    sprintf(info + strlen(info), "boot_time: %ld\n", dstats->boottime);
-    sprintf(info + strlen(info), "uptime: %ld\n", time(NULL) - dstats->boottime);
+    sprintf(info + strlen(info), "boot_time: %ld\n", dstats->boottime.tv_sec);
+    sprintf(info + strlen(info), "uptime: %ld\n", current.tv_sec - dstats->boottime.tv_sec);
 
 
     sprintf(info + strlen(info), "\n# clients\n");

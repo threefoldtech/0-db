@@ -12,6 +12,7 @@ static char *zdb_modes[] = {
     "sequential keys",
     "direct key position",
     "direct key fixed block length",
+    "mixed mode",
 };
 
 //
@@ -27,7 +28,7 @@ zdb_settings_t *zdb_settings_get() {
 
 // returns running mode in readable string
 char *zdb_running_mode(index_mode_t mode) {
-    if(mode > (sizeof(zdb_modes) / sizeof(char *)))
+    if(mode > (sizeof(zdb_modes) / sizeof(char *)) - 1)
         return "unsupported mode";
 
     return zdb_modes[mode];

@@ -27,11 +27,11 @@ but 0-db is not a redis replacement and never will.
 
 # Build targets
 Currently supported system:
-* Linux (using `epoll`)
+* Linux (using `epoll`), kernel 3.17, glibc 2.25
 * MacOS and FreeBSD (using `kqueue`)
 
 Currently supported hardware:
-* Any processor supporting `SSE 4.2`
+* Any CPU supporting `SSE 4.2`
 
 This project won't compile on something else (for now).
 
@@ -93,6 +93,10 @@ On runtime, you can choose between multiple mode:
 
 **Warning**: in any case, please ensure data and index directories used by 0-db are empty, or
 contains only valid database namespaces directories.
+
+If you run `zdbd` without `--mode` argument, server will runs in `mixed mode` and allows some
+`user` and `sequential` namespace on the same instance. Please see `NSSET` command to get more
+information on how to choose runtime mode.
 
 ## User Key
 This is a default mode, a simple key-value store. User can `SET` their own keys, like any key-value store.
@@ -178,10 +182,11 @@ This mode is not possible if you don't have any data/index already available.
 - `NSINFO namespace`
 - `NSLIST`
 - `NSSET namespace property value`
-- `SELECT namespace`
+- `SELECT namespace [SECURE password]`
 - `DBSIZE`
 - `TIME`
 - `AUTH password`
+- `AUTH SECURE`
 - `SCAN [optional cursor]`
 - `SCANX [optional cursor]` (this is just an alias for `SCAN`)
 - `RSCAN [optional cursor]`
@@ -299,15 +304,65 @@ Change a namespace setting/property. Only admin can do this.
 Properties:
 * `maxsize`: set the maximum size in bytes, of the namespace's data set
 * `password`: lock the namespace by a password, use `*` password to clear it
-* `public`: change the public flag, a public namespace can be read-only if a password is set
+* `public`: change the public flag, a public namespace can be read-only if a password is set (0 or 1)
+* `worm`: « write only read multiple » flag which disable overwrite and deletion (0 or 1)
+* `mode`: change index mode (`user` or `seq`)
+
+About mode selection: it's now possible to mix modes (user and sequential) on the same 0-db instance.
+This is only possible if you don't provide any `--mode` argument on runtime, otherwise 0-db will be available
+only on this mode.
+
+It's only possible to change mode on a fully empty dataset (no deleted keys, nothing.), aka on a newly created
+namespace. You can change `default` namespace aswell if it's empty.
+
+As soon as there are a single object in the namespace, you won't be able to change mode.
 
 ## SELECT
 Change your current namespace. If the requested namespace is password-protected, you need
-to add the password as extra parameter. If the namespace is `public` and you don't provide
-any password, the namespace will be accessible in read-only.
+to add the password as extra parameter. If the namespace is `public` but password protected,
+and you don't provide any password, the namespace will be accessible in read-only.
+
+You can use SECURE password, like authentication (see below). A challenge is required first
+(using `AUTH SECURE CHALLENGE` command).
+
+```
+>> AUTH SECURE CHALLENGE
+749e5be04ca0471e
+>> SELECT hello SECURE 632ef9246e9f01a3453aec8f133d1f652cccebbb
+OK
+```
 
 ## AUTH
-If an admin account is set, use `AUTH` command to authentificate yourself as `ADMIN`.
+If an administrator password is set, use `AUTH` command to authentificate yourself as `ADMIN`.
+There is two way possible to request authentication.
+
+### Legacy plain-text authentication
+You can authenticate yourself using the simple `AUTH <password>` way. This is still supported and valid.
+In the futur this will be probably disabled for security reason.
+
+There is no encryption between client and 0-db server, any network monitor could leak
+administration password.
+
+### Secure authentication
+There is a more advanced two-step authentication made to avoid plain-text password leak and safe
+against replay-attack.
+
+You can authenticate yourself using the `AUTH SECURE` command, in two step.
+- First you request a challenge using `AUTH SECURE CHALLENGE`
+- Then you authenticate yourself using `AUTH SECURE sha1(challenge:password)`
+
+The challenge is session-specific random nonce. It can be used only 1 time.
+Let assume the password is `helloworld`, the authentication workflow is:
+```
+>> AUTH SECURE CHALLENGE
+708f109fbef4d656
+>> AUTH SECURE 5af26c9c8bf4db0b342c42fc47e3bdae58da4578
+OK
+```
+
+The secure password is constructed via `sha1(708f109fbef4d656:helloworld)`
+
+This is the prefered method to use.
 
 ## WAIT
 Blocking wait on command execution by someone else. This allows you to wait somebody else

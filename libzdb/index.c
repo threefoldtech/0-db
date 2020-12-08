@@ -23,6 +23,7 @@ void index_item_header_dump(index_item_t *item) {
     (void) item;
 #else
     zdb_debug("[+] index: item dump: id length  : %" PRIu8  "\n", item->idlength);
+    zdb_debug("[+] index: item dump: data fileid: %" PRIu16 "\n", item->dataid);
     zdb_debug("[+] index: item dump: data offset: %" PRIu32 "\n", item->offset);
     zdb_debug("[+] index: item dump: data length: %" PRIu32 "\n", item->length);
     zdb_debug("[+] index: item dump: previous   : %" PRIx32 "\n", item->previous);
@@ -43,6 +44,7 @@ void index_entry_dump(index_entry_t *entry) {
     zdb_debug("[+] index: entry dump: id length  : %" PRIu8  "\n", entry->idlength);
     zdb_debug("[+] index: entry dump: idx offset : %" PRIu32 "\n", entry->idxoffset);
     zdb_debug("[+] index: entry dump: idx fileid : %" PRIu32 "\n", entry->indexid);
+    zdb_debug("[+] index: entry dump: data fileid: %" PRIu16 "\n", entry->dataid);
     zdb_debug("[+] index: entry dump: data offset: %" PRIu32 "\n", entry->offset);
     zdb_debug("[+] index: entry dump: data length: %" PRIu32 "\n", entry->length);
     zdb_debug("[+] index: entry dump: flags      : %" PRIu8  "\n", entry->flags);
@@ -109,7 +111,7 @@ int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
     }
 
     if(response != (ssize_t) length) {
-        fprintf(stderr, "[-] index write: partial write\n");
+        zdb_logerr("[-] index write: partial write\n");
         return 0;
     }
 
@@ -134,12 +136,12 @@ static int index_read(int fd, void *buffer, size_t length) {
     }
 
     if(response == 0) {
-        fprintf(stderr, "[-] index read: eof reached\n");
+        zdb_logerr("[-] index read: eof reached\n");
         return 0;
     }
 
     if(response != (ssize_t) length) {
-        fprintf(stderr, "[-] index read: partial read\n");
+        zdb_logerr("[-] index read: partial read\n");
         return 0;
     }
 
@@ -281,11 +283,11 @@ void index_open_final(index_root_t *root) {
 
     if((root->indexfd = open(root->indexfile, flags, 0600)) < 0) {
         zdb_warnp(root->indexfile);
-        fprintf(stderr, "[-] index: could not open index file\n");
+        zdb_logerr("[-] index: could not open index file\n");
         return;
     }
 
-    printf("[+] index: active file: %s\n", root->indexfile);
+    zdb_log("[+] index: active file: %s\n", root->indexfile);
 }
 
 void index_close(index_root_t *root) {
@@ -306,7 +308,12 @@ size_t index_jump_next(index_root_t *root) {
         hook_append(hook, root->indexfile);
     }
 
+    // flushing current index file
+    zdb_log("[+] index: flushing file before closing\n");
+    fsync(root->indexfd);
+
     // closing current file descriptor
+    zdb_log("[+] index: closing current index file\n");
     index_close(root);
 
     // moving to the next file
@@ -669,9 +676,9 @@ static inline size_t index_clean_namespace_branch(index_branch_t *branch, void *
         }
 
         #ifndef RELEASE
-        printf("[+] index: namespace cleaner: free: ");
+        zdb_log("[+] index: namespace cleaner: free: ");
         zdb_hexdump(entry->id, entry->idlength);
-        printf("\n");
+        printf("\n"); // FIXME
         #endif
 
         // okay, we need to remove this key

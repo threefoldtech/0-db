@@ -24,6 +24,7 @@ int index_dump_files(index_root_t *zdbindex, uint64_t maxfile) {
         printf("[+] index-dump: header seems correct\n");
         printf("[+] index-dump: created at: %s\n", zdb_header_date(header->created, datestr, sizeof(datestr)));
         printf("[+] index-dump: last open: %s\n", zdb_header_date(header->opened, datestr, sizeof(datestr)));
+        printf("[+] index-dump: index mode: %s\n", zdb_running_mode(header->mode));
 
         //
         // dumping contents

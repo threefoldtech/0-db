@@ -108,7 +108,7 @@ int history_send(redis_client_t *client, index_item_t *item, index_ekey_t *ekey)
     response.payload = data_get(data, item->offset, item->length, item->dataid, item->idlength);
 
     if(!response.payload.buffer) {
-        printf("[-] command: history: cannot read payload\n");
+        zdb_log("[-] command: history: cannot read payload\n");
         redis_hardsend(client, "-Internal Error");
         free(response.payload.buffer);
         return 0;
@@ -152,6 +152,9 @@ int command_history(redis_client_t *client) {
         return 1;
     }
 
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
     // requesting a previous data, without any exact offset
     // this basicly request the first older entry of a specific key
     if(client->request->argc == 2) {
@@ -173,7 +176,7 @@ int command_history(redis_client_t *client) {
         ekey.indexid = entry->parentid;
         ekey.offset = entry->parentoff;
 
-        index_item_t *item = index_item_get_disk(index, entry->dataid, entry->idxoffset, entry->idlength);
+        index_item_t *item = index_item_get_disk(index, entry->indexid, entry->idxoffset, entry->idlength);
 
         return history_send(client, item, &ekey);
     }

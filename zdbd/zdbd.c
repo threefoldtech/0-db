@@ -100,7 +100,7 @@ void zdbd_hexdump(void *input, size_t length) {
         *writer++ = __hex[buffer[i] & 0x0F];
     }
 
-    printf("0x%s", output);
+    printf("0x%s\n", output);
     free(output);
 }
 
@@ -108,6 +108,7 @@ void zdbd_hexdump(void *input, size_t length) {
 // global warning and fatal message
 //
 void *zdbd_warnp(char *str) {
+    zdbd_timelog();
     fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
     return NULL;
 }
@@ -132,6 +133,20 @@ void zdbd_diep(char *str) {
 void zdbd_dieg(char *str, int status) {
     fprintf(stderr, "[-] %s: %s\n", str, gai_strerror(status));
     exit(EXIT_FAILURE);
+}
+
+void zdbd_timelog() {
+    struct timeval n, *b;
+    double value = 0;
+
+    // boot time
+    zdb_settings_t *zdb_settings = zdb_settings_get();
+    b = &zdb_settings->stats.inittime;
+
+    gettimeofday(&n, NULL);
+    value = (double)(n.tv_usec - b->tv_usec) / 1000000 + (double)(n.tv_sec - b->tv_sec);
+
+    printf("[% 15.6f]", value);
 }
 
 // internal id generatir
@@ -189,13 +204,13 @@ static void sighandler(int signal) {
             }
 
             // trying to save what we can save
-            printf("\n[+] signal: crashed, trying to clean\n");
+            zdb_log("\n[+] signal: crashed, trying to clean\n");
             namespaces_emergency();
             break;
 
         case SIGINT:
         case SIGTERM:
-            printf("\n[+] signal: request cleaning\n");
+            zdb_log("[+] signal: request cleaning\n");
 
             if(zdb_settings->hook) {
                 hook_t *hook = hook_new("close", 1);
@@ -264,7 +279,7 @@ void usage() {
     printf("                       > user: default user key-value mode\n");
     printf("                       > seq: sequential keys generated\n");
     printf("                       > direct: direct position by key\n");
-    printf("                       > block: fixed blocks length (smaller direct)\n");
+    printf("                      note: if not specified, zdb will run in mixed mode\n");
     printf("  --datasize <size>   maximum datafile size before split (default: %.2f MB)\n\n", MB(ZDB_DEFAULT_DATA_MAXSIZE));
 
     printf(" Network options:\n");
@@ -294,11 +309,11 @@ void usage() {
 // main entry: processing arguments
 //
 int main(int argc, char *argv[]) {
-    zdbd_notice("[*] 0-db engine, v%s (commit %s)", zdb_version(), zdb_revision());
-    zdbd_notice("[*] 0-db server, v" ZDBD_VERSION " (commit " ZDBD_REVISION ")");
-
     zdb_settings_t *zdb_settings = zdb_initialize();
     zdbd_settings_t *zdbd_settings = &zdbd_rootsettings;
+
+    zdbd_notice("[*] 0-db engine, v%s (commit %s)", zdb_version(), zdb_revision());
+    zdbd_notice("[*] 0-db server, v" ZDBD_VERSION " (commit " ZDBD_REVISION ")");
 
     int option_index = 0;
 
@@ -391,8 +406,10 @@ int main(int argc, char *argv[]) {
                     zdbd_warning("[!] WARNING: direct mode will not be supported at all anymore");
                     zdbd_warning("[!] WARNING: in futur release");
 
+                /*
                 } else if(strcmp(optarg, "block") == 0) {
                     zdb_settings->mode = ZDB_MODE_DIRECTBLOCK;
+                */
 
                 } else {
                     zdbd_danger("[-] invalid mode '%s'", optarg);
@@ -439,7 +456,7 @@ int main(int argc, char *argv[]) {
     //
     // print information relative to database instance
     //
-    printf("[+] system: running mode: " COLOR_GREEN "%s" COLOR_RESET "\n", zdb_running_mode(zdb_settings->mode));
+    zdb_log("[+] system: running mode: " COLOR_GREEN "%s" COLOR_RESET "\n", zdb_running_mode(zdb_settings->mode));
 
     // max files is limited by type length of dataid, which is uint16 by default
     // taking field size in bytes, multiplied by 8 for bits
@@ -455,7 +472,7 @@ int main(int argc, char *argv[]) {
 
     // initialize daemon statistics
     memset(&zdbd_settings->stats, 0x00, sizeof(zdbd_stats_t));
-    zdbd_settings->stats.boottime = time(NULL);
+    gettimeofday(&zdbd_settings->stats.boottime, NULL);
 
     // update network listening settings to reflect
     // if dualnet if set or not

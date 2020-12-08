@@ -66,6 +66,7 @@ namespace_t *namespace_get(char *name) {
     return NULL;
 }
 
+// FIXME: no error handled externally
 void namespace_descriptor_update(namespace_t *namespace, int fd) {
     ns_header_legacy_t header;
     ns_header_extended_t extended;
@@ -299,7 +300,9 @@ namespace_t *namespace_load_light(ns_root_t *nsroot, char *name, int ensure) {
     namespace->worm = 0;    // by default, worm mode is disabled
     namespace->maxsize = 0; // by default, there is no limits
     namespace->idlist = 0;  // by default, no list set
-    namespace->version = NAMESPACE_CURRENT_VERSION;
+
+    namespace->locked = NS_LOCK_UNLOCKED;           // by default, namespace are unlocked
+    namespace->version = NAMESPACE_CURRENT_VERSION; // set current version before reading descriptor
 
     if(ensure) {
         if(!namespace_ensure(namespace))
@@ -492,7 +495,7 @@ ns_root_t *namespaces_allocate(zdb_settings_t *settings) {
         zdb_diep("namespace malloc");
 
     // allocating (if needed, only some modes needs it) the big (single) index branches
-    if(settings->mode == ZDB_MODE_KEY_VALUE) {
+    if(settings->mode == ZDB_MODE_KEY_VALUE || settings->mode == ZDB_MODE_MIX) {
         zdb_debug("[+] namespaces: pre-allocating index (%d lazy branches)\n", buckets_branches);
 
         // allocating minimal branches array
@@ -579,6 +582,33 @@ static void namespace_kick_slot(namespace_t *namespace) {
             return;
         }
     }
+}
+
+// return 1 or 0 if namespace is fresh
+// a fresh namespace is a completly empty namespace
+// without any data/keys, not only an empty namespace
+// but even an namespace without any deleted keys
+//
+// it's important to know if a namespace is 'fresh' in order
+// to change it's mode after it's creation, the mode cannot
+// be changed if any keys have been written
+int namespace_is_fresh(namespace_t *namespace) {
+    if(namespace->index->nextentry != 0) {
+        zdb_debug("[-] namespace: not fresh: nextentry not zero\n");
+        return 0;
+    }
+
+    if(namespace->index->nextid != 0) {
+        zdb_debug("[-] namespace: not fresh: nextif not zero\n");
+        return 0;
+    }
+
+    if(namespace->index->indexid != 0) {
+        zdb_debug("[-] namespace: not fresh: indexid not zero\n");
+        return 0;
+    }
+
+    return 1;
 }
 
 // trigger hook when namespace is reloaded
@@ -697,10 +727,10 @@ int namespaces_emergency() {
     namespace_t *ns;
 
     for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
-        printf("[+] namespaces: flushing index [%s]\n", ns->name);
+        zdb_log("[+] namespaces: flushing index [%s]\n", ns->name);
 
         if(index_emergency(ns->index)) {
-            printf("[+] namespaces: flushing data [%s]\n", ns->name);
+            zdb_log("[+] namespaces: flushing data [%s]\n", ns->name);
             // only flusing data if index flush was accepted
             // if index flush returns 0, we are probably in an initializing stage
             data_emergency(ns->data);
@@ -709,3 +739,51 @@ int namespaces_emergency() {
 
     return 0;
 }
+
+// lock a namespace, which set read-only mode for everybody
+// this mode is useful when namespace goes in maintenance without
+// making namespace unavailable
+int namespace_lock(namespace_t *namespace) {
+    zdb_debug("[+] namespace: locking namespace: %s\n", namespace->name);
+    namespace->locked = NS_LOCK_READ_ONLY;
+    return 0;
+}
+
+// set namespace back in normal state
+int namespace_unlock(namespace_t *namespace) {
+    zdb_debug("[+] namespace: unlocking namespace: %s\n", namespace->name);
+    namespace->locked = NS_LOCK_UNLOCKED;
+    return 0;
+
+}
+
+// check lock status of a namespace (0 is unlocked, 1 is locked or frozen)
+int namespace_is_locked(namespace_t *namespace) {
+    zdb_debug("[+] namespace: lock status: %s [%d]\n", namespace->name, namespace->locked);
+    return (namespace->locked != NS_LOCK_UNLOCKED);
+}
+
+// freeze a namespace, which set it unavailable for everybody
+// this mode is useful when namespace goes in maintenance for hard changes
+// which needs to disable any action on this namespace
+int namespace_freeze(namespace_t *namespace) {
+    zdb_debug("[+] namespace: freezing namespace: %s\n", namespace->name);
+    namespace->locked = NS_LOCK_READ_WRITE;
+    return 0;
+}
+
+// set namespace back in normal state
+int namespace_unfreeze(namespace_t *namespace) {
+    zdb_debug("[+] namespace: unfrezzing namespace: %s\n", namespace->name);
+    namespace->locked = NS_LOCK_UNLOCKED;
+    return 0;
+
+}
+
+// check lock status of a namespace (0 is unlocked, 1 is frozen or locked)
+int namespace_is_frozen(namespace_t *namespace) {
+    zdb_debug("[+] namespace: lock (freeze) status: %s [%d]\n", namespace->name, namespace->locked);
+    return (namespace->locked == NS_LOCK_READ_WRITE);
+}
+
+

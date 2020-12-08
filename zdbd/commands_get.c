@@ -25,6 +25,9 @@ int command_get(redis_client_t *client) {
         return 1;
     }
 
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
     // fetching index entry for this key
     if(!(entry = index_get(client->ns->index, request->argv[1]->buffer, request->argv[1]->length))) {
         zdbd_debug("[-] command: get: key not found\n");
@@ -47,7 +50,7 @@ int command_get(redis_client_t *client) {
     data_payload_t payload = data_get(data, entry->offset, entry->length, entry->dataid, entry->idlength);
 
     if(!payload.buffer) {
-        printf("[-] command: get: cannot read payload\n");
+        zdb_log("[-] command: get: cannot read payload\n");
         redis_hardsend(client, "-Internal Error");
         free(payload.buffer);
         return 0;

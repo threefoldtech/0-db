@@ -24,11 +24,22 @@ static uint32_t zdb_instanceid_generate() {
 zdb_settings_t *zdb_initialize() {
     zdb_settings_t *s = &zdb_rootsettings;
 
+    if(s->initialized == 1)
+        return NULL;
+
     // apply default settings
     s->datapath = ZDB_DEFAULT_DATAPATH;
     s->indexpath = ZDB_DEFAULT_INDEXPATH;
     s->datasize = ZDB_DEFAULT_DATA_MAXSIZE;
-    s->mode = ZDB_MODE_KEY_VALUE;
+
+    // running 0-db in mixed mode by default
+    //
+    // this flag can be used on runtime to specify
+    // if mixed mode is allowed or not, if a specific
+    // mode is set here, you could restrict instance to
+    // a single mode, but this is up to caller to enable
+    // restriction, library doesn't restrict anything
+    s->mode = ZDB_MODE_MIX;
 
     // resetting values
     s->verbose = 0;
@@ -40,12 +51,15 @@ zdb_settings_t *zdb_initialize() {
 
     // initialize stats and init time
     memset(&s->stats, 0x00, sizeof(zdb_stats_t));
-    s->stats.inittime = time(NULL);
+    gettimeofday(&s->stats.inittime, NULL);
 
     // initialize instance id
     s->iid = zdb_instanceid_generate();
 
-    return &zdb_rootsettings;
+    // set a global lock, already initialized
+    s->initialized = 1;
+
+    return s;
 }
 
 zdb_settings_t *zdb_open(zdb_settings_t *zdb_settings) {
@@ -82,5 +96,6 @@ void zdb_close(zdb_settings_t *zdb_settings) {
     zdb_debug("[+] bootstrap: cleaning library\n");
     free(zdb_settings->zdbid);
     zdb_settings->zdbid = NULL;
+    zdb_settings->initialized = 0;
 }
 

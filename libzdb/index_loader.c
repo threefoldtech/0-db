@@ -17,9 +17,9 @@
 // index initializer and dumper
 //
 static inline void index_dump_entry(index_entry_t *entry) {
-    printf("[+] key [");
+    zdb_log("[+] key [");
     zdb_hexdump(entry->id, entry->idlength);
-    printf("] offset %" PRIu32 ", length: %" PRIu32 "\n", entry->offset, entry->length);
+    zdb_log("] offset %" PRIu32 ", length: %" PRIu32 "\n", entry->offset, entry->length);
 }
 
 // dumps the current index load
@@ -27,10 +27,10 @@ static inline void index_dump_entry(index_entry_t *entry) {
 static void index_dump(index_root_t *root, int fulldump) {
     size_t branches = 0;
 
-    printf("[+] index: verifyfing populated keys\n");
+    zdb_log("[+] index: verifyfing populated keys\n");
 
     if(fulldump)
-        printf("[+] ===========================\n");
+        zdb_log("[+] ===========================\n");
 
     // iterating over each buckets
     for(uint32_t b = 0; b < buckets_branches; b++) {
@@ -53,9 +53,9 @@ static void index_dump(index_root_t *root, int fulldump) {
 
     if(fulldump) {
         if(root->stats.entries == 0)
-            printf("[+] index is empty\n");
+            zdb_log("[+] index is empty\n");
 
-        printf("[+] ===========================\n");
+        zdb_log("[+] ===========================\n");
     }
 
     zdb_verbose("[+] index: uses: %lu branches\n", branches);
@@ -91,7 +91,7 @@ index_header_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
     header.created = time(NULL);
     header.fileid = indexid;
     header.opened = time(NULL);
-    header.mode = zdb_rootsettings.mode;
+    header.mode = root->mode;
 
     if(!index_write(fd, &header, sizeof(index_header_t), root))
         zdb_diep("index_initialize: write");
@@ -203,8 +203,8 @@ static size_t index_load_file(index_root_t *root) {
             // we read something, but not the expected header, at least
             // not this amount of data, which is a completly undefined behavior
             // let's just stopping here
-            fprintf(stderr, "[-] index: header corrupted or incomplete\n");
-            fprintf(stderr, "[-] index: expected %lu bytes, %ld read\n", sizeof(index_header_t), length);
+            zdb_logerr("[-] index: header corrupted or incomplete\n");
+            zdb_logerr("[-] index: expected %lu bytes, %ld read\n", sizeof(index_header_t), length);
             exit(EXIT_FAILURE);
         }
 
@@ -225,17 +225,19 @@ static size_t index_load_file(index_root_t *root) {
         // and it's empty, there is no goal to do anything
         // let's crash
         if(root->status & INDEX_READ_ONLY) {
-            fprintf(stderr, "[-] no index found and readonly filesystem\n");
-            fprintf(stderr, "[-] cannot starts correctly\n");
+            zdb_logerr("[-] no index found and readonly filesystem\n");
+            zdb_logerr("[-] cannot starts correctly\n");
             exit(EXIT_FAILURE);
         }
 
-        printf("[+] index: creating empty file\n");
+        zdb_log("[+] index: creating empty file\n");
         header = index_initialize(root->indexfd, root->indexid, root);
     }
 
     if(!index_descriptor_validate(&header, root))
         return 1;
+
+    zdb_debug("[+] index: running mode: %s\n", zdb_running_mode(header.mode));
 
     // re-writing the header, with updated data if the index is writable
     // if the file was just created, it's okay, we have a new struct ready
@@ -252,16 +254,18 @@ static size_t index_load_file(index_root_t *root) {
     zdb_verbose("[+] index: created at: %s\n", zdb_header_date(header.created, date, sizeof(date)));
     zdb_verbose("[+] index: last open: %s\n", zdb_header_date(header.opened, date, sizeof(date)));
 
-    if(header.mode != zdb_rootsettings.mode) {
-        zdb_danger("[!] ========================================================");
-        zdb_danger("[!] DANGER: index created in another mode than running mode");
-        zdb_danger("[!] DANGER: stopping here, to ensure no data loss");
-        zdb_danger("[!] ========================================================");
+    if(zdb_rootsettings.mode != ZDB_MODE_MIX) {
+        if(header.mode != zdb_rootsettings.mode) {
+            zdb_danger("[!] ========================================================");
+            zdb_danger("[!] DANGER: index created in another mode than running mode");
+            zdb_danger("[!] DANGER: stopping here, to ensure no data loss");
+            zdb_danger("[!] ========================================================");
 
-        exit(EXIT_FAILURE);
+            exit(EXIT_FAILURE);
+        }
     }
 
-    printf("[+] index: populating: %s\n", root->indexfile);
+    zdb_log("[+] index: populating: %s\n", root->indexfile);
 
     // index seems in a good state
     // let's load it completely in memory now
@@ -509,7 +513,26 @@ index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir, void *na
     root->namespace = namespace;
     root->mode = settings->mode;
 
+    // switching to default mode when mix enabled
+    if(root->mode == ZDB_MODE_MIX)
+        root->mode = ZDB_DEFAULT_MIX_MODE;
+
     return root;
+}
+
+// reload and ensure all internal pointers are available
+index_root_t *index_rehash(index_root_t *root) {
+    if(root->mode == ZDB_MODE_SEQUENTIAL)
+        if(root->seqid == NULL)
+            root->seqid = index_allocate_seqid();
+
+    // since this function will be called for each namespace
+    // we will not allocate all the time the reusable variables
+    // but this is the 'main entry' of index loading, so doing this
+    // here makes sens
+    index_internal_allocate_single();
+
+   return root;
 }
 
 // create an index and load files
@@ -519,23 +542,17 @@ index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespa
     index_root_t *root = index_init_lazy(settings, indexdir, namespace);
     root->branches = branches;
 
-    if(settings->mode == ZDB_MODE_SEQUENTIAL)
-        root->seqid = index_allocate_seqid();
-
-    // since this function will be called for each namespace
-    // we will not allocate all the time the reusable variables
-    // but this is the 'main entry' of index loading, so doing this
-    // here makes sens
-    index_internal_allocate_single();
+    // initialize internal pointers
+    index_rehash(root);
     index_internal_load(root);
 
-    if(settings->mode == ZDB_MODE_KEY_VALUE)
+    if(root->mode == ZDB_MODE_KEY_VALUE)
         index_dump(root, settings->dump);
 
     index_dump_statistics(root);
 
     #ifndef RELEASE
-    if(settings->mode == ZDB_MODE_SEQUENTIAL)
+    if(root->mode == ZDB_MODE_SEQUENTIAL)
         index_seqid_dump(root);
     #endif
 
@@ -571,4 +588,48 @@ void index_destroy_global() {
 // delete index files (not the namespace descriptor)
 void index_delete_files(index_root_t *root) {
     zdb_dir_clean_payload(root->indexdir);
+}
+
+// update (rewrite) current index header
+// this is useful when you want to update the mode
+// of the index, this should be done _ONLY_ if
+// the index is completly empty and fresh
+//
+// warning: no internal check will be made
+//          be careful and ensure you can change mode
+//
+int index_switch_mode(index_root_t *root) {
+    index_header_t header;
+    int fd;
+
+    // open initial index file in write mode
+    if((fd = index_open_file_readwrite(root, 0)) < 0) {
+        zdb_warnp("index_switch_mode: open");
+        return fd;
+    }
+
+    // read existing header
+    lseek(fd, 0, SEEK_SET);
+
+    if(read(fd, &header, sizeof(header)) != sizeof(header)) {
+        zdb_warnp("index_switch_mode: read");
+        close(fd);
+        return 1;
+    }
+
+    // update mode
+    header.mode = root->mode;
+
+    // rewrite header
+    lseek(fd, 0, SEEK_SET);
+
+    if(write(fd, &header, sizeof(header)) != sizeof(header)) {
+        zdb_warnp("index_switch_mode: write");
+        close(fd);
+        return 1;
+    }
+
+    close(fd);
+
+    return 0;
 }

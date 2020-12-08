@@ -19,14 +19,16 @@ int command_exists(redis_client_t *client) {
         return 1;
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
-        printf("[-] invalid key size\n");
+        zdb_log("[-] command: exists: invalid key size\n");
         redis_hardsend(client, "-Invalid key");
         return 1;
     }
 
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
     zdbd_debug("[+] command: exists: lookup key: ");
     zdbd_debughex(request->argv[1]->buffer, request->argv[1]->length);
-    zdbd_debug("\n");
 
     index_root_t *index = client->ns->index;
     index_entry_t *entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length);
@@ -56,14 +58,16 @@ int command_check(redis_client_t *client) {
         return 1;
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
-        printf("[-] invalid key size\n");
+        zdb_log("[-] command: check: invalid key size\n");
         redis_hardsend(client, "-Invalid key");
         return 1;
     }
 
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
     zdbd_debug("[+] command: check: lookup key: ");
     zdbd_debughex(request->argv[1]->buffer, request->argv[1]->length);
-    zdbd_debug("\n");
 
     index_root_t *index = client->ns->index;
     index_entry_t *entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length);
@@ -104,7 +108,7 @@ int command_del(redis_client_t *client) {
         return 1;
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
-        printf("[-] command: del: invalid key size\n");
+        zdb_log("[-] command: del: invalid key size\n");
         redis_hardsend(client, "-Invalid key");
         return 1;
     }
@@ -114,6 +118,12 @@ int command_del(redis_client_t *client) {
         redis_hardsend(client, "-Namespace is in read-only mode");
         return 1;
     }
+
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
+    if(namespace_is_locked(client->ns))
+        return command_error_locked(client);
 
     index_root_t *index = client->ns->index;
     data_root_t *data = client->ns->data;

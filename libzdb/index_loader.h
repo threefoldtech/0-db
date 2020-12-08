@@ -9,6 +9,7 @@
     index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir, void *namespace);
 
     // internal functions
+    index_root_t *index_rehash(index_root_t *root);
     void index_internal_load(index_root_t *root);
     void index_internal_allocate_single();
 
@@ -16,6 +17,7 @@
     uint64_t index_availity_check(index_root_t *root);
     index_header_t *index_descriptor_load(index_root_t *root);
     index_header_t *index_descriptor_validate(index_header_t *header, index_root_t *root);
+    int index_switch_mode(index_root_t *root);
 
     // gracefully clean everything
     void index_delete_files(index_root_t *root);

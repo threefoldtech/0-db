@@ -81,7 +81,6 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
 
     zdbd_debug("[+] command: set: userkey: ");
     zdbd_debughex(id, idlength);
-    zdbd_debug("\n");
 
     zdbd_debug("[+] command: set: offset: %lu\n", offset);
 
@@ -90,6 +89,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
         .offset = offset,
         .length = request->argv[2]->length,
         .crc = dreq.crc,
+        // .dataid = data->dataid,
         .flags = 0,
         .timestamp = timestamp,
     };
@@ -185,7 +185,6 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
 
     zdbd_debug("[+] command: set: sequential-key: ");
     zdbd_debughex(&id, idlength);
-    zdbd_debug("\n");
 
     zdbd_debug("[+] command: set: offset: %lu\n", offset);
 
@@ -194,6 +193,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
         .offset = offset,
         .length = request->argv[2]->length,
         .crc = dreq.crc,
+        .dataid = data->dataid,
         .flags = 0,
         .timestamp = timestamp,
     };
@@ -260,9 +260,16 @@ int command_set(redis_client_t *client) {
         return 1;
     }
 
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
+    if(namespace_is_locked(client->ns))
+        return command_error_locked(client);
+
     // shortcut to data
     index_root_t *index = client->ns->index;
     index_entry_t *entry = NULL;
+    index_mode_t mode = client->ns->index->mode;
     size_t floating = 0;
 
     // if the user want to override an existing key
@@ -309,7 +316,7 @@ int command_set(redis_client_t *client) {
         data_jump_next(client->ns->data, newid);
     }
 
-    size_t offset = redis_set_handlers[zdb_settings->mode](client, entry);
+    size_t offset = redis_set_handlers[mode](client, entry);
     if(offset == 0)
         return 0;
 
