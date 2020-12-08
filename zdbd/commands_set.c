@@ -89,6 +89,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
         .offset = offset,
         .length = request->argv[2]->length,
         .crc = dreq.crc,
+        // .dataid = data->dataid,
         .flags = 0,
         .timestamp = timestamp,
     };
@@ -192,6 +193,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
         .offset = offset,
         .length = request->argv[2]->length,
         .crc = dreq.crc,
+        .dataid = data->dataid,
         .flags = 0,
         .timestamp = timestamp,
     };
@@ -257,6 +259,12 @@ int command_set(redis_client_t *client) {
         redis_hardsend(client, "-Namespace is in read-only mode");
         return 1;
     }
+
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
+    if(namespace_is_locked(client->ns))
+        return command_error_locked(client);
 
     // shortcut to data
     index_root_t *index = client->ns->index;

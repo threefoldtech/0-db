@@ -300,7 +300,9 @@ namespace_t *namespace_load_light(ns_root_t *nsroot, char *name, int ensure) {
     namespace->worm = 0;    // by default, worm mode is disabled
     namespace->maxsize = 0; // by default, there is no limits
     namespace->idlist = 0;  // by default, no list set
-    namespace->version = NAMESPACE_CURRENT_VERSION;
+
+    namespace->locked = NS_LOCK_UNLOCKED;           // by default, namespace are unlocked
+    namespace->version = NAMESPACE_CURRENT_VERSION; // set current version before reading descriptor
 
     if(ensure) {
         if(!namespace_ensure(namespace))
@@ -737,3 +739,51 @@ int namespaces_emergency() {
 
     return 0;
 }
+
+// lock a namespace, which set read-only mode for everybody
+// this mode is useful when namespace goes in maintenance without
+// making namespace unavailable
+int namespace_lock(namespace_t *namespace) {
+    zdb_debug("[+] namespace: locking namespace: %s\n", namespace->name);
+    namespace->locked = NS_LOCK_READ_ONLY;
+    return 0;
+}
+
+// set namespace back in normal state
+int namespace_unlock(namespace_t *namespace) {
+    zdb_debug("[+] namespace: unlocking namespace: %s\n", namespace->name);
+    namespace->locked = NS_LOCK_UNLOCKED;
+    return 0;
+
+}
+
+// check lock status of a namespace (0 is unlocked, 1 is locked or frozen)
+int namespace_is_locked(namespace_t *namespace) {
+    zdb_debug("[+] namespace: lock status: %s [%d]\n", namespace->name, namespace->locked);
+    return (namespace->locked != NS_LOCK_UNLOCKED);
+}
+
+// freeze a namespace, which set it unavailable for everybody
+// this mode is useful when namespace goes in maintenance for hard changes
+// which needs to disable any action on this namespace
+int namespace_freeze(namespace_t *namespace) {
+    zdb_debug("[+] namespace: freezing namespace: %s\n", namespace->name);
+    namespace->locked = NS_LOCK_READ_WRITE;
+    return 0;
+}
+
+// set namespace back in normal state
+int namespace_unfreeze(namespace_t *namespace) {
+    zdb_debug("[+] namespace: unfrezzing namespace: %s\n", namespace->name);
+    namespace->locked = NS_LOCK_UNLOCKED;
+    return 0;
+
+}
+
+// check lock status of a namespace (0 is unlocked, 1 is frozen or locked)
+int namespace_is_frozen(namespace_t *namespace) {
+    zdb_debug("[+] namespace: lock (freeze) status: %s [%d]\n", namespace->name, namespace->locked);
+    return (namespace->locked == NS_LOCK_READ_WRITE);
+}
+
+

@@ -27,6 +27,7 @@ zdb_settings_t zdb_rootsettings = {
     .hook = NULL,
     .datasize = ZDB_DEFAULT_DATA_MAXSIZE,
     .maxsize = 0,
+    .initialized = 0,
 };
 
 

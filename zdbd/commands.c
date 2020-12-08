@@ -218,3 +218,16 @@ int command_asterisk(redis_client_t *client) {
     return 0;
 }
 
+// generic error for locked namespace
+int command_error_locked(redis_client_t *client) {
+    zdbd_debug("[-] command: request interrupted, namespace locked\n");
+    redis_hardsend(client, "-Namespace is temporarily locked (read-only)");
+    return 1;
+}
+
+// generic error for frozen namespace
+int command_error_frozen(redis_client_t *client) {
+    zdbd_debug("[-] command: request interrupted, namespace frozen\n");
+    redis_hardsend(client, "-Namespace is temporarily frozen (read-write disabled)");
+    return 1;
+}

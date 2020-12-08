@@ -10,4 +10,7 @@
     int command_admin_authorized(redis_client_t *client);
     int command_wait(redis_client_t *client);
     int command_asterisk(redis_client_t *client);
+
+    int command_error_locked(redis_client_t *client);
+    int command_error_frozen(redis_client_t *client);
 #endif

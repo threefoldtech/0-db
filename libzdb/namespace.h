@@ -16,6 +16,12 @@
 
     } ns_flags_t;
 
+    typedef enum ns_lock_t {
+        NS_LOCK_UNLOCKED = 0,
+        NS_LOCK_READ_ONLY = 1,
+        NS_LOCK_READ_WRITE = 2,
+    } ns_lock_t;
+
     // ns_header_legacy_t contains header about a specific namespace for previous 0-db
     // version, this header will be the only contents of the namespace descriptor file
     typedef struct ns_header_legacy_t {
@@ -55,6 +61,7 @@
         size_t maxsize;        // maximum size allowed
         size_t idlist;         // nsroot list index
         size_t version;        // internal version used
+        ns_lock_t locked;      // set namespace read/write temporary status
         char worm;             // worm mode (write only read multiple)
                                // this mode disable overwrite/deletion
 
@@ -78,6 +85,7 @@
 
     size_t namespace_length();
     int namespace_valid_name(char *name);
+    void namespace_descriptor_update(namespace_t *namespace, int fd);
 
     namespace_t *namespace_iter();
     namespace_t *namespace_iter_next(namespace_t *namespace);
@@ -88,6 +96,12 @@
     int namespace_flush(namespace_t *namespace);
     int namespace_reload(namespace_t *namespace);
     int namespace_is_fresh(namespace_t *namespace);
+    int namespace_lock(namespace_t *namespace);
+    int namespace_unlock(namespace_t *namespace);
+    int namespace_is_locked(namespace_t *namespace);
+    int namespace_freeze(namespace_t *namespace);
+    int namespace_unfreeze(namespace_t *namespace);
+    int namespace_is_frozen(namespace_t *namespace);
     void namespace_free(namespace_t *namespace);
     namespace_t *namespace_get(char *name);
 
