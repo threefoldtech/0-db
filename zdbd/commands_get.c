@@ -42,7 +42,7 @@ int command_get(redis_client_t *client) {
         return 1;
     }
 
-    // key found and valid, let's checking the contents
+    // key found and valid, let's check the contents
     zdbd_debug("[+] command: get: entry found, flags: %x, data length: %" PRIu32 "\n", entry->flags, entry->length);
     zdbd_debug("[+] command: get: data file: %d, data offset: %" PRIu32 "\n", entry->dataid, entry->offset);
 

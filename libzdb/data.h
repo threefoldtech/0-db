@@ -18,9 +18,9 @@
     // used by the data manager
     typedef struct data_root_t {
         char *datadir;      // root path of the data files
-        char *datafile;     // pointer to the current datafile used
+        char *datafile;     // name of current datafile in use
         uint16_t dataid;    // id of the datafile currently in use
-        int datafd;         // file descriptor of the current datafile used
+        int datafd;         // file descriptor of the current datafile in use
         int sync;           // flag to force data write sync
         int synctime;       // force to sync data after this timeout (on next write)
         time_t lastsync;    // keep track when the last sync was explictly made
@@ -34,8 +34,8 @@
     // this is not really relevant but can be used
     // to validate contents and detect type with the magic
     typedef struct data_header_t {
-        char magic[4];     // four bytes magic bytes to recognize the file
-        uint32_t version;  // file version, for possible upgrade compatibility
+        char magic[4];     // four byte magic to recognize the file
+        uint32_t version;  // file version, for eventual upgrade compatibility
         uint64_t created;  // unix timestamp of creation time
         uint64_t opened;   // unix timestamp of last opened time
         uint16_t fileid;   // current index file id (sync with dataid)
@@ -48,8 +48,8 @@
 
     } data_flags_t;
 
-    // data_header_t contains header of each entry on the datafile
-    // this header doesn't contains the payload, we assume the payload
+    // data_header_t contains header of each entry in the datafile
+    // this header doesn't contain the payload, we assume the payload
     // follows the header
     typedef struct data_entry_header_t {
         uint8_t idlength;     // length of the id
@@ -62,10 +62,10 @@
 
     } __attribute__((packed)) data_entry_header_t;
 
-    // struct used to return data from datafile
+    // struct used to return data entry from a datafile
     // this struct contains length, which can be filled
     // by the data algorythm if we need to extract length
-    // from data header (directkey mode for exemple)
+    // from data header (directkey mode for example)
     typedef struct data_payload_t {
         unsigned char *buffer;
         size_t length;
@@ -77,11 +77,11 @@
     // in order to know what to do
     typedef enum data_scan_status_t {
         DATA_SCAN_SUCCESS,          // requested data found
-        DATA_SCAN_REQUEST_PREVIOUS, // offset requested found in the previous datafile
+        DATA_SCAN_REQUEST_PREVIOUS, // requested offset found in the previous datafile
         DATA_SCAN_EOF_REACHED,      // end of datafile reached, last key of next datafile requested
         DATA_SCAN_UNEXPECTED,       // unexpected (memory, ...) error
-        DATA_SCAN_NO_MORE_DATA,     // last item requested, nothing more
-        DATA_SCAN_DELETED,          // entry was deleted, scan is updated to go further
+        DATA_SCAN_NO_MORE_DATA,     // last item has been requested, no more data
+        DATA_SCAN_DELETED,          // entry was deleted, scan is updated to go to the next entry
 
     } data_scan_status_t;
 

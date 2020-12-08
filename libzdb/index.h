@@ -38,7 +38,7 @@
     // this is not really relevant but can be used
     // to validate contents and detect type with the magic
     typedef struct index_header_t {
-        char magic[4];     // four bytes magic bytes to recognize the file
+        char magic[4];     // four magic bytes to recognize the file
         uint32_t version;  // file version, for possible upgrade compatibility
         uint64_t created;  // unix timestamp of creation time
         uint64_t opened;   // unix timestamp of last opened time
@@ -105,13 +105,13 @@
 
     // WARNING: this should be on index_branch.h
     //          but we can't due to circular dependencies
-    //          in order to fix this, we should put all struct in a dedicated file
+    //          in order to fix this, we should put all structs in a dedicated file
     //
     // the current implementation of the index use rudimental index memory system
     // it's basicly just linked-list of entries
     // to improve performance without changing this basic implementation,
     // which is really slow, of course, we use a "branch" system which simply
-    // split all the arrays based on an id
+    // splits all the arrays based on an id
     //
     // the id is specified on the implementation file, with the length, etc.
     //
@@ -165,10 +165,10 @@
     // global root memory structure of the index
     //
     typedef struct index_root_t {
-        char *indexdir;     // directory where index files are
+        char *indexdir;     // directory of index files
         char *indexfile;    // current index filename in use
         uint16_t indexid;   // current index file id in use (sync with data id)
-        int indexfd;        // current file descriptor used
+        int indexfd;        // current file descriptor in use
         uint64_t nextentry; // next-entry is a global id used in sequential mode (next seq-id)
         uint32_t nextid;    // next-id is a localfile id used in direct mode (next id on this file)
         int sync;           // flag to force write sync
@@ -179,7 +179,7 @@
         void *namespace;    // see index_entry_t, same reason
 
         index_seqid_t *seqid;      // sequential fileid mapping
-        index_branch_t **branches; // list of branches explained later
+        index_branch_t **branches; // list of branches (explained later)
         index_status_t status;     // index health
         index_stats_t stats;       // index statistics
 
@@ -187,7 +187,7 @@
 
     } index_root_t;
 
-    // key used by direct mode
+    // key used in direct mode
     // contains information about fileid and
     // objectid, since all object are made of
     // the same length, we can compute offset like this

@@ -101,12 +101,12 @@ static void buffer_free(buffer_t *buffer) {
 //
 // redis socket response
 //
-// we use non-blocking socket for all clients
+// we use non-blocking sockets for all clients
 //
-// since sending response to client can takes more than one send call
-// we need a way to deal with theses clients without loosing performance
-// for the others client connected, and threading or anything parallele execution
-// is prohibed by design in this project
+// since sending responses to clients can take more than one send call
+// we need a way to deal with these clients without losing performance
+// for the other clients connected, while threading or any parallel execution
+// is prohibited by design in this project
 //
 // when we need to send a response to a client, we try to do it without
 // any extra allocation, we just send data as it, if they was sent in one shot, there
@@ -417,14 +417,14 @@ static resp_status_t redis_handle_resp_empty(redis_client_t *client) {
     // should we check for \r\n ?
 
     // checking for array request, we only support array
-    // since any command are send using array
+    // since any command is send using array
     if(*buffer->reader != '*') {
         zdbd_debug("[-] resp: request is not an array, rejecting\n");
         resp_discard(client, "Malformed request, array expected");
         return RESP_STATUS_DISCARD;
     }
 
-    // reading the amount of argument
+    // reading the amount of arguments
     request->argc = atoi(buffer->reader + 1);
     zdbd_debug("[+] redis: resp: %d arguments\n", request->argc);
 
@@ -463,8 +463,8 @@ static resp_status_t redis_handle_resp_header(redis_client_t *client) {
     buffer_t *buffer = &client->buffer;
     char *match;
 
-    // this could occures if the reader was set
-    // to the next data and theses data are not yet available
+    // this could occure if the reader was set
+    // to the next data and this data is not yet available
     if(buffer->reader > buffer->writer) {
         zdbd_debug("[-] resp: header: trying to read data not received yet\n");
         return RESP_STATUS_ABNORMAL;
@@ -821,7 +821,7 @@ void socket_keepalive(int fd) {
 }
 
 // allocate a new client for a new file descriptor
-// used to keep session-life information about clients
+// used to keep session-live information about clients
 redis_client_t *socket_client_new(int fd) {
     zdbd_debug("[+] new client (fd: %d)\n", fd);
 
@@ -829,7 +829,7 @@ redis_client_t *socket_client_new(int fd) {
         redis_client_t **newlist = NULL;
         size_t newlength = clients.length + fd;
 
-        // growing up the list
+        // growing the list
         if(!(newlist = (redis_client_t **) realloc(clients.list, sizeof(redis_client_t *) * newlength)))
             return NULL;
 
@@ -837,7 +837,7 @@ redis_client_t *socket_client_new(int fd) {
         for(size_t i = clients.length; i < newlength; i++)
             newlist[i] = NULL;
 
-        // increase clients list
+        // increase client list
         clients.list = newlist;
         clients.length = newlength;
     }
@@ -863,14 +863,14 @@ redis_client_t *socket_client_new(int fd) {
     // initialize wait timeout
     memset(&client->watchtime, 0, sizeof(struct timespec));
 
-    // allocating a fixed buffer
+    // allocate a fixed buffer
     client->buffer = buffer_new();
     if(!client->buffer.buffer) {
         free(client);
         return NULL;
     }
 
-    // allocating single request object
+    // allocate a single request object
     if(!(client->request = (resp_request_t *) malloc(sizeof(resp_request_t)))) {
         zdbd_warnp("new client request malloc");
         free(client);
@@ -885,14 +885,14 @@ redis_client_t *socket_client_new(int fd) {
     client->request->argc = 0;
     client->request->argv = NULL;
 
-    // attaching default namespace to this client
+    // attach default namespace to this client
     client->ns = namespace_get_default();
 
     // by default, the default namespace is writable
     // except if protect mode is enabled
     client->writable = (zdbd_rootsettings.protect) ? 0 : 1;
 
-    // set all users admin if no password are set
+    // set all users to admin if no password are set
     client->admin = (zdbd_rootsettings.adminpwd) ? 0 : 1;
 
     // set client to the list
@@ -933,7 +933,7 @@ void socket_client_free(int fd) {
 }
 
 // walk over all clients and match them by provided namespace
-// if they matches, moving them to special state awaiting
+// if they matches, move them to a special state, waiting
 // for disconnection (with alert)
 int redis_detach_clients(namespace_t *namespace) {
     for(size_t i = 0; i < clients.length; i++) {
@@ -1139,8 +1139,8 @@ int redis_posthandler_client(redis_client_t *client) {
 }
 
 // one namespace is removed
-// we need to move client attached to this namespace
-// to a none-valid namespace, in order to notify them
+// we need to move the client attached to this namespace
+// to a non-valid namespace, in order to notify them
 
 // classic tcp socket
 static int redis_tcp_listen(char *listenaddr, char *port) {
@@ -1214,7 +1214,7 @@ static void daemonize() {
         setvbuf(stdout, NULL, _IOLBF, 0);
     }
 
-    zdbd_verbose("[+] system: working on background now");
+    zdbd_verbose("[+] system: working in background now");
 }
 
 static void redis_listen_hook() {
