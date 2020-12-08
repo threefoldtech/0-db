@@ -1,7 +1,7 @@
 #ifndef __ZDB_HOOK_H
     #define __ZDB_HOOK_H
 
-    // a hook is called if external application/script
+    // a hook is called when an external application/script
     // is provided at runtime, this hook executable
     // will be executed in background for different actions
     typedef struct hook_t {

@@ -38,8 +38,8 @@ int index_set_buckets_bits(uint8_t bits) {
 
 //
 // index branch
-// this implementation use a lazy load of branches
-// this allows us to use lot of branch (buckets_branches) in this case)
+// this implementation uses a lazy load of branches
+// this allows us to use a lot of branches (buckets_branches) in this case)
 // without consuming all the memory if we don't need it
 //
 index_branch_t **index_buckets_init() {

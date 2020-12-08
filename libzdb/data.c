@@ -30,17 +30,17 @@ static void data_entry_header_dump(data_entry_header_t *entry) {
 }
 #endif
 
-// force to sync data buffer into the underlaying device
+// force to sync the data buffer into the underlaying device
 static inline int data_sync(data_root_t *root, int fd) {
     fsync(fd);
     root->lastsync = time(NULL);
     return 1;
 }
 
-// checking is some sync is forced
-// there is two possibilities:
-// - we set --sync option on runtime, and each write is sync forced
-// - we set --synctime on runtime and after this amount of seconds
+// checking whether some sync is forced
+// there are two possibilities:
+// - we set --sync option on runtime, then each write is sync forced
+// - we set --synctime on runtime and after this period (in seconds)
 //   we force to sync the last write
 static inline int data_sync_check(data_root_t *root, int fd) {
     if(root->sync)
@@ -50,20 +50,23 @@ static inline int data_sync_check(data_root_t *root, int fd) {
         return 0;
 
     if((time(NULL) - root->lastsync) > root->synctime) {
-        zdb_debug("[+] data: last sync expired, force sync\n");
+        zdb_debug("[+] data: last sync expired, forcing sync\n");
         return data_sync(root, fd);
     }
 
     return 0;
 }
 
-// wrap (mostly) all write operation on datafile
+// wrap (mostly) all write operations to the datafile
+//
 // it's easier to keep a single logic with error handling
-// related to write check
-// this function takes an extra argument 'syncer" which explicitly
+// related to write checking
+//
+// this function takes an extra argument "syncer" which explicitly
 // ask to check if we need to do some sync-check or not
-// this is useful when writing data, we write header then payload
-// and we can avoid to do two sync (only one when done)
+//
+// this is useful when writing data, we write the header then the payload
+// so we can avoid to do two sync calls (only one when done)
 static int data_write(int fd, void *buffer, size_t length, int syncer, data_root_t *root) {
     ssize_t response;
 
@@ -178,7 +181,7 @@ static inline int data_grab_dataid(data_root_t *root, uint16_t dataid) {
 
     if(root->dataid != dataid) {
         // the requested datafile is not the current datafile opened
-        // we will re-open the expected datafile temporary
+        // we will re-open the expected datafile temporarily
         zdb_debug("[-] data: switching file: %d, requested: %d\n", root->dataid, dataid);
         if((fd = data_open_id(root, dataid)) < 0)
             return -1;
@@ -189,7 +192,7 @@ static inline int data_grab_dataid(data_root_t *root, uint16_t dataid) {
 
 static inline void data_release_dataid(data_root_t *root, uint16_t dataid, int fd) {
     // if the requested data id (or fd) is not the one
-    // currently used by the main structure, we close it
+    // currently in use by the main structure, we close it
     // since it was temporary
     if(root->dataid != dataid) {
         close(fd);
@@ -225,7 +228,7 @@ void data_initialize(char *filename, data_root_t *root) {
     close(fd);
 }
 
-// simply set globaly the current filename based on it's id
+// simply set globally the current filename based on it's id
 static void data_set_id(data_root_t *root) {
     sprintf(root->datafile, "%s/zdb-data-%05u", root->datadir, root->dataid);
 }
@@ -288,7 +291,7 @@ size_t data_jump_next(data_root_t *root, uint16_t newid) {
 }
 
 // compute a crc32 of the payload
-// this function uses Intel CRC32 (SSE4.2) intrinsic
+// this function uses Intel CRC32 (SSE4.2) intrinsic (SIMD)
 uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
     uint64_t *input = (uint64_t *) bytes;
     uint32_t hash = 0;
@@ -306,11 +309,11 @@ uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
 static size_t data_length_from_offset(int fd, size_t offset) {
     data_entry_header_t header;
 
-    // moving the the header offset
+    // moving to the header offset
     lseek(fd, offset, SEEK_SET);
 
     if(read(fd, &header, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
-        zdb_warnp("data header read");
+        zdb_warnp("incorrect data header read");
         return 0;
     }
 
@@ -324,8 +327,8 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
         .length = 0
     };
 
-    // if we don't know the length in advance, we will read the
-    // data header to know the payload size from it
+    // if we don't know the length in advance, so we read the
+    // data header to know the payload size
     if(length == 0) {
         zdb_debug("[+] data: fetching length from datafile\n");
 
@@ -348,7 +351,7 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
 
     if(read(fd, payload.buffer, length) != (ssize_t) length) {
         zdb_rootsettings.stats.datareadfailed += 1;
-        zdb_warnp("data_get: read");
+        zdb_warnp("data_get: incorrect read length");
 
         free(payload.buffer);
         payload.buffer = NULL;
@@ -360,8 +363,9 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
     return payload;
 }
 
-// wrapper for data_get_real, which open the right dataid
-// which allows to do only the needed and this wrapper prepare the right data id
+// wrapper for data_get_real, which opens the right dataid
+// allowing to do only what's necessary and this wrapper
+// just prepares the right data id
 data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
     int fd;
     data_payload_t payload = {
@@ -390,7 +394,7 @@ static inline int data_check_real(int fd, size_t offset) {
     unsigned char *buffer;
     data_entry_header_t header;
 
-    // positioning datafile to expected offset
+    // positioning to the expected offset in the datafile
     lseek(fd, offset, SEEK_SET);
 
     if(read(fd, &header, sizeof(data_entry_header_t)) != (ssize_t) sizeof(data_entry_header_t)) {
@@ -398,7 +402,7 @@ static inline int data_check_real(int fd, size_t offset) {
         return -1;
     }
 
-    // skipping the key, set buffer to payload point
+    // skipping the key, set buffer to payload position
     lseek(fd, header.idlength, SEEK_CUR);
 
     // allocating buffer from header's length
@@ -445,7 +449,7 @@ int data_check(data_root_t *root, size_t offset, uint16_t dataid) {
 
 
 
-// insert data on the datafile and returns it's offset
+// insert data to the datafile and return it's offset
 // size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength, uint8_t flags, uint32_t crc) {
 size_t data_insert(data_root_t *root, data_request_t *source) {
     unsigned char *id = (unsigned char *) source->vid;
@@ -454,7 +458,7 @@ size_t data_insert(data_root_t *root, data_request_t *source) {
     data_entry_header_t *header;
 
     if(!(header = malloc(headerlength)))
-        zdb_diep("malloc");
+        zdb_diep("data_insert: malloc");
 
     header->idlength = source->idlength;
     header->datalength = source->datalength;

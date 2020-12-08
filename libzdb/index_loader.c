@@ -61,8 +61,8 @@ static void index_dump(index_root_t *root, int fulldump) {
     zdb_verbose("[+] index: uses: %lu branches\n", branches);
 
     // overhead contains:
-    // - the buffer allocated to hold each (futur) branches pointer
-    // - the branch struct itself for each branches
+    // - the buffer allocated to hold each (future) branches pointer
+    // - the branch struct itself for each branch
     size_t overhead = (buckets_branches * sizeof(index_branch_t **)) +
                       (branches * sizeof(index_branch_t));
 
@@ -102,22 +102,22 @@ index_header_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
 static int index_try_rootindex(index_root_t *root) {
     // try to open the index file with create flag
     if((root->indexfd = open(root->indexfile, O_CREAT | O_RDWR, 0600)) < 0) {
-        // okay it looks like we can't open this file
-        // the only case we support is if the filesystem is in
+        // it looks like we can't open this file
+        // the only case we support is when the filesystem is in
         // read only, otherwise we just crash, this should not happen
         if(errno != EROFS)
             zdb_diep(root->indexfile);
 
-        zdb_debug("[-] warning: read-only index filesystem\n");
+        zdb_debug("[-] warning: index lives in a read-only filesystem\n");
 
         // okay, it looks like the index filesystem is in readonly
         // this can happen by choice or because the disk is unstable
-        // and the system remounted-it in readonly, this won't stop
+        // and the system remounted-it in readonly; this won't stop
         // us to read it if we can, we won't change it
         if((root->indexfd = open(root->indexfile, O_RDONLY, 0600)) < 0) {
             // it looks like we can't open it, even in readonly
-            // we need to keep in mind that the index file we requests
-            // may not exists (we can then silently ignore this, we reached
+            // so we need to keep in mind that the index file we requested
+            // may not exist (we can then silently ignore this, we reached
             // the last index file found)
             if(errno == ENOENT)
                 return 0;
@@ -222,7 +222,7 @@ static size_t index_load_file(index_root_t *root) {
 
         // if we are here, it's the first index file found
         // and we are in read-only mode, we can't write on the index
-        // and it's empty, there is no goal to do anything
+        // and it's empty, there is no use in doing anything
         // let's crash
         if(root->status & INDEX_READ_ONLY) {
             zdb_logerr("[-] no index found and readonly filesystem\n");

@@ -178,10 +178,10 @@ static int signal_intercept(int signal, void (*function)(int)) {
     return ret;
 }
 
-// signal handler will take care to try to
-// save as much as possible, when problem occures
-// for exemple, on segmentation fault, we will try to flush
-// and closes descriptor anyway to avoid loosing data
+// signal handler will try to save as much as possible,
+// when a problem occurs, for example, on a segmentation fault,
+// we will try to flush and closes descriptors anyway to avoid
+// losing data
 static void sighandler(int signal) {
     zdb_settings_t *zdb_settings = zdb_settings_get();
     void *buffer[1024];
@@ -223,7 +223,7 @@ static void sighandler(int signal) {
             break;
     }
 
-    // forwarding original error code
+    // forward original error code
     exit(128 + signal);
 }
 
@@ -253,7 +253,7 @@ static int proceed(zdb_settings_t *zdb_settings, zdbd_settings_t *zdbd_settings)
         defns->maxsize = zdb_settings->maxsize;
     }
 
-    // main worker point (if dump not enabled)
+    // main worker entry point (if dump not enabled)
     if(!zdb_settings->dump)
         redis_listen(zdbd_settings->listen, zdbd_settings->port, zdbd_settings->socket);
 
@@ -262,8 +262,8 @@ static int proceed(zdb_settings_t *zdb_settings, zdbd_settings_t *zdbd_settings)
     // a STOP to the server to gracefuly quit
     //
     // this is useful when profiling to ensure there
-    // is no memory leaks, if everything is cleaned as
-    // expected.
+    // are no memory leaks, and if everything is cleaned as
+    // expected
     zdb_close(zdb_settings);
 
     return 0;
@@ -273,7 +273,7 @@ void usage() {
     printf("Command line arguments:\n\n");
 
     printf(" Database settings:\n");
-    printf("  --data  <dir>       datafile directory (default " ZDB_DEFAULT_DATAPATH ")\n");
+    printf("  --data  <dir>       datafiles directory (default " ZDB_DEFAULT_DATAPATH ")\n");
     printf("  --index <dir>       indexfiles directory (default " ZDB_DEFAULT_INDEXPATH ")\n");
     printf("  --mode  <mode>      select working mode:\n");
     printf("                       > user: default user key-value mode\n");
@@ -297,7 +297,7 @@ void usage() {
     printf(" Useful tools:\n");
     printf("  --verbose           enable verbose (debug) information\n");
     printf("  --dump              only dump index contents, then exit (debug)\n");
-    printf("  --sync              force all write to be sync'd\n");
+    printf("  --sync              force all write to be synced\n");
     printf("  --background        run in background (daemon), when ready\n");
     printf("  --logfile <file>    log file (only in daemon mode)\n");
     printf("  --help              print this message\n");
