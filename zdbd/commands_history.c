@@ -152,6 +152,9 @@ int command_history(redis_client_t *client) {
         return 1;
     }
 
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
     // requesting a previous data, without any exact offset
     // this basicly request the first older entry of a specific key
     if(client->request->argc == 2) {
@@ -173,7 +176,7 @@ int command_history(redis_client_t *client) {
         ekey.indexid = entry->parentid;
         ekey.offset = entry->parentoff;
 
-        index_item_t *item = index_item_get_disk(index, entry->dataid, entry->idxoffset, entry->idlength);
+        index_item_t *item = index_item_get_disk(index, entry->indexid, entry->idxoffset, entry->idlength);
 
         return history_send(client, item, &ekey);
     }

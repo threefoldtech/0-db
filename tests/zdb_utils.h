@@ -17,6 +17,8 @@
     redisReply *zdb_response_scan(test_t *test, int argc, const char *argv[]);
     redisReply *zdb_response_history(test_t *test, int argc, const char *argv[]);
 
+    char *zdb_auth_challenge(test_t *test);
+
     #define SEQNEW 1337
     #define argvsz(x) (sizeof(x) / sizeof(char *))
 #endif

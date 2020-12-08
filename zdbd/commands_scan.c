@@ -223,6 +223,9 @@ int command_scan(redis_client_t *client) {
     scan_list_t scanlist;
     scan_info_t info;
 
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
     // initialize empty scanlist
     scanlist_init(&scanlist);
 
@@ -276,6 +279,9 @@ int command_rscan(redis_client_t *client) {
     index_scan_t scan;
     scan_list_t scanlist;
     scan_info_t info;
+
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
 
     // initialize empty scanlist
     scanlist_init(&scanlist);
@@ -332,6 +338,9 @@ int command_keycur(redis_client_t *client) {
 
     if(!command_args_validate(client, 2))
         return 1;
+
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
 
     index_root_t *index = client->ns->index;
     resp_object_t *key = request->argv[1];

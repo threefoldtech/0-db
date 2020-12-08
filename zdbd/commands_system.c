@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,35 +40,6 @@ int command_time(redis_client_t *client) {
     redis_reply_stack(client, response, strlen(response));
 
     return 0;
-}
-
-int command_auth(redis_client_t *client) {
-    resp_request_t *request = client->request;
-
-    if(!command_args_validate(client, 2))
-        return 1;
-
-    if(!zdbd_rootsettings.adminpwd) { // FIXME
-        redis_hardsend(client, "-Authentification disabled");
-        return 0;
-    }
-
-    if(request->argv[1]->length > 128) {
-        redis_hardsend(client, "-Password too long");
-        return 1;
-    }
-
-    char password[192];
-    sprintf(password, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
-
-    if(strcmp(password, zdbd_rootsettings.adminpwd) == 0) { // FIXME
-        client->admin = 1;
-        redis_hardsend(client, "+OK");
-        return 0;
-    }
-
-    redis_hardsend(client, "-Access denied");
-    return 1;
 }
 
 // STOP will be only compiled in debug mode

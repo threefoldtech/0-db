@@ -25,6 +25,9 @@ int command_get(redis_client_t *client) {
         return 1;
     }
 
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
     // fetching index entry for this key
     if(!(entry = index_get(client->ns->index, request->argv[1]->buffer, request->argv[1]->length))) {
         zdbd_debug("[-] command: get: key not found\n");

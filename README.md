@@ -27,11 +27,11 @@ but 0-db is not a redis replacement and never will.
 
 # Build targets
 Currently supported system:
-* Linux (using `epoll`)
+* Linux (using `epoll`), kernel 3.17, glibc 2.25
 * MacOS and FreeBSD (using `kqueue`)
 
 Currently supported hardware:
-* Any processor supporting `SSE 4.2`
+* Any CPU supporting `SSE 4.2`
 
 This project won't compile on something else (for now).
 
@@ -182,10 +182,11 @@ This mode is not possible if you don't have any data/index already available.
 - `NSINFO namespace`
 - `NSLIST`
 - `NSSET namespace property value`
-- `SELECT namespace`
+- `SELECT namespace [SECURE password]`
 - `DBSIZE`
 - `TIME`
 - `AUTH password`
+- `AUTH SECURE`
 - `SCAN [optional cursor]`
 - `SCANX [optional cursor]` (this is just an alias for `SCAN`)
 - `RSCAN [optional cursor]`
@@ -318,11 +319,50 @@ As soon as there are a single object in the namespace, you won't be able to chan
 
 ## SELECT
 Change your current namespace. If the requested namespace is password-protected, you need
-to add the password as extra parameter. If the namespace is `public` and you don't provide
-any password, the namespace will be accessible in read-only.
+to add the password as extra parameter. If the namespace is `public` but password protected,
+and you don't provide any password, the namespace will be accessible in read-only.
+
+You can use SECURE password, like authentication (see below). A challenge is required first
+(using `AUTH SECURE CHALLENGE` command).
+
+```
+>> AUTH SECURE CHALLENGE
+749e5be04ca0471e
+>> SELECT hello SECURE 632ef9246e9f01a3453aec8f133d1f652cccebbb
+OK
+```
 
 ## AUTH
-If an admin account is set, use `AUTH` command to authentificate yourself as `ADMIN`.
+If an administrator password is set, use `AUTH` command to authentificate yourself as `ADMIN`.
+There is two way possible to request authentication.
+
+### Legacy plain-text authentication
+You can authenticate yourself using the simple `AUTH <password>` way. This is still supported and valid.
+In the futur this will be probably disabled for security reason.
+
+There is no encryption between client and 0-db server, any network monitor could leak
+administration password.
+
+### Secure authentication
+There is a more advanced two-step authentication made to avoid plain-text password leak and safe
+against replay-attack.
+
+You can authenticate yourself using the `AUTH SECURE` command, in two step.
+- First you request a challenge using `AUTH SECURE CHALLENGE`
+- Then you authenticate yourself using `AUTH SECURE sha1(challenge:password)`
+
+The challenge is session-specific random nonce. It can be used only 1 time.
+Let assume the password is `helloworld`, the authentication workflow is:
+```
+>> AUTH SECURE CHALLENGE
+708f109fbef4d656
+>> AUTH SECURE 5af26c9c8bf4db0b342c42fc47e3bdae58da4578
+OK
+```
+
+The secure password is constructed via `sha1(708f109fbef4d656:helloworld)`
+
+This is the prefered method to use.
 
 ## WAIT
 Blocking wait on command execution by someone else. This allows you to wait somebody else

@@ -11,6 +11,7 @@
 #include "zdbd.h"
 #include "redis.h"
 #include "commands.h"
+#include "auth.h"
 
 // create a new namespace
 //   NSNEW [namespace]
@@ -110,7 +111,7 @@ int command_nsdel(redis_client_t *client) {
 
 
 // change user active namespace
-//   SELECT [namespace]
+//   SELECT namespace [SECURE] <password>
 int command_select(redis_client_t *client) {
     resp_request_t *request = client->request;
     char target[COMMAND_MAXLEN];
@@ -157,24 +158,77 @@ int command_select(redis_client_t *client) {
             writable = 0;
 
         } else {
-            char password[256];
-
-            if(request->argv[2]->length > (ssize_t) sizeof(password) - 1) {
-                redis_hardsend(client, "-Password too long");
+            if(request->argc > 4) {
+                redis_hardsend(client, "-Too many arguments");
                 return 1;
             }
 
-            // copy password to a temporary variable
-            // to check password match using strcmp and no any strncmp
-            // to ensure we check exact password
-            sprintf(password, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
+            // SELECT namespace password
+            if(request->argc == 3) {
+                char password[256];
 
-            if(strcmp(password, namespace->password) != 0) {
-                redis_hardsend(client, "-Access denied");
-                return 1;
+                if(request->argv[2]->length > (ssize_t) sizeof(password) - 1) {
+                    redis_hardsend(client, "-Password too long");
+                    return 1;
+                }
+
+                // copy password to a temporary variable
+                // to check password match using strcmp and no any strncmp
+                // to ensure we check exact password
+                sprintf(password, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
+
+                if(strcmp(password, namespace->password) != 0) {
+                    redis_hardsend(client, "-Access denied");
+                    return 1;
+                }
+
+                zdbd_debug("[-] command: select: protected and password match, access granted\n");
             }
 
-            zdbd_debug("[-] command: select: protected and password match, access granted\n");
+            // SELECT namespace SECURE password
+            if(request->argc == 4) {
+                // only accept <SELECT namespace SECURE password>
+                if(strncasecmp(request->argv[2]->buffer, "SECURE", request->argv[2]->length) != 0) {
+                    redis_hardsend(client, "-Only SECURE extra method supported");
+                    return 1;
+                }
+
+                // only accept client which previously requested nonce challenge
+                if(client->nonce == NULL) {
+                    redis_hardsend(client, "-No CHALLENGE requested, secure authentication not available");
+                    return 1;
+                }
+
+                zdbd_debug("[+] namespace: auth: challenge: %s\n", client->nonce);
+
+                // expecting sha1 hexa-string input
+                if(request->argv[3]->length != ZDB_SHA1_DIGEST_STR_LENGTH) {
+                    redis_hardsend(client, "-Invalid hash length");
+                    return 1;
+                }
+
+                char *expected;
+
+                if(!(expected = zdb_hash_password(client->nonce, namespace->password))) {
+                    redis_hardsend(client, "-Internal generator error");
+                    return 1;
+                }
+
+                zdbd_debug("[+] namespace: auth: expected hash: %s\n", expected);
+
+                resp_object_t *user = request->argv[3];
+
+                if(zdbd_password_check(user->buffer, user->length, expected) == 0) {
+                    free(expected);
+                    zdbd_debug("[-] namespace: auth: secure authentication denied\n");
+                    redis_hardsend(client, "-Access denied");
+                    return 1;
+                }
+
+                free(expected);
+
+                // nothing to do, granted
+            }
 
             // password provided and match
         }
@@ -251,6 +305,7 @@ int command_nsinfo(redis_client_t *client) {
     sprintf(info + strlen(info), "entries: %lu\n", namespace->index->stats.entries);
     sprintf(info + strlen(info), "public: %s\n", namespace->public ? "yes" : "no");
     sprintf(info + strlen(info), "worm: %s\n", namespace->worm ? "yes" : "no");
+    sprintf(info + strlen(info), "locked: %s\n", namespace->locked ? "yes" : "no");
     sprintf(info + strlen(info), "password: %s\n", namespace->password ? "yes" : "no");
     sprintf(info + strlen(info), "data_size_bytes: %lu\n", namespace->index->stats.datasize);
     sprintf(info + strlen(info), "data_size_mb: %.2f\n", MB(namespace->index->stats.datasize));
@@ -314,6 +369,106 @@ int command_nsinfo(redis_client_t *client) {
     return 0;
 }
 
+// NSSET maxsize
+static int command_nsset_maxsize(namespace_t *namespace, char *value) {
+    namespace->maxsize = atoll(value);
+    zdbd_debug("[+] command: nsset: new size limit: %lu\n", namespace->maxsize);
+
+    return 0;
+}
+
+// NSSET password
+static int command_nsset_password(namespace_t *namespace, char *value) {
+    // clearing password using "*" password
+    if(strcmp(value, "*") == 0) {
+        free(namespace->password);
+        namespace->password = NULL;
+
+        zdbd_debug("[+] command: nsset: password cleared\n");
+
+    } else {
+        // updating password
+        namespace->password = strdup(value);
+        zdbd_debug("[+] command: nsset: password set and updated\n");
+    }
+
+    return 0;
+}
+
+// NSSET public
+static int command_nsset_public(namespace_t *namespace, char *value) {
+    namespace->public = (value[0] == '1') ? 1 : 0;
+    zdbd_debug("[+] command: nsset: changing public view to: %d\n", namespace->public);
+
+    return 0;
+}
+
+// NSSET worm
+static int command_nsset_worm(namespace_t *namespace, char *value) {
+    namespace->worm = (value[0] == '1') ? 1 : 0;
+    zdbd_debug("[+] command: nsset: changing worm mode to: %d\n", namespace->worm);
+
+    return 0;
+}
+
+// NSSET mode
+static int command_nsset_mode(redis_client_t *client, namespace_t *namespace, char *value) {
+     zdb_settings_t *settings = zdb_settings_get();
+
+    if(settings->mode != ZDB_MODE_MIX) {
+        zdbd_debug("[-] command: nsset: runtime mode switcher disabled\n");
+        redis_hardsend(client, "-This server instance is configured to use a single runtime mode");
+        return 1;
+    }
+
+    // checking if mode still can be changed
+    // this is only possible for an empty namespace
+    if(namespace_is_fresh(namespace) != 1) {
+        zdbd_debug("[-] command: nsset: mode: namespace not fresh\n");
+        redis_hardsend(client, "-Cannot change mode of used namespace");
+        return 1;
+    }
+
+    if(strcmp(value, "user") == 0) {
+        zdbd_debug("[+] command: nsset: switching to user mode\n");
+        namespace->index->mode = ZDB_MODE_KEY_VALUE;
+        index_switch_mode(namespace->index);
+        index_rehash(namespace->index);
+
+    } else if(strcmp(value, "seq") == 0) {
+        zdbd_debug("[+] command: nsset: switching to sequential mode\n");
+        namespace->index->mode = ZDB_MODE_SEQUENTIAL;
+        index_switch_mode(namespace->index);
+        index_rehash(namespace->index);
+
+    } else {
+        zdbd_debug("[-] command: nsset: unknown mode '%s'\n", value);
+        redis_hardsend(client, "-Invalid property value (expected: user, seq)");
+        return 1;
+    }
+
+    return 0;
+}
+
+
+// NSSET lock
+static int command_nsset_lock(namespace_t *namespace, char *value) {
+    namespace->locked = (value[0] == '1') ? NS_LOCK_READ_ONLY : NS_LOCK_UNLOCKED;
+    zdbd_debug("[+] command: nsset: changing lock mode to: %d\n", namespace->locked);
+
+    return 0;
+}
+
+// NSSET freeze
+static int command_nsset_freeze(namespace_t *namespace, char *value) {
+    namespace->locked = (value[0] == '1') ? NS_LOCK_READ_WRITE : NS_LOCK_UNLOCKED;
+    zdbd_debug("[+] command: nsset: changing lock mode to: %d\n", namespace->locked);
+
+    return 0;
+}
+
+
+
 // change namespace settings
 //   NSSET [namespace] password *        -> clear password
 //   NSSET [namespace] password [foobar] -> set password to 'foobar'
@@ -354,12 +509,6 @@ int command_nsset(redis_client_t *client) {
     sprintf(command, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
     sprintf(value, "%.*s", request->argv[3]->length, (char *) request->argv[3]->buffer);
 
-    // default namespace cannot be changed
-    if(strcmp(target, NAMESPACE_DEFAULT) == 0) {
-        redis_hardsend(client, "-Cannot update default namespace");
-        return 1;
-    }
-
     // checking for existing namespace
     if(!(namespace = namespace_get(target))) {
         zdbd_debug("[-] command: nsset: namespace not found\n");
@@ -368,72 +517,47 @@ int command_nsset(redis_client_t *client) {
     }
 
     //
-    // testing properties
+    // testing properties which can be applied
+    // to any namespace, including default one
     //
-    if(strcmp(command, "maxsize") == 0) {
-        namespace->maxsize = atoll(value);
-        zdbd_debug("[+] command: nsset: new size limit: %lu\n", namespace->maxsize);
+
+    if(strcmp(command, "mode") == 0) {
+        if(command_nsset_mode(client, namespace, value) == 1)
+            return 1;
+
+    } else if(strcmp(command, "lock") == 0) {
+        if(command_nsset_lock(namespace, value) == 1)
+            return 1;
+
+    } else if(strcmp(command, "freeze") == 0) {
+        if(command_nsset_freeze(namespace, value) == 1)
+            return 1;
+
+    // checking if we try to change settings on
+    // the default namespace, after this point, we
+    // deny any changes on default namespace
+    } else if(strcmp(target, NAMESPACE_DEFAULT) == 0) {
+        redis_hardsend(client, "-Cannot update default namespace");
+        return 1;
+
+    //
+    // testing properties, excluding default namespace
+    //
+    } else if(strcmp(command, "maxsize") == 0) {
+        if(command_nsset_maxsize(namespace, value) == 1)
+            return 1;
 
     } else if(strcmp(command, "password") == 0) {
-        // clearing password using "*" password
-        if(strcmp(value, "*") == 0) {
-            free(namespace->password);
-            namespace->password = NULL;
-
-            zdbd_debug("[+] command: nsset: password cleared\n");
-
-            // updating password
-        } else {
-            namespace->password = strdup(value);
-            zdbd_debug("[+] command: nsset: password set and updated\n");
-        }
-
+        if(command_nsset_password(namespace, value) == 1)
+            return 1;
 
     } else if(strcmp(command, "public") == 0) {
-        namespace->public = (value[0] == '1') ? 1 : 0;
-        zdbd_debug("[+] command: nsset: changing public view to: %d\n", namespace->public);
+        if(command_nsset_public(namespace, value) == 1)
+            return 1;
 
     } else if(strcmp(command, "worm") == 0) {
-        namespace->worm = (value[0] == '1') ? 1 : 0;
-        zdbd_debug("[+] command: nsset: changing worm mode to: %d\n", namespace->worm);
-
-    } else if(strcmp(command, "worm") == 0) {
-        namespace->worm = (value[0] == '1') ? 1 : 0;
-        zdbd_debug("[+] command: nsset: changing worm mode to: %d\n", namespace->worm);
-
-    } else if(strcmp(command, "mode") == 0) {
-        zdb_settings_t *settings = zdb_settings_get();
-
-        if(settings->mode != ZDB_MODE_MIX) {
-            zdbd_debug("[-] command: nsset: runtime mode switcher disabled\n");
-            redis_hardsend(client, "-This server instance is configured to use a single runtime mode");
+        if(command_nsset_worm(namespace, value) == 1)
             return 1;
-        }
-
-        // checking if mode still can be changed
-        // this is only possible for an empty namespace
-        if(namespace_is_fresh(namespace) != 1) {
-            zdbd_debug("[-] command: nsset: mode: namespace not fresh\n");
-            redis_hardsend(client, "-Cannot change mode of used namespace");
-            return 1;
-        }
-
-        if(strcmp(value, "user") == 0) {
-            zdbd_debug("[+] command: nsset: switching to user mode\n");
-            namespace->index->mode = ZDB_MODE_KEY_VALUE;
-            index_switch_mode(namespace->index);
-            index_rehash(namespace->index);
-
-        } else if(strcmp(value, "seq") == 0) {
-            zdbd_debug("[+] command: nsset: switching to sequential mode\n");
-            namespace->index->mode = ZDB_MODE_SEQUENTIAL;
-            index_switch_mode(namespace->index);
-            index_rehash(namespace->index);
-
-        } else {
-            zdbd_debug("[-] command: nsset: unknown mode '%s'\n", value);
-            redis_hardsend(client, "-Invalid property value (expected: user, seq)");
-        }
 
     } else {
         zdbd_debug("[-] command: nsset: unknown property '%s'\n", command);

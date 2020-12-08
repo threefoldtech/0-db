@@ -70,6 +70,13 @@
         char *hook;        // external hook script to execute
         size_t datasize;   // maximum datafile size before jumping to next one
         size_t maxsize;    // default namespace maximum datasize
+        int initialized;   // single instance lock flag
+
+        // right now, the library can't handle multiple instance on the
+        // same time, there is a global zdb_settings variable shared with
+        // the global program
+        //
+        // this needs to be fixed later
 
         char *zdbid;      // fake 0-db id generated based on listening
         uint32_t iid;     // 0-db random instance id generated on boot
@@ -143,5 +150,7 @@
     #include "namespace.h"
     #include "settings.h"
     #include "bootstrap.h"
+    #include "sha1.h"
+    #include "security.h"
     #include "api.h"
 #endif

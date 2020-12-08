@@ -858,6 +858,7 @@ redis_client_t *socket_client_new(int fd) {
     client->watching = NULL;
     client->mirror = 0;
     client->master = 0;
+    client->nonce = NULL;
 
     // initialize wait timeout
     memset(&client->watchtime, 0, sizeof(struct timespec));
@@ -921,6 +922,7 @@ void socket_client_free(int fd) {
     redis_free_request(client->request);
     buffer_free(&client->buffer);
 
+    free(client->nonce);
     free(client->request);
     free(client);
 
@@ -1295,6 +1297,10 @@ int redis_listen(char *listenaddr, char *port, char *socket) {
         if(clients.list[i])
             socket_client_free(i);
 
+    for(int i = 0; i < fdindex; i++)
+        close(redis.mainfd[i]);
+
+    free(redis.mainfd);
     free(clients.list);
 
     // notifing source that we are done

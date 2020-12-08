@@ -49,6 +49,8 @@ static index_entry_t *index_get_handler_sequential(index_root_t *index, void *id
     index_reusable_entry->timestamp = item->timestamp;
     index_reusable_entry->length = item->length;
 
+    // index_entry_dump(index_reusable_entry);
+
     // cleaning intermediate object
     free(item);
 
