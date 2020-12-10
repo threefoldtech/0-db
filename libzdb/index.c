@@ -497,7 +497,7 @@ int index_entry_delete_disk(index_root_t *root, index_entry_t *entry) {
     entry->flags |= INDEX_ENTRY_DELETED;
 
     // (re-)open the expected index file, in read-write mode
-    if((fd = index_open_file_readwrite(root, entry->dataid)) < 0)
+    if((fd = index_open_file_readwrite(root, entry->indexid)) < 0)
         return 1;
 
     // jump to the right offset for this entry
