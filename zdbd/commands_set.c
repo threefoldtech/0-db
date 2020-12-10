@@ -165,9 +165,13 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
 
     // checking if we need to update this entry or if data are unchanged
     if(existing && existing->crc == dreq.crc) {
-        zdbd_debug("[+] command: set: existing %08x <> %08x crc match, ignoring\n", existing->crc, dreq.crc);
-        redis_hardsend(client, "$-1");
-        return 0;
+        // it's possible to get same crc for similar data but
+        // with different size, comparing size aswell
+        if(existing->length == valuelength) {
+            zdbd_debug("[+] command: set: existing %08x <> %08x crc match, ignoring\n", existing->crc, dreq.crc);
+            redis_hardsend(client, "$-1");
+            return 0;
+        }
     }
 
     // insert the data into the datafile
