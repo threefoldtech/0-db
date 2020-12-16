@@ -456,6 +456,11 @@ index_entry_t *index_reusable_entry = NULL;
 //     we do this in the index file and not in the data file so we keep
 //     the data file really always append in any case
 int index_entry_delete_memory(index_root_t *root, index_entry_t *entry) {
+    // updating statistics
+    root->stats.entries -= 1;
+    root->stats.datasize -= entry->length;
+    root->stats.size -= sizeof(index_entry_t) + entry->idlength;
+
     // running in a mode without index, let's just skip this
     if(root->branches == NULL)
         return 0;
@@ -474,11 +479,6 @@ int index_entry_delete_memory(index_root_t *root, index_entry_t *entry) {
 
     // removing entry from global branch
     index_branch_remove(branch, entry, previous);
-
-    // updating statistics
-    root->stats.entries -= 1;
-    root->stats.datasize -= entry->length;
-    root->stats.size -= sizeof(index_entry_t) + entry->idlength;
 
     // cleaning memory object
     free(entry);
