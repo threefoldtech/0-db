@@ -439,11 +439,13 @@ Current supported hooks:
 | --------------------- | ----------------------- | -------------------------- |
 | `ready`               | Server is ready         | (none)                     |
 | `close`               | Server closing (nicely) | (none)                     |
-| `jump`                | Data/Index incremented  | Closing and New index file |
+| `jump-index`          | Index incremented       | Closing and new index file |
+| `jump-data`           | Data incremented        | Closing and new data file  |
 | `crash`               | Server crashed          | (none)                     |
 | `namespace-created`   | New namespace created   | Namespace name             |
 | `namespace-deleted`   | Namespace removed       | Namespace name             |
 | `namespace-reloaded`  | Namespace reloaded      | Namespace name             |
+| `missing-data`        | Data file not found     | Missing filename           |
 
 # Limitation
 By default, datafiles are split when bigger than 256 MB.

@@ -268,10 +268,6 @@ index_entry_t *index_update_memory_handler_sequential(index_root_t *root, index_
     root->nextentry += 1;
     root->nextid += 1;
 
-    // nothing to do if the key is deleted
-    if(index_entry_is_deleted(new))
-        return new;
-
     // key is not deleted, let's update statistics
     if(!exists) {
         // blindly if exists is NULL (that means we comes from
@@ -281,6 +277,10 @@ index_entry_t *index_update_memory_handler_sequential(index_root_t *root, index_
         root->stats.entries += 1;
         return new;
     }
+
+    // nothing to do if the key is deleted
+    if(index_entry_is_deleted(new))
+        return new;
 
     // we have a previous key, this is a real
     // update and we need to reflect that on the statistics
@@ -341,6 +341,10 @@ index_entry_t *index_update_entry_sequential(index_root_t *root, index_set_t *se
     // to be incremented to skip this position in the futur
     root->nextid += 1;
     root->nextentry += 1;
+
+    // update statistics
+    root->stats.datasize -= previous->length;
+    root->stats.datasize += set->entry->length;
 
     return set->entry;
 }

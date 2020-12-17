@@ -153,14 +153,14 @@ int command_del(redis_client_t *client) {
     // update data file, flag entry deleted
     if(!data_delete(data, entry->id, entry->idlength)) {
         zdbd_debug("[-] command: del: deleting data failed\n");
-        redis_hardsend(client, "-Cannot delete key");
+        redis_hardsend(client, "-Cannot delete key (data)");
         return 0;
     }
 
     // mark index entry as deleted
     if(index_entry_delete(index, entry)) {
         zdbd_debug("[-] command: del: index delete flag failed\n");
-        redis_hardsend(client, "-Cannot delete key");
+        redis_hardsend(client, "-Cannot delete key (index)");
         return 0;
     }
 

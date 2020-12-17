@@ -303,7 +303,7 @@ size_t index_jump_next(index_root_t *root) {
     zdb_verbose("[+] index: jumping to the next file\n");
 
     if(zdb_rootsettings.hook) {
-        hook = hook_new("jump", 4);
+        hook = hook_new("jump-index", 4);
         hook_append(hook, zdb_rootsettings.zdbid);
         hook_append(hook, root->indexfile);
     }
@@ -456,6 +456,11 @@ index_entry_t *index_reusable_entry = NULL;
 //     we do this in the index file and not in the data file so we keep
 //     the data file really always append in any case
 int index_entry_delete_memory(index_root_t *root, index_entry_t *entry) {
+    // updating statistics
+    root->stats.entries -= 1;
+    root->stats.datasize -= entry->length;
+    root->stats.size -= sizeof(index_entry_t) + entry->idlength;
+
     // running in a mode without index, let's just skip this
     if(root->branches == NULL)
         return 0;
@@ -475,11 +480,6 @@ int index_entry_delete_memory(index_root_t *root, index_entry_t *entry) {
     // removing entry from global branch
     index_branch_remove(branch, entry, previous);
 
-    // updating statistics
-    root->stats.entries -= 1;
-    root->stats.datasize -= entry->length;
-    root->stats.size -= sizeof(index_entry_t) + entry->idlength;
-
     // cleaning memory object
     free(entry);
 
@@ -497,7 +497,7 @@ int index_entry_delete_disk(index_root_t *root, index_entry_t *entry) {
     entry->flags |= INDEX_ENTRY_DELETED;
 
     // (re-)open the expected index file, in read-write mode
-    if((fd = index_open_file_readwrite(root, entry->dataid)) < 0)
+    if((fd = index_open_file_readwrite(root, entry->indexid)) < 0)
         return 1;
 
     // jump to the right offset for this entry
