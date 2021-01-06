@@ -9,7 +9,6 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <signal.h>
-#include <execinfo.h>
 #include <getopt.h>
 #include <ctype.h>
 #include <time.h>
@@ -184,17 +183,10 @@ static int signal_intercept(int signal, void (*function)(int)) {
 // losing data
 static void sighandler(int signal) {
     zdb_settings_t *zdb_settings = zdb_settings_get();
-    void *buffer[1024];
 
     switch(signal) {
         case SIGSEGV:
             fprintf(stderr, "[-] fatal: segmentation fault\n");
-            fprintf(stderr, "[-] ----------------------------------\n");
-
-            int calls = backtrace(buffer, sizeof(buffer) / sizeof(void *));
-            backtrace_symbols_fd(buffer, calls, 1);
-
-            fprintf(stderr, "[-] ----------------------------------");
 
             if(zdb_settings->hook) {
                 hook_t *hook = hook_new("crash", 1);
