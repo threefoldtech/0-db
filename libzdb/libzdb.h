@@ -3,6 +3,7 @@
 
     #include <stdint.h>
     #include <time.h>
+    #include <sys/time.h>
 
     #ifndef ZDB_REVISION
         #define ZDB_REVISION "(unknown)"
