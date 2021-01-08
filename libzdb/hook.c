@@ -103,11 +103,15 @@ void libzdb_hooks_cleanup() {
     if(!zdb_rootsettings.hook)
         return;
 
-    if(zdb_rootsettings.stats.childwait > 0) {
-        // some child were executed
-        // check if they are done
-        if(waitpid(-1, &status, WNOHANG) > -1) {
-            // one child finished, discard it
+    // no pending child
+    if(zdb_rootsettings.stats.childwait == 0)
+        return;
+
+    // some child were executed
+    // check if they are done
+    if(waitpid(-1, &status, WNOHANG) > 0) {
+        // one child terminated
+        if(WIFEXITED(status) || WIFSIGNALED(status)) {
             zdb_rootsettings.stats.childwait -= 1;
         }
     }
