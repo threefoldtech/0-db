@@ -106,7 +106,7 @@ void libzdb_hooks_cleanup() {
     if(zdb_rootsettings.stats.childwait > 0) {
         // some child were executed
         // check if they are done
-        if(waitpid(-1, &status, WNOHANG) > -1) {
+        if(waitpid(-1, &status, WNOHANG | WEXITED) > -1) {
             // one child finished, discard it
             zdb_rootsettings.stats.childwait -= 1;
         }
