@@ -58,6 +58,8 @@
         uint64_t datadiskread;    // amount of data bytes read on disk (except index loader)
         uint64_t datadiskwrite;   // amount of data bytes written on disk (except namespace creation)
 
+        uint32_t childwait;       // amount of hook child pending
+
     } zdb_stats_t;
 
     typedef struct zdb_settings_t {

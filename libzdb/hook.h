@@ -17,4 +17,7 @@
     pid_t hook_execute(hook_t *hook);
     int hook_execute_wait(hook_t *hook);
     void hook_free(hook_t *hook);
+
+    // need to be called periodicly to cleanup zombies
+    void libzdb_hooks_cleanup();
 #endif
