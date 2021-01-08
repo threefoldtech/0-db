@@ -1082,6 +1082,9 @@ void redis_idle_process() {
             }
         }
     }
+
+    // discard any pending hook child
+    libzdb_hooks_cleanup();
 }
 
 // handler executed after each command executed

@@ -55,6 +55,10 @@ pid_t hook_execute(hook_t *hook) {
         if(pid < 0) {
             zdb_warnp("hook: fork");
             pid = 0;
+
+        } else {
+            // adding one pending child
+            zdb_rootsettings.stats.childwait += 1;
         }
 
         return pid;
@@ -90,4 +94,21 @@ void hook_free(hook_t *hook) {
     // freeing objects
     free(hook->argv);
     free(hook);
+}
+
+void libzdb_hooks_cleanup() {
+    int status;
+
+    // nothing to do if hooks are disabled
+    if(!zdb_rootsettings.hook)
+        return;
+
+    if(zdb_rootsettings.stats.childwait > 0) {
+        // some child were executed
+        // check if they are done
+        if(waitpid(-1, &status, WNOHANG) > -1) {
+            // one child finished, discard it
+            zdb_rootsettings.stats.childwait -= 1;
+        }
+    }
 }

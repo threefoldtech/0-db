@@ -224,8 +224,6 @@ static int proceed(zdb_settings_t *zdb_settings, zdbd_settings_t *zdbd_settings)
     signal_intercept(SIGSEGV, sighandler);
     signal_intercept(SIGINT, sighandler);
     signal_intercept(SIGTERM, sighandler);
-    // signal(SIGCHLD, SIG_IGN);
-    // FIXME: this will introduce EINTR syscall
 
     zdbd_id_set(zdbd_settings->listen, zdbd_settings->port, zdbd_settings->socket);
 
