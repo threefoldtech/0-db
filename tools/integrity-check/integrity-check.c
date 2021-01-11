@@ -73,10 +73,10 @@ int data_integrity(data_root_t *zdbdata) {
         printf("[+] data entry: %lu, id length: %d\n", entrycount, entry->idlength);
         printf("[+]   expected length: %u, current offset: %" PRId64 "\n", entry->datalength, (int64_t) current);
         printf("[+]   previous offset: %u\n", entry->previous);
-        printf("[+]   expected crc: %08x\n", entry->integrity);
-        printf("[+]   entry key: ");
+        printf("[+]   expected crc   : %08x\n", entry->integrity);
+        printf("[+]   entry flags    : 0x%x\n", entry->flags);
+        printf("[+]   entry key      : ");
         zdb_tools_hexdump(entry->id, entry->idlength);
-        printf("\n");
 
         if(entry->datalength == 0)
             continue;
@@ -94,11 +94,11 @@ int data_integrity(data_root_t *zdbdata) {
             errors += 1;
 
         } else {
-            printf("[+]   data crc: match\n");
+            printf("[+]   data crc       : ok, match\n");
         }
 
         #ifdef SHADUMP
-        printf("[+]   data sha256: ");
+        printf("[+]   data sha256   : ");
         sha256dump(buffer, entry->datalength);
         printf("\n");
         #endif
