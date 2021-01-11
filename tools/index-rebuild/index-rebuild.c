@@ -21,10 +21,6 @@ int index_data_jump_to(uint16_t fileid, index_root_t *zdbindex, data_root_t *zdb
     data_header_t *header;
     char datestr[64];
 
-    // only take care of next index id we it's not the first
-    if(fileid > 0)
-        index_jump_next(zdbindex);
-
     // closing previous data fd
     if(zdbdata->datafd)
         close(zdbdata->datafd);
@@ -47,10 +43,16 @@ int index_data_jump_to(uint16_t fileid, index_root_t *zdbindex, data_root_t *zdb
     printf("[+] index-rebuild: data created at: %s\n", zdb_header_date(header->created, datestr, sizeof(datestr)));
     printf("[+] index-rebuild: data last open: %s\n", zdb_header_date(header->opened, datestr, sizeof(datestr)));
 
+    // only take care of next index id if it's not the first
+    // doing it at the end to avoid creating an empty index
+    // for non-existing data
+    if(fileid > 0)
+        index_jump_next(zdbindex);
+
     return 0;
 }
 
-size_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata) {
+ssize_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata) {
     size_t entrycount = 0;
     uint8_t idlength;
     data_entry_header_t *entry = NULL;
@@ -77,7 +79,6 @@ size_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata) {
 
         printf("[+] processing key: ");
         zdb_tools_hexdump(entry->id, entry->idlength);
-        printf("\n");
 
         index_entry_t idxreq = {
             .idlength = entry->idlength,
@@ -99,9 +100,17 @@ size_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata) {
         // this is needed to keep track of the history
         index_entry_t *existing = index_get(zdbindex, entry->id, entry->idlength);
 
-        if(!index_set(zdbindex, &setter, existing)) {
-            fprintf(stderr, "[-] index-rebuild: could not insert index item\n");
-            return 1;
+        if(entry->flags & DATA_ENTRY_DELETED) {
+            if(index_entry_delete(zdbindex, existing)) {
+                fprintf(stderr, "[-] index-rebuild: could not delete index item\n");
+                return -1;
+            }
+
+        } else {
+            if(!index_set(zdbindex, &setter, existing)) {
+                fprintf(stderr, "[-] index-rebuild: could not insert index item\n");
+                return -1;
+            }
         }
 
         // skipping data payload
@@ -118,6 +127,7 @@ size_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata) {
 
 int index_rebuild(index_root_t *zdbindex, data_root_t *zdbdata) {
     uint16_t fileid = 0;
+    ssize_t entries = 0;
     size_t entrycount = 0;
 
     // prorcessing all files
@@ -127,7 +137,10 @@ int index_rebuild(index_root_t *zdbindex, data_root_t *zdbdata) {
             break;
 
         // processing this file
-        entrycount += index_rebuild_pass(zdbindex, zdbdata);
+        if((entries = index_rebuild_pass(zdbindex, zdbdata)) < 0)
+            break;
+
+        entrycount += entries;
     }
 
     zdb_success("[+] index rebuilt (%lu entries inserted)", entrycount);
