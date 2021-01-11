@@ -13,6 +13,7 @@ static struct option long_options[] = {
     {"namespace",  required_argument, 0, 'n'},
     {"template",   required_argument, 0, 't'},
     {"mode",       required_argument, 0, 'm'},
+    {"time",       required_argument, 0, 'T'},
     {"help",       no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
@@ -52,7 +53,7 @@ int index_data_jump_to(uint16_t fileid, index_root_t *zdbindex, data_root_t *zdb
     return 0;
 }
 
-ssize_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata) {
+ssize_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata, time_t timestamp) {
     size_t entrycount = 0;
     uint8_t idlength;
     data_entry_header_t *entry = NULL;
@@ -75,10 +76,13 @@ ssize_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata) {
         if(read(zdbdata->datafd, entry, entrylength) != entrylength)
             zdb_diep("data header read failed");
 
-        entrycount += 1;
-
         printf("[+] processing key: ");
         zdb_tools_hexdump(entry->id, entry->idlength);
+
+        if(timestamp > 0 && entry->timestamp > timestamp) {
+            printf("[+] index-rebuild: timestamp limit reached, stopping here\n");
+            return entrycount;
+        }
 
         index_entry_t idxreq = {
             .idlength = entry->idlength,
@@ -115,6 +119,7 @@ ssize_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata) {
 
         // skipping data payload
         lseek(zdbdata->datafd, entry->datalength, SEEK_CUR);
+        entrycount += 1;
     }
 
     free(entry);
@@ -125,7 +130,7 @@ ssize_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata) {
 }
 
 
-int index_rebuild(index_root_t *zdbindex, data_root_t *zdbdata) {
+int index_rebuild(index_root_t *zdbindex, data_root_t *zdbdata, time_t timestamp) {
     uint16_t fileid = 0;
     ssize_t entries = 0;
     size_t entrycount = 0;
@@ -137,7 +142,7 @@ int index_rebuild(index_root_t *zdbindex, data_root_t *zdbdata) {
             break;
 
         // processing this file
-        if((entries = index_rebuild_pass(zdbindex, zdbdata)) < 0)
+        if((entries = index_rebuild_pass(zdbindex, zdbdata, timestamp)) < 0)
             break;
 
         entrycount += entries;
@@ -156,6 +161,7 @@ void usage() {
     printf("  --namespace <name>     which namespace to compact\n");
     printf("  --template  <file>     zdb-namespace source file (namespace settings)\n");
     printf("  --mode      <mode>     zdb mode used ('user' or 'seq' expected)\n");
+    printf("  --time      <timest>   rebuild up to that timestamp (rollback in time)\n");
     printf("  --help                 print this message\n");
 
     exit(EXIT_FAILURE);
@@ -167,6 +173,7 @@ int main(int argc, char *argv[]) {
     char *datapath = NULL;
     char *nsname = NULL;
     char *template = NULL;
+    time_t timestamp = 0;
     int mode = -1;
 
     while(1) {
@@ -191,6 +198,10 @@ int main(int argc, char *argv[]) {
 
             case 't':
                 template = optarg;
+                break;
+
+            case 'T':
+                timestamp = atoi(optarg);
                 break;
 
             case 'm':
@@ -287,5 +298,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    return index_rebuild(zdbindex, zdbdata);
+    if(timestamp > 0) {
+        printf("[+] index-rebuild: only rebuild up-to: %ld\n", timestamp);
+    }
+
+    return index_rebuild(zdbindex, zdbdata, timestamp);
 }
