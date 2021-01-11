@@ -5,11 +5,11 @@
     void zdb_fulldump(void *data, size_t len);
 
     #ifndef RELEASE
-        #define zdb_verbose(...)  { zdb_timelog(); printf(__VA_ARGS__); }
-        #define zdb_debug(...)    { zdb_timelog(); printf(__VA_ARGS__); }
+        #define zdb_verbose(...)  { zdb_timelog(stdout); printf(__VA_ARGS__); }
+        #define zdb_debug(...)    { zdb_timelog(stdout); printf(__VA_ARGS__); }
         #define zdb_debughex(...) { zdb_hexdump(__VA_ARGS__); }
     #else
-        #define zdb_verbose(...) { if(zdb_rootsettings.verbose) { zdb_timelog(); printf(__VA_ARGS__); } }
+        #define zdb_verbose(...) { if(zdb_rootsettings.verbose) { zdb_timelog(stdout); printf(__VA_ARGS__); } }
         #define zdb_debug(...) ((void)0)
         #define zdb_debughex(...) ((void)0)
     #endif
