@@ -108,7 +108,7 @@ void zdbd_hexdump(void *input, size_t length) {
 //
 void *zdbd_warnp(char *str) {
     zdbd_timelog(stderr);
-    fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
+    fprintf(stderr, COLOR_YELLOW "[-] %s: %s" COLOR_RESET "\n", str, strerror(errno));
     return NULL;
 }
 

@@ -94,7 +94,7 @@ void zdb_tools_hexdump(void *input, size_t length) {
 //
 void *zdb_warnp(char *str) {
     zdb_timelog(stderr);
-    fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
+    fprintf(stderr, COLOR_YELLOW "[-] %s: %s" COLOR_RESET "\n", str, strerror(errno));
     return NULL;
 }
 
