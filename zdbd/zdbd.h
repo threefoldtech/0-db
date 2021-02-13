@@ -60,27 +60,27 @@
     void zdbd_hexdump(void *buffer, size_t length);
     void zdbd_fulldump(void *data, size_t len);
 
-    #define zdbd_log(fmt, ...)     { zdbd_timelog(); printf(fmt, ##__VA_ARGS__); }
-    #define zdbd_logerr(fmt, ...)  { zdbd_timelog(); fprintf(stderr, fmt, ##__VA_ARGS__); }
+    #define zdbd_log(fmt, ...)     { zdbd_timelog(stdout); printf(fmt, ##__VA_ARGS__); }
+    #define zdbd_logerr(fmt, ...)  { zdbd_timelog(stderr); fprintf(stderr, fmt, ##__VA_ARGS__); }
 
-    #define zdbd_danger(fmt, ...)  { zdbd_timelog(); printf(COLOR_RED    fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define zdbd_warning(fmt, ...) { zdbd_timelog(); printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define zdbd_success(fmt, ...) { zdbd_timelog(); printf(COLOR_GREEN  fmt COLOR_RESET "\n", ##__VA_ARGS__); }
-    #define zdbd_notice(fmt, ...)  { zdbd_timelog(); printf(COLOR_CYAN   fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdbd_danger(fmt, ...)  { zdbd_timelog(stdout); printf(COLOR_RED    fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdbd_warning(fmt, ...) { zdbd_timelog(stdout); printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdbd_success(fmt, ...) { zdbd_timelog(stdout); printf(COLOR_GREEN  fmt COLOR_RESET "\n", ##__VA_ARGS__); }
+    #define zdbd_notice(fmt, ...)  { zdbd_timelog(stdout); printf(COLOR_CYAN   fmt COLOR_RESET "\n", ##__VA_ARGS__); }
 
     #ifndef RELEASE
-        #define zdbd_verbose(...)  { zdbd_timelog(); printf(__VA_ARGS__); }
-        #define zdbd_debug(...)    { zdbd_timelog(); printf(__VA_ARGS__); }
+        #define zdbd_verbose(...)  { zdbd_timelog(stdout); printf(__VA_ARGS__); }
+        #define zdbd_debug(...)    { zdbd_timelog(stdout); printf(__VA_ARGS__); }
         #define zdbd_debughex(...) { zdbd_hexdump(__VA_ARGS__); }
     #else
-        #define zdbd_verbose(...) { if(zdbd_rootsettings.verbose) { zdbd_timelog(); printf(__VA_ARGS__); } }
+        #define zdbd_verbose(...) { if(zdbd_rootsettings.verbose) { zdbd_timelog(stdout); printf(__VA_ARGS__); } }
         #define zdbd_debug(...) ((void)0)
         #define zdbd_debughex(...) ((void)0)
     #endif
 
     extern zdbd_settings_t zdbd_rootsettings;
 
-    void zdbd_timelog();
+    void zdbd_timelog(FILE *fp);
     void zdbd_diep(char *str);
     void zdbd_dieg(char *str, int status);
     void *zdbd_warnp(char *str);

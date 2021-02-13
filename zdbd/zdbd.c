@@ -107,7 +107,7 @@ void zdbd_hexdump(void *input, size_t length) {
 // global warning and fatal message
 //
 void *zdbd_warnp(char *str) {
-    zdbd_timelog();
+    zdbd_timelog(stderr);
     fprintf(stderr, "[-] %s: %s\n", str, strerror(errno));
     return NULL;
 }
@@ -134,7 +134,7 @@ void zdbd_dieg(char *str, int status) {
     exit(EXIT_FAILURE);
 }
 
-void zdbd_timelog() {
+void zdbd_timelog(FILE *fp) {
     struct timeval n, *b;
     double value = 0;
 
@@ -145,7 +145,7 @@ void zdbd_timelog() {
     gettimeofday(&n, NULL);
     value = (double)(n.tv_usec - b->tv_usec) / 1000000 + (double)(n.tv_sec - b->tv_sec);
 
-    printf("[% 15.6f]", value);
+    fprintf(fp, "[% 15.6f]", value);
 }
 
 // internal id generatir
