@@ -1260,7 +1260,7 @@ int redis_listen(char *listenaddr, char *port, char *socket) {
     // if unix socket is requested, adding it
     if(socket) {
         redis.mainfd[fdindex] = redis_unix_listen(socket);
-        zdbd_debug("[+] listen request: unix://%s (fd: %d)\n", socket, redis.mainfd[fdindex]);
+        zdbd_log("[+] listen request: unix://%s (fd: %d)\n", socket, redis.mainfd[fdindex]);
 
         socket_nonblock(redis.mainfd[fdindex]);
         fdindex += 1;
@@ -1269,7 +1269,7 @@ int redis_listen(char *listenaddr, char *port, char *socket) {
     // if tcp socket is requested, adding it
     if(listenaddr) {
         redis.mainfd[fdindex] = redis_tcp_listen(listenaddr, port);
-        zdbd_debug("[+] listen request: tcp://%s:%s (fd: %d)\n", listenaddr, port, redis.mainfd[fdindex]);
+        zdbd_log("[+] listen request: tcp://%s:%s (fd: %d)\n", listenaddr, port, redis.mainfd[fdindex]);
 
         socket_nonblock(redis.mainfd[fdindex]);
         fdindex += 1;
