@@ -70,6 +70,7 @@ pid_t hook_execute(hook_t *hook) {
     execv(zdb_rootsettings.hook, hook->argv);
     zdb_warnp("hook: execv");
 
+    exit(EXIT_FAILURE);
     return 0;
 }
 
