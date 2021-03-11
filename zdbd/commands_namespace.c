@@ -272,7 +272,7 @@ int command_nslist(redis_client_t *client) {
 //   NSINFO [namespace]
 int command_nsinfo(redis_client_t *client) {
     resp_request_t *request = client->request;
-    char info[2048];
+    char *info;
     char target[COMMAND_MAXLEN];
     namespace_t *namespace;
 
@@ -293,6 +293,10 @@ int command_nsinfo(redis_client_t *client) {
         redis_hardsend(client, "-Namespace not found");
         return 1;
     }
+
+    // allocate large buffer for info
+    if(!(info = calloc(sizeof(char), 8192)))
+        return 1;
 
     // value is hard-capped to 32 bits, even if internal uses 64 bits
     uint32_t nextid = (uint32_t) zdb_index_next_id(namespace->index);
@@ -356,15 +360,22 @@ int command_nsinfo(redis_client_t *client) {
         sprintf(info + strlen(info), "password_raw: %s\n", namespace->password);
     }
 
+    if(client->admin) {
+        sprintf(info + strlen(info), "data_path: %s\n", namespace->data->datadir);
+        sprintf(info + strlen(info), "index_path: %s\n", namespace->index->indexdir);
+    }
+
     redis_bulk_t response = redis_bulk(info, strlen(info));
     if(!response.buffer) {
         redis_hardsend(client, "$-1");
+        free(info);
         return 0;
     }
 
     redis_reply_stack(client, response.buffer, response.length);
 
     free(response.buffer);
+    free(info);
 
     return 0;
 }

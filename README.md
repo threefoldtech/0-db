@@ -293,7 +293,30 @@ data_limits_bytes: 0   # namespace size limit (0 for unlimited)
 index_size_bytes: 0    # index size in bytes (thanks captain obvious)
 index_size_kb: 0.00    # index size in KB
 mode: userkey          # running mode (userkey/sequential)
+
+## new fields
+worm: no               # write-once-read-multiple mode enabled
+locked: no             # lock (read-only or even write disabled) mode
+
+next_internal_id: 0x00000000    # internal next key id
+stats_index_io_errors: 0        # amount of index read/write io error
+stats_index_io_error_last: 0    # last timestamp of index io error
+stats_index_faults: 0           # always 0 for now
+stats_data_io_errors: 0         # amount of data read/write io error
+stats_data_io_error_last: 0     # timestamp of last io error
+stats_data_faults: 0            # always 0 for now
+
+index_disk_freespace_bytes: 57676599296    # free space on index partition (bytes)
+index_disk_freespace_mb: 55004.69          # free space on index partition (megabytes)
+data_disk_freespace_bytes: 57676599296     # free space on data partition (bytes)
+data_disk_freespace_mb: 55004.69           # free space on data partition (metabytes)
+
+data_path: /tmp/zdb-data/default           # namespace physical data path (only available for admin)
+index_path: /tmp/zdb-index/default         # namespace physical index path (only available for admin)
 ```
+
+Fields `stats_index_` and `stats_data_` fields are useful to know if partition on which data and index
+live had issues during running time.
 
 ## NSLIST
 Returns an array of all available namespaces.
