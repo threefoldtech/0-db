@@ -307,6 +307,8 @@ Properties:
 * `public`: change the public flag, a public namespace can be read-only if a password is set (0 or 1)
 * `worm`: « write only read multiple » flag which disable overwrite and deletion (0 or 1)
 * `mode`: change index mode (`user` or `seq`)
+* `lock`: set namespace in read-only or normal mode (0 or 1)
+* `freeze`: set namespace in read-write protected or normal mode (0 or 1)
 
 About mode selection: it's now possible to mix modes (user and sequential) on the same 0-db instance.
 This is only possible if you don't provide any `--mode` argument on runtime, otherwise 0-db will be available
@@ -316,6 +318,12 @@ It's only possible to change mode on a fully empty dataset (no deleted keys, not
 namespace. You can change `default` namespace aswell if it's empty.
 
 As soon as there are a single object in the namespace, you won't be able to change mode.
+
+`LOCK` mode won't change anything for read queries, but any update (set, del, ...) will be
+denied with an error message (eg: `Namespace is temporarily locked`).
+
+`FREEZE` mode will deny any operation on the specific namespace, read, write, update, delete operations
+will be denied with an error message (eg: `Namespace is temporarily frozen`)
 
 ## SELECT
 Change your current namespace. If the requested namespace is password-protected, you need
