@@ -1220,13 +1220,15 @@ static void daemonize() {
     zdbd_verbose("[+] system: working in background now");
 }
 
-static void redis_listen_hook() {
+static int redis_listen_hook() {
     hook_t *hook = hook_new("ready", 1);
 
     hook_append(hook, zdb_id());
 
-    hook_execute(hook);
+    int value = hook_execute_wait(hook);
     hook_free(hook);
+
+    return value;
 }
 
 int redis_socket_init(redis_handler_t *redis, char *listenaddr, char *socket) {
@@ -1285,12 +1287,23 @@ int redis_listen(char *listenaddr, char *port, char *socket) {
         zdbd_success("[+] listening on socket %d", redis.mainfd[i]);
     }
 
+    // notify we are ready
+    if(zdb_settings->hook) {
+        int code;
+
+        // if hook fails, abort database boot
+        // if any hook were specified, it's required that this
+        // hook returns 0 to notify everything is ready
+        if((code = redis_listen_hook()) != 0) {
+            zdbd_danger("[-] hook: unsuccessful init hook, stopping (code: %d)", code);
+            return 1;
+        }
+
+        zdbd_notice("[+] hook: external hook initialized correctly");
+    }
+
     if(zdbd_rootsettings.background)
         daemonize();
-
-    // notify we are ready
-    if(zdb_settings->hook)
-        redis_listen_hook();
 
     // entering the worker loop
     int handler = socket_handler(&redis);

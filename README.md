@@ -434,12 +434,12 @@ You can request 0-db to call an external program/script, as hook-system. This al
 machine running 0-db to adapt itself when something happen.
 
 To use the hook system, just set `--hook /path/to/executable` on argument.
-The file must be executable, no shell are invoked.
+The file must be executable, no shell are invoked. Executing a shell script with shebang is valid.
 
-When 0-db starts, it create it own pseudo `identifier` based on listening address/port/socket.
+When 0-db starts, it create it's own pseudo `identifier` based on listening address/port/socket.
 This id is used on hooks arguments.
 
-First argument is `Hook Name`, second argument is `Generated ID`, next arguments depends of the hook.
+First argument is `Hook name`, second argument is `Generated ID`, next arguments depends of the hook.
 
 Current supported hooks:
 
@@ -454,6 +454,12 @@ Current supported hooks:
 | `namespace-deleted`   | Namespace removed       | Namespace name             |
 | `namespace-reloaded`  | Namespace reloaded      | Namespace name             |
 | `missing-data`        | Data file not found     | Missing filename           |
+
+**WARNING**: as soon as hook system is enabled, `ready` event needs to be handled correctly.
+If hook returns something else than `0`, database initialization will be stopped.
+
+In order to get `zdbd` starting with hook, `ready` _needs_ to returns `0` to valdate server that everything
+is okay and database can operate.
 
 # Limitation
 By default, datafiles are split when bigger than 256 MB.
