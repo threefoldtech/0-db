@@ -332,7 +332,6 @@ size_t index_jump_next(index_root_t *root) {
     if(zdb_rootsettings.hook) {
         hook_append(hook, root->indexfile);
         hook_execute(hook);
-        hook_free(hook);
     }
 
     if(root->seqid)

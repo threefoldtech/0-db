@@ -192,7 +192,6 @@ static void sighandler(int signal) {
                 hook_t *hook = hook_new("crash", 1);
                 hook_append(hook, zdb_id());
                 hook_execute(hook);
-                hook_free(hook);
             }
 
             // trying to save what we can save
@@ -208,7 +207,6 @@ static void sighandler(int signal) {
                 hook_t *hook = hook_new("close", 1);
                 hook_append(hook, zdb_id());
                 hook_execute(hook);
-                hook_free(hook);
             }
 
             namespaces_emergency();

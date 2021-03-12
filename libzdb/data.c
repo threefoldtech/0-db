@@ -119,7 +119,6 @@ int data_open_notfound_hook(char *filename) {
     hook_append(hook, zdb_rootsettings.zdbid);
     hook_append(hook, filename);
     retval = hook_execute_wait(hook);
-    hook_free(hook);
 
     return retval;
 }
@@ -338,7 +337,6 @@ size_t data_jump_next(data_root_t *root, uint16_t newid) {
     if(zdb_rootsettings.hook) {
         hook_append(hook, root->datafile);
         hook_execute(hook);
-        hook_free(hook);
     }
 
     return root->dataid;

@@ -382,7 +382,6 @@ static void namespace_create_hook(namespace_t *namespace) {
     hook_append(hook, zdb_rootsettings.zdbid ? zdb_rootsettings.zdbid : "unknown-id");
     hook_append(hook, namespace->name);
     hook_execute(hook);
-    hook_free(hook);
 }
 
 //
@@ -620,7 +619,6 @@ static void namespace_reload_hook(namespace_t *namespace) {
     hook_append(hook, zdb_rootsettings.zdbid ? zdb_rootsettings.zdbid : "unknown-id");
     hook_append(hook, namespace->name);
     hook_execute(hook);
-    hook_free(hook);
 }
 
 // start a namespace reload procees
@@ -681,7 +679,6 @@ static void namespace_delete_hook(namespace_t *namespace) {
     hook_append(hook, zdb_rootsettings.zdbid ? zdb_rootsettings.zdbid : "unknown-id");
     hook_append(hook, namespace->name);
     hook_execute(hook);
-    hook_free(hook);
 }
 
 //

@@ -1226,7 +1226,6 @@ static int redis_listen_hook() {
     hook_append(hook, zdb_id());
 
     int value = hook_execute_wait(hook);
-    hook_free(hook);
 
     return value;
 }
