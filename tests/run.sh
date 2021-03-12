@@ -18,7 +18,7 @@ rm -rf /tmp/zdbtest
 ./zdbd/zdb -v --dump --data /tmp/zdbtest/ --index /tmp/zdbtest/
 
 # first real test suite
-./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/false --datasize $((128 * 1024 * 1024))
+./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true --datasize $((128 * 1024 * 1024))
 ./tests/zdbtests
 sleep 1
 
@@ -26,12 +26,12 @@ sleep 1
 ./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --dump
 
 # simulate a segmentation fault
-./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/false
+./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true
 pkill -SEGV zdb
 sleep 1
 
 # simulate a SIGINT (ctrl+c)
-./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/false
+./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true
 pkill -INT zdb
 sleep 1
 
@@ -39,7 +39,7 @@ sleep 1
 rm -rf /tmp/zdbtest
 
 # starting test suite with small datasize, generating lot of file jump
-./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/false --datasize 32
+./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true --datasize 32
 ./tests/zdbtests
 sleep 1
 
