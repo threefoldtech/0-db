@@ -1,8 +1,8 @@
 #ifndef __ZDB_HOOK_H
     #define __ZDB_HOOK_H
 
-    #define ZDB_HOOKS_INITIAL_LENGTH  2
-    #define ZDB_HOOKS_EXPIRE_SECONDS  10
+    #define ZDB_HOOKS_INITIAL_LENGTH  8
+    #define ZDB_HOOKS_EXPIRE_SECONDS  60
 
     // a hook is called when an external application/script
     // is provided at runtime, this hook executable
