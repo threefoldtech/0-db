@@ -193,6 +193,7 @@ This mode is not possible if you don't have any data/index already available.
 - `WAIT command | * [timeout-ms]`
 - `HISTORY key [binary-data]`
 - `FLUSH`
+- `HOOKS`
 
 `SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
 
@@ -437,6 +438,52 @@ recovery is possible (history, etc. are deleted).
 
 This is only allowed on private and password protected namespace. You need to select the namespace
 before running the command.
+
+## HOOKS
+
+This command is reserved to admin. It lists running (or recently running) hooks and their status.
+
+This list contains a list of hooks. Each entry contains 6 fields:
+```
+> HOOKS
+1) 1) "ready"
+   2) (empty array)
+   3) (integer) 18621
+   4) (integer) 1615511907
+   5) (integer) 1615511907
+   6) (integer) 0
+```
+
+Values are:
+1. Hook Type (name)
+2. Extra arguments (depend of the type)
+3. Process ID (pid)
+4. Timestamp when hook were created
+5. Timestamp when hook finished
+6. Status Code (return code)
+
+A still running hook will have a positive created timestamp but zero
+finished timestamp.
+
+Example of a hook triggered when 'namespace2' namespace were created:
+```
+> HOOKS
+1) 1) "namespace-created"
+   2) 1) "namespace2"
+   3) (integer) 18447
+   4) (integer) 1615511807
+   5) (integer) 1615511818
+   6) (integer) 2
+```
+
+The database keep a volatile list, only recent hooks are kept and list
+is cleaned up after some time for now it's 60 seconds. This could changes.
+
+If no recent hooks were executed, list is empty:
+```
+> HOOKS
+(empty array)
+```
 
 # Namespaces
 A namespace is a dedicated directory on index and data root directory.
