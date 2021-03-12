@@ -78,6 +78,7 @@ static command_t commands_handlers[] = {
     {.command = "PING",    .handler = command_ping},     // default PING command
     {.command = "TIME",    .handler = command_time},     // default TIME command
     {.command = "AUTH",    .handler = command_auth},     // custom AUTH command to authentifcate admin
+    {.command = "HOOKS",   .handler = command_hooks},    // custom HOOKS command to list running hooks
 
     // dataset
     {.command = "SET",     .handler = command_set},      // default SET command

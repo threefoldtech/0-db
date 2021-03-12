@@ -116,3 +116,56 @@ int command_info(redis_client_t *client) {
     return 0;
 }
 
+int command_hooks(redis_client_t *client) {
+    zdb_settings_t *zdb_settings = zdb_settings_get();
+    zdb_hooks_t *hooks = &zdb_settings->hooks;
+    hook_t *hook = NULL;
+    char *info;
+
+    if(!(info = calloc(sizeof(char), 8192)))
+        return 1;
+
+    sprintf(info, "*%lu\r\n", hooks->active);
+
+    for(size_t i = 0; i < hooks->length; i++) {
+        if(!(hook = hooks->hooks[i]))
+            continue;
+
+        char *type = hook->argv[1];
+
+        sprintf(info + strlen(info), "*6\r\n");
+
+        // hook type
+        sprintf(info + strlen(info), "$%lu\r\n%s\r\n", strlen(type), type);
+
+        // hook arguments
+        sprintf(info + strlen(info), "*%lu\r\n", hook->argc - 4);
+
+        // skipping:
+        //  - 1st argument: hook binary
+        //  - 2nd argument: which is the type
+        //  - 3rd argument: which is the instance id
+        //  - last argument: which is always null
+        for(size_t s = 3; s < hook->argc - 1; s++) {
+            char *arg = hook->argv[s];
+            sprintf(info + strlen(info), "$%lu\r\n%s\r\n", strlen(arg), arg);
+        }
+
+        // hook pid
+        sprintf(info + strlen(info), ":%d\r\n", hook->pid);
+
+        // timestamp when started
+        sprintf(info + strlen(info), ":%ld\r\n", hook->created);
+
+        // timestamp when finished
+        sprintf(info + strlen(info), ":%ld\r\n", hook->finished);
+
+        // exit code value
+        sprintf(info + strlen(info), ":%d\r\n", hook->status);
+    }
+
+    redis_reply_heap(client, info, strlen(info), free);
+
+    return 0;
+}
+

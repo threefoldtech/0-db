@@ -6,4 +6,6 @@
     int command_auth(redis_client_t *client);
     int command_stop(redis_client_t *client);
     int command_info(redis_client_t *client);
+
+    int command_hooks(redis_client_t *client);
 #endif
