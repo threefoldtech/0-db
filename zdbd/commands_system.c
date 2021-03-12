@@ -122,6 +122,9 @@ int command_hooks(redis_client_t *client) {
     hook_t *hook = NULL;
     char *info;
 
+    if(!command_admin_authorized(client))
+        return 1;
+
     if(!(info = calloc(sizeof(char), 8192)))
         return 1;
 
