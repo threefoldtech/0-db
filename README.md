@@ -62,6 +62,7 @@ made, a new entry is added, with a special flag. This have multiple advantages:
 - More efficient for SSD, longer life, since overwrite doesn't occures
 - Easy for backup or transfert: incremental copy work out-of-box
 - Easy for manipulation: data is flat
+- History support out-of-box, since all data are kept
 
 Of course, when we have advantages, some cons comes with them:
 - Any overwrite won't clean previous data
@@ -69,7 +70,6 @@ Of course, when we have advantages, some cons comes with them:
 - You need some maintenance to keep your database not exploding
 
 Hopefuly, theses cons have their solution:
-- We always have previous data there, let's allows to walk throught it and support history out-of-box !
 - Since data are always append, you can at any time start another process reading that database
 and rewrite data somewhere else, with optimization (removed non-needed files). This is what we call
 `compaction`, and some tools are here to do so.
@@ -99,7 +99,9 @@ If you run `zdbd` without `--mode` argument, server will runs in `mixed mode` an
 information on how to choose runtime mode.
 
 ## User Key
-This is a default mode, a simple key-value store. User can `SET` their own keys, like any key-value store.
+This is a default mode, a simple key-value store.
+User can `SET` their own keys, like any key-value store.
+All the keys are kept in memory.
 
 Even in this mode, the key itself is returned by the `SET` command.
 
@@ -355,7 +357,7 @@ to add the password as extra parameter. If the namespace is `public` but passwor
 and you don't provide any password, the namespace will be accessible in read-only.
 
 You can use SECURE password, like authentication (see below). A challenge is required first
-(using `AUTH SECURE CHALLENGE` command).
+(using `AUTH SECURE CHALLENGE` command). See `AUTH` below for more information.
 
 ```
 >> AUTH SECURE CHALLENGE
