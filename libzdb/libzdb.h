@@ -4,6 +4,7 @@
     #include <stdint.h>
     #include <time.h>
     #include <sys/time.h>
+    #include "hook.h"
 
     #ifndef ZDB_REVISION
         #define ZDB_REVISION "(unknown)"
@@ -81,10 +82,11 @@
         //
         // this needs to be fixed later
 
-        char *zdbid;      // fake 0-db id generated based on listening
-        uint32_t iid;     // 0-db random instance id generated on boot
+        char *zdbid;         // fake 0-db id generated based on listening
+        uint32_t iid;        // 0-db random instance id generated on boot
 
-        zdb_stats_t stats; // global 0-db statistics
+        zdb_stats_t stats;   // global 0-db statistics
+        zdb_hooks_t hooks;   // global hooks running list
 
         // the synctime can be useful to add basic security without killing
         // performance
@@ -142,7 +144,6 @@
 
     #include "data.h"
     #include "filesystem.h"
-    #include "hook.h"
     #include "index.h"
     #include "index_branch.h"
     #include "index_get.h"

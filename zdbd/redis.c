@@ -1289,6 +1289,7 @@ int redis_listen(char *listenaddr, char *port, char *socket) {
     // notify we are ready
     if(zdb_settings->hook) {
         int code;
+        zdbd_log("[+] hook: starting and waiting initial hook event (ready)\n");
 
         // if hook fails, abort database boot
         // if any hook were specified, it's required that this
