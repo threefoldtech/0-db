@@ -44,6 +44,25 @@ static int real_command_args_validate(redis_client_t *client, int expected, int 
     return 1;
 }
 
+// same as validate, but not expecting exact amount of arguments, but
+// a minimum value
+int command_args_validate_min(redis_client_t *client, int expected) {
+    if(client->request->argc < expected) {
+        redis_hardsend(client, "-Missing arguments");
+        return 0;
+    }
+
+    // checking for empty arguments
+    for(int i = 0; i < client->request->argc; i++) {
+        if(client->request->argv[i]->length == 0) {
+            redis_hardsend(client, "-Invalid argument");
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 int command_args_validate_null(redis_client_t *client, int expected) {
     return real_command_args_validate(client, expected, 1);
 }
@@ -58,6 +77,28 @@ int command_admin_authorized(redis_client_t *client) {
         zdbd_rootsettings.stats.adminfailed += 1;
 
         redis_hardsend(client, "-Permission denied");
+        return 0;
+    }
+
+    return 1;
+}
+
+int command_args_overflow(redis_client_t *client, int argidx, int maxlen) {
+    resp_request_t *request = client->request;
+
+    if(request->argv[argidx]->length > maxlen) {
+        redis_hardsend(client, "-Argument too long");
+        return 0;
+    }
+
+    return 1;
+}
+
+int command_args_namespace(redis_client_t *client, int argidx) {
+    resp_request_t *request = client->request;
+
+    if(request->argv[argidx]->length > NAMESPACE_MAX_LENGTH) {
+        redis_hardsend(client, "-Namespace too long");
         return 0;
     }
 

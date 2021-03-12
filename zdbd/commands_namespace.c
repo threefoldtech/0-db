@@ -25,10 +25,8 @@ int command_nsnew(redis_client_t *client) {
     if(!command_args_validate(client, 2))
         return 1;
 
-    if(request->argv[1]->length > 128) {
-        redis_hardsend(client, "-Namespace too long");
+    if(!command_args_namespace(client, 1))
         return 1;
-    }
 
     // get string formatted namespace
     sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
@@ -71,10 +69,8 @@ int command_nsdel(redis_client_t *client) {
     if(!command_args_validate(client, 2))
         return 1;
 
-    if(request->argv[1]->length > 128) {
-        redis_hardsend(client, "-Namespace too long");
+    if(!command_args_namespace(client, 1))
         return 1;
-    }
 
     // get string formatted namespace
     sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
@@ -122,10 +118,8 @@ int command_select(redis_client_t *client) {
         return 1;
     }
 
-    if(request->argv[1]->length > 128) {
-        redis_hardsend(client, "-Namespace too long");
+    if(!command_args_namespace(client, 1))
         return 1;
-    }
 
     // get name as usable string
     sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
@@ -279,10 +273,8 @@ int command_nsinfo(redis_client_t *client) {
     if(!command_args_validate(client, 2))
         return 1;
 
-    if(request->argv[1]->length > 128) {
-        redis_hardsend(client, "-Namespace too long");
+    if(!command_args_namespace(client, 1))
         return 1;
-    }
 
     // get name as usable string
     sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
@@ -500,21 +492,15 @@ int command_nsset(redis_client_t *client) {
     if(!command_args_validate(client, 4))
         return 1;
 
-    if(request->argv[1]->length > 128) {
-        redis_hardsend(client, "-Namespace too long");
+    if(!command_args_namespace(client, 1))
         return 1;
-    }
 
-    if(request->argv[2]->length > COMMAND_MAXLEN || request->argv[3]->length > COMMAND_MAXLEN) {
-        redis_hardsend(client, "-Argument too long");
+    if(!command_args_overflow(client, 2, COMMAND_MAXLEN))
         return 1;
-    }
 
     // limit size of the value
-    if(request->argv[3]->length > 63) {
-        redis_hardsend(client, "-Invalid value");
+    if(!command_args_overflow(client, 3, 63))
         return 1;
-    }
 
     sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
     sprintf(command, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
@@ -606,10 +592,8 @@ int command_reload(redis_client_t *client) {
     if(!command_args_validate(client, 2))
         return 1;
 
-    if(request->argv[1]->length > 128) {
-        redis_hardsend(client, "-Namespace too long");
+    if(!command_args_namespace(client, 1))
         return 1;
-    }
 
     // get name as usable string
     sprintf(target, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
