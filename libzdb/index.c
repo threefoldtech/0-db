@@ -160,6 +160,9 @@ static char *index_set_id_buffer(char *buffer, char *indexdir, uint16_t indexid)
 void index_set_id(index_root_t *root, uint16_t fileid) {
     root->indexid = fileid;
     index_set_id_buffer(root->indexfile, root->indexdir, root->indexid);
+
+    // increase index dirty map to fit new length
+    index_dirty_resize(root, fileid);
 }
 
 //
@@ -534,6 +537,9 @@ int index_entry_delete_disk(index_root_t *root, index_entry_t *entry) {
 
     close(fd);
 
+    // flag index entry as dirty, it was just modified
+    index_dirty_set(root, entry->indexid, 1);
+
     return 0;
 }
 
@@ -742,3 +748,66 @@ const char *index_modename(index_root_t *index) {
 
     return "unknown";
 }
+
+//
+// dirty handler
+//
+void index_dirty_resize(index_root_t *root, size_t maxid) {
+    // ignore any request with lower maxid than we
+    // already had
+    if(maxid <= root->dirty.maxid)
+        return;
+
+    root->dirty.maxid = maxid;
+
+    // checking if this new id increase amount of bytes
+    // needed for the bitmap, always ensure we are in
+    // correct range
+    size_t bytes = (maxid + 8) / 8;
+
+    // ignore shrink or same length
+    if(bytes <= root->dirty.length)
+        return;
+
+    // shortcut size
+    size_t size = sizeof(uint8_t) * bytes;
+
+    root->dirty.length = bytes;
+
+    zdb_debug("[+] index: allocating dirty length: %lu bytes\n", bytes);
+
+    if(!(root->dirty.map = (uint8_t *) realloc(root->dirty.map, size)))
+        zdb_diep("index: dirty: realloc");
+
+    // initialize new byte to zero
+    root->dirty.map[bytes - 1] = 0;
+}
+
+// reset the whole dirty map to clean
+void index_dirty_reset(index_root_t *root) {
+    zdb_debug("[+] index: resetting dirty flags\n");
+
+    for(size_t i = 0; i < root->dirty.length; i++)
+        root->dirty.map[i] = 0;
+}
+
+// value should only be 0 or 1
+void index_dirty_set(index_root_t *root, uint32_t id, uint8_t value) {
+    int index = id / 8;
+    int shift = id % 8;
+
+    zdb_debug("[+] index: set index dirty [file %d, bit %d]\n", index, shift);
+
+    // ensure value is 0 or 1 (nothing else)
+    // then set this bit on the bitmap
+    root->dirty.map[index] |= (!!value << shift);
+}
+
+// returns 0 or 1 if index requested is dirty or not
+int index_dirty_get(index_root_t *root, uint32_t id) {
+    int index = id / 8;
+    int shift = id % 8;
+
+    return !!(root->dirty.map[index] & (1 << shift));
+}
+

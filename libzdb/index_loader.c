@@ -513,6 +513,8 @@ index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir, void *na
     root->namespace = namespace;
     root->mode = settings->mode;
 
+    index_dirty_resize(root, 1);
+
     // switching to default mode when mix enabled
     if(root->mode == ZDB_MODE_MIX)
         root->mode = ZDB_DEFAULT_MIX_MODE;
@@ -564,6 +566,7 @@ index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespa
 void index_destroy(index_root_t *root) {
     // delete root object
     free(root->indexfile);
+    free(root->dirty.map);
 
     if(root->seqid) {
         free(root->seqid->seqmap);

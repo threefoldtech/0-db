@@ -103,6 +103,9 @@ int index_seq_overwrite(index_root_t *root, index_set_t *set) {
 
     close(fd);
 
+    // flag index entry as dirty, it was just modified
+    index_dirty_set(root, seqmap->fileid, 1);
+
     return 0;
 }
 
