@@ -172,3 +172,78 @@ int command_hooks(redis_client_t *client) {
     return 0;
 }
 
+static int command_index_dirty(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    index_root_t *index = client->ns->index;
+    char subcommand[COMMAND_MAXLEN];
+    char *response;
+
+    if(request->argc == 3) {
+        if(!command_args_overflow(client, 2, COMMAND_MAXLEN))
+            return 1;
+
+        sprintf(subcommand, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
+
+        if(strcasecmp(subcommand, "RESET") == 0) {
+            index_dirty_reset(index);
+            redis_hardsend(client, "+OK");
+            return 0;
+        }
+
+        redis_hardsend(client, "-Unknown INDEX DIRTY subcommand");
+        return 1;
+    }
+
+    if(!(response = calloc(sizeof(char), 2048))) {
+        zdbd_warnp("index: dirty: calloc");
+        redis_hardsend(client, "-Internal Memory Error");
+        return 1;
+    }
+
+    size_t compute = 0;
+
+    // FIXME: avoid double loop
+    for(size_t i = 0; i < index->dirty.length; i++)
+        for(int a = 0; a < 8; a++)
+            if(index_dirty_get(index, (i * 8) + a) == 1)
+                compute += 1;
+
+    sprintf(response, "*%lu\r\n", compute);
+
+    // listing dirty index files
+    for(size_t i = 0; i < index->dirty.length; i++) {
+        for(int a = 0; a < 8; a++) {
+            int fileid = (i * 8) + a;
+
+            if(index_dirty_get(index, fileid) == 1)
+                sprintf(response + strlen(response), ":%d\r\n", fileid);
+        }
+    }
+
+    redis_reply_heap(client, response, strlen(response), free);
+
+    return 0;
+}
+
+int command_index(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    char command[COMMAND_MAXLEN];
+
+    if(!command_admin_authorized(client))
+        return 1;
+
+    if(!command_args_validate_min(client, 2))
+        return 1;
+
+    if(!command_args_overflow(client, 1, COMMAND_MAXLEN))
+        return 1;
+
+    sprintf(command, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
+
+    if(strcasecmp(command, "DIRTY") == 0)
+        return command_index_dirty(client);
+
+    redis_hardsend(client, "-Unknown INDEX subcommand");
+    return 1;
+}
+

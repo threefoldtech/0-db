@@ -8,4 +8,5 @@
     int command_info(redis_client_t *client);
 
     int command_hooks(redis_client_t *client);
+    int command_index(redis_client_t *client);
 #endif
