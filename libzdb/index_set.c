@@ -215,10 +215,13 @@ index_entry_t *index_insert_memory_handler_memkey(index_root_t *root, index_set_
 index_entry_t *index_insert_memory_handler_sequential(index_root_t *root, index_set_t *set) {
     index_entry_t *new = set->entry;
 
+    size_t entrysize = sizeof(index_entry_t) + new->idlength;
+
     // update statistics (if the key exists)
     // maybe it doesn't exists if it comes from a replay
     root->stats.entries += 1;
     root->stats.datasize += new->length;
+    root->stats.size += entrysize;
 
     // update next entry id
     root->nextentry += 1;
@@ -267,6 +270,7 @@ index_entry_t *index_update_memory_handler_memkey(index_root_t *root, index_set_
 
 index_entry_t *index_update_memory_handler_sequential(index_root_t *root, index_set_t *set, index_entry_t *exists) {
     index_entry_t *new = set->entry;
+    size_t entrysize = sizeof(index_entry_t) + new->idlength;
 
     root->nextentry += 1;
     root->nextid += 1;
@@ -278,6 +282,7 @@ index_entry_t *index_update_memory_handler_sequential(index_root_t *root, index_
         // but more a replay from the index_loader
         root->stats.datasize += new->length;
         root->stats.entries += 1;
+        root->stats.size += entrysize;
         return new;
     }
 
@@ -290,6 +295,7 @@ index_entry_t *index_update_memory_handler_sequential(index_root_t *root, index_
     // there are no new entry, since it's an update
     root->stats.datasize -= exists->length;
     root->stats.datasize += new->length;
+    root->stats.size += entrysize;
 
     return new;
 }
