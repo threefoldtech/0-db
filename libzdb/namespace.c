@@ -213,7 +213,7 @@ static int namespace_descriptor_load(namespace_t *namespace) {
             zdb_warnp("namespace password read");
     }
 
-    zdb_success("[+] namespace: loaded: %s", namespace->name);
+    zdb_log("[+] namespace: [%s] opened, analyzing...\n", namespace->name);
     zdb_debug("[+] -> maxsize: %lu (%.2f MB)\n", namespace->maxsize, MB(namespace->maxsize));
     zdb_debug("[+] -> password protection: %s\n", namespace->password ? "yes" : "no");
     zdb_debug("[+] -> public access: %s\n", namespace->public ? "yes" : "no");
@@ -724,10 +724,12 @@ int namespaces_emergency() {
     namespace_t *ns;
 
     for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
-        zdb_log("[+] namespaces: flushing index [%s]\n", ns->name);
+        zdb_log("[+] namespaces: flushing: %s\n", ns->name);
+
+        zdb_debug("[+] namespaces: flushing index [%s]\n", ns->name);
 
         if(index_emergency(ns->index)) {
-            zdb_log("[+] namespaces: flushing data [%s]\n", ns->name);
+            zdb_debug("[+] namespaces: flushing data [%s]\n", ns->name);
             // only flusing data if index flush was accepted
             // if index flush returns 0, we are probably in an initializing stage
             data_emergency(ns->data);

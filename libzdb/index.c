@@ -290,7 +290,7 @@ void index_open_final(index_root_t *root) {
         return;
     }
 
-    zdb_log("[+] index: active file: %s\n", root->indexfile);
+    zdb_verbose("[+] index: active file: %s\n", root->indexfile);
 }
 
 void index_close(index_root_t *root) {

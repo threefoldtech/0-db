@@ -225,8 +225,8 @@ static size_t index_load_file(index_root_t *root) {
         // and it's empty, there is no use in doing anything
         // let's crash
         if(root->status & INDEX_READ_ONLY) {
-            zdb_logerr("[-] no index found and readonly filesystem\n");
-            zdb_logerr("[-] cannot starts correctly\n");
+            zdb_logerr("[-] index: loader: no index found and readonly filesystem\n");
+            zdb_logerr("[-] index: loader: cannot starts correctly\n");
             exit(EXIT_FAILURE);
         }
 
@@ -265,7 +265,7 @@ static size_t index_load_file(index_root_t *root) {
         }
     }
 
-    zdb_log("[+] index: populating: %s\n", root->indexfile);
+    zdb_verbose("[+] index: populating: %s\n", root->indexfile);
 
     // index seems in a good state
     // let's load it completely in memory now
@@ -398,7 +398,7 @@ void index_internal_load(index_root_t *root) {
             index_set_id(root, fileid);
 
             if(index_load_file(root) == 0) {
-                zdb_verbose("[-] index_load: something went wrong with index %d\n", root->indexid);
+                zdb_verbose("[-] index: loader: something went wrong with index %d\n", root->indexid);
                 break;
             }
         }
@@ -407,14 +407,14 @@ void index_internal_load(index_root_t *root) {
         // we need to create the index
         index_set_id(root, 0);
         if(index_load_file(root) != 0) {
-            zdb_verbose("[-] index_load: seems initial index could not be created\n");
+            zdb_verbose("[-] index: loader: seems initial index could not be created\n");
             return;
         }
     }
 
     if(root->seqid && root->seqid->length == 0) {
-        zdb_debug("[+] index: fresh database created in sequential mode\n");
-        zdb_debug("[+] index: initializing default seqmap\n");
+        zdb_debug("[+] index: loader: fresh database created in sequential mode\n");
+        zdb_debug("[+] index: loader: initializing default seqmap\n");
         index_seqid_push(root, 0, 0);
     }
 
@@ -432,7 +432,7 @@ void index_internal_load(index_root_t *root) {
     }
 
     if(root->status & INDEX_HEALTHY)
-        zdb_success("[+] index: healthy");
+        zdb_verbose("[+] index: loader: index is healthy\n");
 
     // setting index as loaded (removing flag)
     root->status &= ~INDEX_NOT_LOADED;

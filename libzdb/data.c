@@ -303,7 +303,7 @@ static void data_open_final(data_root_t *root) {
     }
 
     zdb_debug("[+] data: entries read: %d, last offset: %lu\n", entries, root->previous);
-    zdb_log("[+] data: active file: %s\n", root->datafile);
+    zdb_verbose("[+] data: active file: %s\n", root->datafile);
 }
 
 // jumping to the next id close the current data file
