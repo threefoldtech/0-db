@@ -136,7 +136,10 @@ static int index_read(int fd, void *buffer, size_t length) {
     }
 
     if(response == 0) {
-        zdb_logerr("[-] index read: eof reached\n");
+        // end of reach found, can be safe if user
+        // requested a key out-of-bounds, it's not
+        // an error itself
+        zdb_debug("[-] index read: eof reached\n");
         return 0;
     }
 
