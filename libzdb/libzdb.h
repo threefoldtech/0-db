@@ -130,7 +130,7 @@
     #define COLOR_RESET  "\033[0m"
 
     #define zdb_log(fmt, ...)     { zdb_timelog(stdout); printf(fmt, ##__VA_ARGS__); }
-    #define zdb_logerr(fmt, ...)  { zdb_timelog(stdout); fprintf(stderr, fmt, ##__VA_ARGS__); }
+    #define zdb_logerr(fmt, ...)  { zdb_timelog(stderr); fprintf(stderr, fmt, ##__VA_ARGS__); }
 
     #define zdb_danger(fmt, ...)  { zdb_timelog(stdout); printf(COLOR_RED    fmt COLOR_RESET "\n", ##__VA_ARGS__); }
     #define zdb_warning(fmt, ...) { zdb_timelog(stdout); printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
