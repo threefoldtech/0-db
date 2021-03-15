@@ -230,7 +230,7 @@ static size_t index_load_file(index_root_t *root) {
             exit(EXIT_FAILURE);
         }
 
-        zdb_log("[+] index: creating empty file\n");
+        zdb_verbose("[+] index: creating empty file\n");
         header = index_initialize(root->indexfd, root->indexid, root);
     }
 

@@ -395,6 +395,8 @@ static void namespace_create_hook(namespace_t *namespace) {
 int namespace_create(char *name) {
     namespace_t *namespace;
 
+    zdb_log("[+] namespace: creating: %s\n", name);
+
     // call the generic namespace loader
     if(!(namespace = namespace_load(nsroot, name)))
         return 0;
@@ -687,7 +689,7 @@ static void namespace_delete_hook(namespace_t *namespace) {
 // note: this function assume namespace exists, you should
 // call this by checking before if everything was okay to delete it.
 int namespace_delete(namespace_t *namespace) {
-    zdb_debug("[+] namespace: removing: %s\n", namespace->name);
+    zdb_log("[+] namespace: removing: %s\n", namespace->name);
 
     // detach all clients attached to this namespace
     // redis_detach_clients(namespace);

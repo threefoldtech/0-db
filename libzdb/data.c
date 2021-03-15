@@ -320,11 +320,11 @@ size_t data_jump_next(data_root_t *root, uint16_t newid) {
     }
 
     // flushing data
-    zdb_log("[+] data: flushing file before closing\n");
+    zdb_verbose("[+] data: flushing file before closing\n");
     fsync(root->datafd);
 
     // closing current file descriptor
-    zdb_log("[+] data: closing current datafile\n");
+    zdb_verbose("[+] data: closing current datafile\n");
     close(root->datafd);
 
     // moving to the next file

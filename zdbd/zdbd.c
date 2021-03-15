@@ -267,7 +267,6 @@ void usage() {
     printf("  --mode  <mode>      select working mode:\n");
     printf("                       > user: default user key-value mode\n");
     printf("                       > seq: sequential keys generated\n");
-    printf("                       > direct: direct position by key\n");
     printf("                      note: if not specified, zdb will run in mixed mode\n");
     printf("  --datasize <size>   maximum datafile size before split (default: %.2f MB)\n\n", MB(ZDB_DEFAULT_DATA_MAXSIZE));
 

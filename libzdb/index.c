@@ -136,7 +136,7 @@ static int index_read(int fd, void *buffer, size_t length) {
     }
 
     if(response == 0) {
-        // end of reach found, can be safe if user
+        // end of file found, can be safe if user
         // requested a key out-of-bounds, it's not
         // an error itself
         zdb_debug("[-] index read: eof reached\n");
@@ -306,7 +306,7 @@ void index_close(index_root_t *root) {
 size_t index_jump_next(index_root_t *root) {
     hook_t *hook = NULL;
 
-    zdb_verbose("[+] index: jumping to the next file\n");
+    zdb_verbose("[+] index: jumping to the next file [closing %s]\n", root->indexfile);
 
     if(zdb_rootsettings.hook) {
         hook = hook_new("jump-index", 4);
@@ -315,11 +315,11 @@ size_t index_jump_next(index_root_t *root) {
     }
 
     // flushing current index file
-    zdb_log("[+] index: flushing file before closing\n");
+    zdb_verbose("[+] index: flushing file before closing\n");
     fsync(root->indexfd);
 
     // closing current file descriptor
-    zdb_log("[+] index: closing current index file\n");
+    zdb_verbose("[+] index: closing current index file\n");
     index_close(root);
 
     // moving to the next file
