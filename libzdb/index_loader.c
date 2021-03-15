@@ -96,6 +96,10 @@ index_header_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
     if(!index_write(fd, &header, sizeof(index_header_t), root))
         zdb_diep("index_initialize: write");
 
+    // reset updated flag, this flag is used to notify
+    // when entries have been written, not header
+    root->updated = 0;
+
     return header;
 }
 
@@ -512,6 +516,7 @@ index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir, void *na
     root->branches = NULL;
     root->namespace = namespace;
     root->mode = settings->mode;
+    root->rotate = time(NULL);
 
     index_dirty_resize(root, 1);
 

@@ -52,6 +52,7 @@
         char *logfile;    // where to redirect logs in background mode
         int protect;      // flag default namespace to use admin password (for writing)
         int dualnet;      // support for dual socket listening
+        int rotatesec;    // amount of seconds before forcing rotation of index/data
 
         zdbd_stats_t stats;
 

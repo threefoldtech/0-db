@@ -182,6 +182,8 @@
         int synctime;       // force sync index after this amount of time
         time_t lastsync;    // keep track when the last sync was explictly made
         index_mode_t mode;  // running mode for that index
+        time_t rotate;      // last time file were rotate (jumped to next file)
+        int updated;        // does current index changed since opened
 
         void *namespace;    // see index_entry_t, same reason
 

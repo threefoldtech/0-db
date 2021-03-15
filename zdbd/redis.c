@@ -1051,10 +1051,7 @@ uint64_t timeval_delta_ms(struct timeval *begin, struct timeval *end) {
     return deltams;
 }
 
-// recurring or periodic actions we can do
-// when the server is in idle state (no clients action
-// for a certain amount of time)
-void redis_idle_process() {
+static void redis_watch_timeout() {
     struct timeval timecheck;
     char response[64];
 
@@ -1082,6 +1079,38 @@ void redis_idle_process() {
             }
         }
     }
+}
+
+void redis_files_rotate() {
+    namespace_t *ns;
+
+    // file rotation disabled, nothing to do here
+    if(zdbd_rootsettings.rotatesec == 0)
+        return;
+
+    for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
+        if(!ns->index->updated)
+            continue;
+
+        time_t diffsec = time(NULL) - ns->index->rotate;
+
+        if(diffsec > zdbd_rootsettings.rotatesec) {
+            zdbd_log("[+] system: rotation requested (%s, %ld seconds)\n", ns->name, diffsec);
+            size_t newid = index_jump_next(ns->index);
+            data_jump_next(ns->data, newid);
+        }
+    }
+}
+
+// recurring or periodic actions we can do
+// when the server is in idle state (no clients action
+// for a certain amount of time)
+void redis_idle_process() {
+    // watch commands timeout
+    redis_watch_timeout();
+
+    // rotate files if requested after some time
+    redis_files_rotate();
 
     // discard any pending hook child
     libzdb_hooks_cleanup();

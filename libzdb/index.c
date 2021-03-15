@@ -110,6 +110,11 @@ int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
         return 0;
     }
 
+    // flag current indexfile as dirty if we
+    // did any write on it
+    if(fd == root->indexfd)
+        root->updated = 1;
+
     if(response != (ssize_t) length) {
         zdb_logerr("[-] index write: partial write\n");
         return 0;
@@ -293,6 +298,9 @@ void index_open_final(index_root_t *root) {
         return;
     }
 
+    // index just opened, not dirty
+    root->updated = 0;
+
     zdb_verbose("[+] index: active file: %s\n", root->indexfile);
 }
 
@@ -342,6 +350,9 @@ size_t index_jump_next(index_root_t *root) {
 
     if(root->seqid)
         index_seqid_push(root, index_next_id(root), root->indexid);
+
+    // keep track when rotation occur
+    root->rotate = time(NULL);
 
     return root->indexid;
 }

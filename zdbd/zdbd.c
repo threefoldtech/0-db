@@ -29,6 +29,7 @@ zdbd_settings_t zdbd_rootsettings = {
     .logfile = NULL,
     .protect = 0,
     .dualnet = 0,
+    .rotatesec = 0,
 };
 
 static struct option long_options[] = {
@@ -50,6 +51,7 @@ static struct option long_options[] = {
     {"datasize",   required_argument, 0, 'D'},
     {"maxsize",    required_argument, 0, 'M'},
     {"protect",    no_argument,       0, 'P'},
+    {"rotate",     required_argument, 0, 'r'},
     {"help",       no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
@@ -288,6 +290,7 @@ void usage() {
     printf("  --sync              force all write to be synced\n");
     printf("  --background        run in background (daemon), when ready\n");
     printf("  --logfile <file>    log file (only in daemon mode)\n");
+    printf("  --rotate <secs>     force file (index and data) rotation after x seconds\n");
     printf("  --help              print this message\n");
 
     exit(EXIT_FAILURE);
@@ -413,6 +416,11 @@ int main(int argc, char *argv[]) {
 
             case 'N':
                 zdbd_settings->dualnet = 1;
+                break;
+
+            case 'r':
+                zdbd_settings->rotatesec = atoi(optarg);
+                zdbd_verbose("[+] system: file rotation time: %d seconds\n", zdbd_settings->rotatesec);
                 break;
 
             case 'D':
