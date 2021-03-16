@@ -314,7 +314,7 @@ size_t data_jump_next(data_root_t *root, uint16_t newid) {
     zdb_verbose("[+] data: jumping to the next file\n");
 
     if(zdb_rootsettings.hook) {
-        hook = hook_new("jump-data", 4);
+        hook = hook_new("jump-data", 2);
         hook_append(hook, zdb_rootsettings.zdbid);
         hook_append(hook, root->datafile);
     }
