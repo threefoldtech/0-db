@@ -1246,7 +1246,7 @@ static void daemonize() {
         setvbuf(stdout, NULL, _IOLBF, 0);
     }
 
-    zdbd_verbose("[+] system: working in background now");
+    zdbd_verbose("[+] system: working in background now\n");
 }
 
 static int redis_listen_hook() {
