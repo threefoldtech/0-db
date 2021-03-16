@@ -115,7 +115,7 @@ int data_open_notfound_hook(char *filename) {
 
     zdb_debug("[+] data: trying to fetch missing datafile: %s\n", filename);
 
-    hook = hook_new("missing-data", 3);
+    hook = hook_new("missing-data", 2);
     hook_append(hook, zdb_rootsettings.zdbid);
     hook_append(hook, filename);
     retval = hook_execute_wait(hook);
