@@ -1,8 +1,7 @@
 name: Build release
-#on:  
-#  release:
-#    types: [created]
-on: [push]
+on:  
+  release:
+    types: [created]
 jobs:
   generate:
     name: Create release artifacts
