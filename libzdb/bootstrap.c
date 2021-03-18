@@ -53,6 +53,9 @@ zdb_settings_t *zdb_initialize() {
     memset(&s->stats, 0x00, sizeof(zdb_stats_t));
     gettimeofday(&s->stats.inittime, NULL);
 
+    // initialize hooks list
+    hook_initialize(&s->hooks);
+
     // initialize instance id
     s->iid = zdb_instanceid_generate();
 
@@ -92,6 +95,9 @@ zdb_settings_t *zdb_open(zdb_settings_t *zdb_settings) {
 void zdb_close(zdb_settings_t *zdb_settings) {
     zdb_debug("[+] bootstrap: closing database\n");
     namespaces_destroy(zdb_settings);
+
+    // cleanup hook subsystem
+    hook_destroy(&zdb_settings->hooks);
 
     zdb_debug("[+] bootstrap: cleaning library\n");
     free(zdb_settings->zdbid);

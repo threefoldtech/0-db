@@ -115,11 +115,10 @@ int data_open_notfound_hook(char *filename) {
 
     zdb_debug("[+] data: trying to fetch missing datafile: %s\n", filename);
 
-    hook = hook_new("missing-data", 3);
+    hook = hook_new("missing-data", 2);
     hook_append(hook, zdb_rootsettings.zdbid);
     hook_append(hook, filename);
     retval = hook_execute_wait(hook);
-    hook_free(hook);
 
     return retval;
 }
@@ -304,7 +303,7 @@ static void data_open_final(data_root_t *root) {
     }
 
     zdb_debug("[+] data: entries read: %d, last offset: %lu\n", entries, root->previous);
-    zdb_log("[+] data: active file: %s\n", root->datafile);
+    zdb_verbose("[+] data: active file: %s\n", root->datafile);
 }
 
 // jumping to the next id close the current data file
@@ -315,17 +314,17 @@ size_t data_jump_next(data_root_t *root, uint16_t newid) {
     zdb_verbose("[+] data: jumping to the next file\n");
 
     if(zdb_rootsettings.hook) {
-        hook = hook_new("jump-data", 4);
+        hook = hook_new("jump-data", 2);
         hook_append(hook, zdb_rootsettings.zdbid);
         hook_append(hook, root->datafile);
     }
 
     // flushing data
-    zdb_log("[+] data: flushing file before closing\n");
+    zdb_verbose("[+] data: flushing file before closing\n");
     fsync(root->datafd);
 
     // closing current file descriptor
-    zdb_log("[+] data: closing current datafile\n");
+    zdb_verbose("[+] data: closing current datafile\n");
     close(root->datafd);
 
     // moving to the next file
@@ -338,7 +337,6 @@ size_t data_jump_next(data_root_t *root, uint16_t newid) {
     if(zdb_rootsettings.hook) {
         hook_append(hook, root->datafile);
         hook_execute(hook);
-        hook_free(hook);
     }
 
     return root->dataid;

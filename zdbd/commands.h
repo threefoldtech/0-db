@@ -6,7 +6,15 @@
     int redis_dispatcher(redis_client_t *client);
 
     int command_args_validate(redis_client_t *client, int expected);
+    int command_args_validate_min(redis_client_t *client, int expected);
     int command_args_validate_null(redis_client_t *client, int expected);
+
+    // avoid too long argument
+    int command_args_overflow(redis_client_t *client, int argidx, int maxlen);
+
+    // validate a argument as namespace
+    int command_args_namespace(redis_client_t *client, int argidx);
+
     int command_admin_authorized(redis_client_t *client);
     int command_wait(redis_client_t *client);
     int command_asterisk(redis_client_t *client);

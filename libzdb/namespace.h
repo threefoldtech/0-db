@@ -9,6 +9,8 @@
     // current expected version of header
     #define NAMESPACE_CURRENT_VERSION  1
 
+    #define NAMESPACE_MAX_LENGTH  128
+
     typedef enum ns_flags_t {
         NS_FLAGS_PUBLIC = 1,   // public read-only namespace
         NS_FLAGS_WORM = 2,     // worm mode enabled or not

@@ -23,7 +23,7 @@
     //        and not assure retro-compatibility
     //        (eg: files written on version 1.x.x won't works
     //             out of box on a version 2.x.x)
-    #define ZDBD_VERSION     "1.2.0"
+    #define ZDBD_VERSION     "1.3.0-rc1"
 
     typedef struct zdbd_stats_t {
         // boottime is kept for zdbd uptime statistics (for INFO command)
@@ -52,6 +52,7 @@
         char *logfile;    // where to redirect logs in background mode
         int protect;      // flag default namespace to use admin password (for writing)
         int dualnet;      // support for dual socket listening
+        int rotatesec;    // amount of seconds before forcing rotation of index/data
 
         zdbd_stats_t stats;
 

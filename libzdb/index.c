@@ -110,6 +110,11 @@ int index_write(int fd, void *buffer, size_t length, index_root_t *root) {
         return 0;
     }
 
+    // flag current indexfile as dirty if we
+    // did any write on it
+    if(fd == root->indexfd)
+        root->updated = 1;
+
     if(response != (ssize_t) length) {
         zdb_logerr("[-] index write: partial write\n");
         return 0;
@@ -136,7 +141,10 @@ static int index_read(int fd, void *buffer, size_t length) {
     }
 
     if(response == 0) {
-        zdb_logerr("[-] index read: eof reached\n");
+        // end of file found, can be safe if user
+        // requested a key out-of-bounds, it's not
+        // an error itself
+        zdb_debug("[-] index read: eof reached\n");
         return 0;
     }
 
@@ -160,6 +168,9 @@ static char *index_set_id_buffer(char *buffer, char *indexdir, uint16_t indexid)
 void index_set_id(index_root_t *root, uint16_t fileid) {
     root->indexid = fileid;
     index_set_id_buffer(root->indexfile, root->indexdir, root->indexid);
+
+    // increase index dirty map to fit new length
+    index_dirty_resize(root, fileid);
 }
 
 //
@@ -172,7 +183,7 @@ static int index_open_file_mode(index_root_t *root, uint16_t fileid, int mode) {
     zdb_debug("[+] index: opening file: %s (ro: %s)\n", filename, (mode & O_RDONLY) ? "yes" : "no");
 
     if((fd = open(filename, mode)) < 0) {
-        zdb_verbosep("index_open", filename);
+        zdb_verbosep("index: open", filename);
         return -1;
     }
 
@@ -287,7 +298,10 @@ void index_open_final(index_root_t *root) {
         return;
     }
 
-    zdb_log("[+] index: active file: %s\n", root->indexfile);
+    // index just opened, not dirty
+    root->updated = 0;
+
+    zdb_verbose("[+] index: active file: %s\n", root->indexfile);
 }
 
 void index_close(index_root_t *root) {
@@ -300,20 +314,20 @@ void index_close(index_root_t *root) {
 size_t index_jump_next(index_root_t *root) {
     hook_t *hook = NULL;
 
-    zdb_verbose("[+] index: jumping to the next file\n");
+    zdb_verbose("[+] index: jumping to the next file [closing %s]\n", root->indexfile);
 
     if(zdb_rootsettings.hook) {
-        hook = hook_new("jump-index", 4);
+        hook = hook_new("jump-index", 2);
         hook_append(hook, zdb_rootsettings.zdbid);
         hook_append(hook, root->indexfile);
     }
 
     // flushing current index file
-    zdb_log("[+] index: flushing file before closing\n");
+    zdb_verbose("[+] index: flushing file before closing\n");
     fsync(root->indexfd);
 
     // closing current file descriptor
-    zdb_log("[+] index: closing current index file\n");
+    zdb_verbose("[+] index: closing current index file\n");
     index_close(root);
 
     // moving to the next file
@@ -332,11 +346,13 @@ size_t index_jump_next(index_root_t *root) {
     if(zdb_rootsettings.hook) {
         hook_append(hook, root->indexfile);
         hook_execute(hook);
-        hook_free(hook);
     }
 
     if(root->seqid)
         index_seqid_push(root, index_next_id(root), root->indexid);
+
+    // keep track when rotation occur
+    root->rotate = time(NULL);
 
     return root->indexid;
 }
@@ -534,6 +550,9 @@ int index_entry_delete_disk(index_root_t *root, index_entry_t *entry) {
     }
 
     close(fd);
+
+    // flag index entry as dirty, it was just modified
+    index_dirty_set(root, entry->indexid, 1);
 
     return 0;
 }
@@ -743,3 +762,66 @@ const char *index_modename(index_root_t *index) {
 
     return "unknown";
 }
+
+//
+// dirty handler
+//
+void index_dirty_resize(index_root_t *root, size_t maxid) {
+    // ignore any request with lower maxid than we
+    // already had
+    if(maxid <= root->dirty.maxid)
+        return;
+
+    root->dirty.maxid = maxid;
+
+    // checking if this new id increase amount of bytes
+    // needed for the bitmap, always ensure we are in
+    // correct range
+    size_t bytes = (maxid + 8) / 8;
+
+    // ignore shrink or same length
+    if(bytes <= root->dirty.length)
+        return;
+
+    // shortcut size
+    size_t size = sizeof(uint8_t) * bytes;
+
+    root->dirty.length = bytes;
+
+    zdb_debug("[+] index: allocating dirty length: %lu bytes\n", bytes);
+
+    if(!(root->dirty.map = (uint8_t *) realloc(root->dirty.map, size)))
+        zdb_diep("index: dirty: realloc");
+
+    // initialize new byte to zero
+    root->dirty.map[bytes - 1] = 0;
+}
+
+// reset the whole dirty map to clean
+void index_dirty_reset(index_root_t *root) {
+    zdb_debug("[+] index: resetting dirty flags\n");
+
+    for(size_t i = 0; i < root->dirty.length; i++)
+        root->dirty.map[i] = 0;
+}
+
+// value should only be 0 or 1
+void index_dirty_set(index_root_t *root, uint32_t id, uint8_t value) {
+    int index = id / 8;
+    int shift = id % 8;
+
+    zdb_debug("[+] index: set index dirty [file %d, bit %d]\n", index, shift);
+
+    // ensure value is 0 or 1 (nothing else)
+    // then set this bit on the bitmap
+    root->dirty.map[index] |= (!!value << shift);
+}
+
+// returns 0 or 1 if index requested is dirty or not
+int index_dirty_get(index_root_t *root, uint32_t id) {
+    int index = id / 8;
+    int shift = id % 8;
+
+    return !!(root->dirty.map[index] & (1 << shift));
+}
+

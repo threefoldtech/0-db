@@ -161,6 +161,13 @@
 
     } index_stats_t;
 
+    typedef struct index_dirty_t {
+        size_t maxid;
+        size_t length;
+        uint8_t *map;
+
+    } index_dirty_t;
+
     //
     // global root memory structure of the index
     //
@@ -175,6 +182,8 @@
         int synctime;       // force sync index after this amount of time
         time_t lastsync;    // keep track when the last sync was explictly made
         index_mode_t mode;  // running mode for that index
+        time_t rotate;      // last time file were rotate (jumped to next file)
+        int updated;        // does current index changed since opened
 
         void *namespace;    // see index_entry_t, same reason
 
@@ -182,6 +191,18 @@
         index_branch_t **branches; // list of branches (explained later)
         index_status_t status;     // index health
         index_stats_t stats;       // index statistics
+        index_dirty_t dirty;       // bitmap of dirty index files
+
+        // dirty index are index files overwritten because of update
+        // it's useful to know which index files are updated, in case of
+        // incremental backup, to know which index changed
+        //
+        // this bitmap is constructed like each bits is one index file id, eg:
+        //   [10001010] the first byte would represent the 8 first index files
+        //              in this example, id 0, 4 and 6 are dirty (updated)
+        //
+        // this try to keep a small storage space to represent the whole index,
+        // for 16384 index files, this would consume 2048 bytes
 
         size_t previous;    // keep latest offset inserted to the indexfile
 
@@ -291,6 +312,12 @@
     void index_close(index_root_t *root);
 
     const char *index_modename(index_root_t *index);
+
+    // dirty management
+    void index_dirty_resize(index_root_t *root, size_t maxid);
+    void index_dirty_reset(index_root_t *root);
+    void index_dirty_set(index_root_t *root, uint32_t id, uint8_t value);
+    int index_dirty_get(index_root_t *root, uint32_t id);
 
     // statistics management
     void index_io_error(index_root_t *root);

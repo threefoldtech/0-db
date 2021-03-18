@@ -1051,10 +1051,7 @@ uint64_t timeval_delta_ms(struct timeval *begin, struct timeval *end) {
     return deltams;
 }
 
-// recurring or periodic actions we can do
-// when the server is in idle state (no clients action
-// for a certain amount of time)
-void redis_idle_process() {
+static void redis_watch_timeout() {
     struct timeval timecheck;
     char response[64];
 
@@ -1082,6 +1079,38 @@ void redis_idle_process() {
             }
         }
     }
+}
+
+void redis_files_rotate() {
+    namespace_t *ns;
+
+    // file rotation disabled, nothing to do here
+    if(zdbd_rootsettings.rotatesec == 0)
+        return;
+
+    for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
+        if(!ns->index->updated)
+            continue;
+
+        time_t diffsec = time(NULL) - ns->index->rotate;
+
+        if(diffsec > zdbd_rootsettings.rotatesec) {
+            zdbd_log("[+] system: rotation requested (%s, %ld seconds)\n", ns->name, diffsec);
+            size_t newid = index_jump_next(ns->index);
+            data_jump_next(ns->data, newid);
+        }
+    }
+}
+
+// recurring or periodic actions we can do
+// when the server is in idle state (no clients action
+// for a certain amount of time)
+void redis_idle_process() {
+    // watch commands timeout
+    redis_watch_timeout();
+
+    // rotate files if requested after some time
+    redis_files_rotate();
 
     // discard any pending hook child
     libzdb_hooks_cleanup();
@@ -1217,16 +1246,17 @@ static void daemonize() {
         setvbuf(stdout, NULL, _IOLBF, 0);
     }
 
-    zdbd_verbose("[+] system: working in background now");
+    zdbd_verbose("[+] system: working in background now\n");
 }
 
-static void redis_listen_hook() {
+static int redis_listen_hook() {
     hook_t *hook = hook_new("ready", 1);
 
     hook_append(hook, zdb_id());
 
-    hook_execute(hook);
-    hook_free(hook);
+    int value = hook_execute_wait(hook);
+
+    return value;
 }
 
 int redis_socket_init(redis_handler_t *redis, char *listenaddr, char *socket) {
@@ -1285,12 +1315,24 @@ int redis_listen(char *listenaddr, char *port, char *socket) {
         zdbd_success("[+] listening on socket %d", redis.mainfd[i]);
     }
 
+    // notify we are ready
+    if(zdb_settings->hook) {
+        int code;
+        zdbd_log("[+] hook: starting and waiting initial hook event (ready)\n");
+
+        // if hook fails, abort database boot
+        // if any hook were specified, it's required that this
+        // hook returns 0 to notify everything is ready
+        if((code = redis_listen_hook()) != 0) {
+            zdbd_danger("[-] hook: unsuccessful init hook, stopping (code: %d)", code);
+            return 1;
+        }
+
+        zdbd_notice("[+] hook: external hook initialized correctly");
+    }
+
     if(zdbd_rootsettings.background)
         daemonize();
-
-    // notify we are ready
-    if(zdb_settings->hook)
-        redis_listen_hook();
 
     // entering the worker loop
     int handler = socket_handler(&redis);

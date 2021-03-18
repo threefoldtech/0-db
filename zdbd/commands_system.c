@@ -116,3 +116,134 @@ int command_info(redis_client_t *client) {
     return 0;
 }
 
+int command_hooks(redis_client_t *client) {
+    zdb_settings_t *zdb_settings = zdb_settings_get();
+    zdb_hooks_t *hooks = &zdb_settings->hooks;
+    hook_t *hook = NULL;
+    char *info;
+
+    if(!command_admin_authorized(client))
+        return 1;
+
+    if(!(info = calloc(sizeof(char), 8192)))
+        return 1;
+
+    sprintf(info, "*%lu\r\n", hooks->active);
+
+    for(size_t i = 0; i < hooks->length; i++) {
+        if(!(hook = hooks->hooks[i]))
+            continue;
+
+        char *type = hook->argv[1];
+
+        sprintf(info + strlen(info), "*6\r\n");
+
+        // hook type
+        sprintf(info + strlen(info), "$%lu\r\n%s\r\n", strlen(type), type);
+
+        // hook arguments
+        sprintf(info + strlen(info), "*%lu\r\n", hook->argc - 4);
+
+        // skipping:
+        //  - 1st argument: hook binary
+        //  - 2nd argument: which is the type
+        //  - 3rd argument: which is the instance id
+        //  - last argument: which is always null
+        for(size_t s = 3; s < hook->argc - 1; s++) {
+            char *arg = hook->argv[s];
+            sprintf(info + strlen(info), "$%lu\r\n%s\r\n", strlen(arg), arg);
+        }
+
+        // hook pid
+        sprintf(info + strlen(info), ":%d\r\n", hook->pid);
+
+        // timestamp when started
+        sprintf(info + strlen(info), ":%ld\r\n", hook->created);
+
+        // timestamp when finished
+        sprintf(info + strlen(info), ":%ld\r\n", hook->finished);
+
+        // exit code value
+        sprintf(info + strlen(info), ":%d\r\n", hook->status);
+    }
+
+    redis_reply_heap(client, info, strlen(info), free);
+
+    return 0;
+}
+
+static int command_index_dirty(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    index_root_t *index = client->ns->index;
+    char subcommand[COMMAND_MAXLEN];
+    char *response;
+
+    if(request->argc == 3) {
+        if(!command_args_overflow(client, 2, COMMAND_MAXLEN))
+            return 1;
+
+        sprintf(subcommand, "%.*s", request->argv[2]->length, (char *) request->argv[2]->buffer);
+
+        if(strcasecmp(subcommand, "RESET") == 0) {
+            index_dirty_reset(index);
+            redis_hardsend(client, "+OK");
+            return 0;
+        }
+
+        redis_hardsend(client, "-Unknown INDEX DIRTY subcommand");
+        return 1;
+    }
+
+    if(!(response = calloc(sizeof(char), 2048))) {
+        zdbd_warnp("index: dirty: calloc");
+        redis_hardsend(client, "-Internal Memory Error");
+        return 1;
+    }
+
+    size_t compute = 0;
+
+    // FIXME: avoid double loop
+    for(size_t i = 0; i < index->dirty.length; i++)
+        for(int a = 0; a < 8; a++)
+            if(index_dirty_get(index, (i * 8) + a) == 1)
+                compute += 1;
+
+    sprintf(response, "*%lu\r\n", compute);
+
+    // listing dirty index files
+    for(size_t i = 0; i < index->dirty.length; i++) {
+        for(int a = 0; a < 8; a++) {
+            int fileid = (i * 8) + a;
+
+            if(index_dirty_get(index, fileid) == 1)
+                sprintf(response + strlen(response), ":%d\r\n", fileid);
+        }
+    }
+
+    redis_reply_heap(client, response, strlen(response), free);
+
+    return 0;
+}
+
+int command_index(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    char command[COMMAND_MAXLEN];
+
+    if(!command_admin_authorized(client))
+        return 1;
+
+    if(!command_args_validate_min(client, 2))
+        return 1;
+
+    if(!command_args_overflow(client, 1, COMMAND_MAXLEN))
+        return 1;
+
+    sprintf(command, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
+
+    if(strcasecmp(command, "DIRTY") == 0)
+        return command_index_dirty(client);
+
+    redis_hardsend(client, "-Unknown INDEX subcommand");
+    return 1;
+}
+

@@ -107,6 +107,7 @@ void zdb_verbosep(char *prefix, char *str) {
         return;
 #endif
 
+    zdb_timelog(stderr);
     fprintf(stderr, "[-] %s: %s: %s\n", prefix, str, strerror(errno));
 }
 

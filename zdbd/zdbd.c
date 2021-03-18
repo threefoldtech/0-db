@@ -29,6 +29,7 @@ zdbd_settings_t zdbd_rootsettings = {
     .logfile = NULL,
     .protect = 0,
     .dualnet = 0,
+    .rotatesec = 0,
 };
 
 static struct option long_options[] = {
@@ -50,6 +51,7 @@ static struct option long_options[] = {
     {"datasize",   required_argument, 0, 'D'},
     {"maxsize",    required_argument, 0, 'M'},
     {"protect",    no_argument,       0, 'P'},
+    {"rotate",     required_argument, 0, 'r'},
     {"help",       no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
@@ -192,7 +194,6 @@ static void sighandler(int signal) {
                 hook_t *hook = hook_new("crash", 1);
                 hook_append(hook, zdb_id());
                 hook_execute(hook);
-                hook_free(hook);
             }
 
             // trying to save what we can save
@@ -208,7 +209,6 @@ static void sighandler(int signal) {
                 hook_t *hook = hook_new("close", 1);
                 hook_append(hook, zdb_id());
                 hook_execute(hook);
-                hook_free(hook);
             }
 
             namespaces_emergency();
@@ -269,7 +269,6 @@ void usage() {
     printf("  --mode  <mode>      select working mode:\n");
     printf("                       > user: default user key-value mode\n");
     printf("                       > seq: sequential keys generated\n");
-    printf("                       > direct: direct position by key\n");
     printf("                      note: if not specified, zdb will run in mixed mode\n");
     printf("  --datasize <size>   maximum datafile size before split (default: %.2f MB)\n\n", MB(ZDB_DEFAULT_DATA_MAXSIZE));
 
@@ -291,6 +290,7 @@ void usage() {
     printf("  --sync              force all write to be synced\n");
     printf("  --background        run in background (daemon), when ready\n");
     printf("  --logfile <file>    log file (only in daemon mode)\n");
+    printf("  --rotate <secs>     force file (index and data) rotation after x seconds\n");
     printf("  --help              print this message\n");
 
     exit(EXIT_FAILURE);
@@ -416,6 +416,11 @@ int main(int argc, char *argv[]) {
 
             case 'N':
                 zdbd_settings->dualnet = 1;
+                break;
+
+            case 'r':
+                zdbd_settings->rotatesec = atoi(optarg);
+                zdbd_verbose("[+] system: file rotation time: %d seconds\n", zdbd_settings->rotatesec);
                 break;
 
             case 'D':

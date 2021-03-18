@@ -4,6 +4,7 @@
     #include <stdint.h>
     #include <time.h>
     #include <sys/time.h>
+    #include "hook.h"
 
     #ifndef ZDB_REVISION
         #define ZDB_REVISION "(unknown)"
@@ -41,7 +42,7 @@
     //        and not assure retro-compatibility
     //        (eg: files written on version 1.x.x won't works
     //             out of box on a version 2.x.x)
-    #define ZDB_VERSION     "1.2.0"
+    #define ZDB_VERSION     "1.3.0-rc1"
 
     typedef struct zdb_stats_t {
         struct timeval inittime;  // timestamp when zdb started (used for uptime)
@@ -81,10 +82,11 @@
         //
         // this needs to be fixed later
 
-        char *zdbid;      // fake 0-db id generated based on listening
-        uint32_t iid;     // 0-db random instance id generated on boot
+        char *zdbid;         // fake 0-db id generated based on listening
+        uint32_t iid;        // 0-db random instance id generated on boot
 
-        zdb_stats_t stats; // global 0-db statistics
+        zdb_stats_t stats;   // global 0-db statistics
+        zdb_hooks_t hooks;   // global hooks running list
 
         // the synctime can be useful to add basic security without killing
         // performance
@@ -128,7 +130,7 @@
     #define COLOR_RESET  "\033[0m"
 
     #define zdb_log(fmt, ...)     { zdb_timelog(stdout); printf(fmt, ##__VA_ARGS__); }
-    #define zdb_logerr(fmt, ...)  { zdb_timelog(stdout); fprintf(stderr, fmt, ##__VA_ARGS__); }
+    #define zdb_logerr(fmt, ...)  { zdb_timelog(stderr); fprintf(stderr, fmt, ##__VA_ARGS__); }
 
     #define zdb_danger(fmt, ...)  { zdb_timelog(stdout); printf(COLOR_RED    fmt COLOR_RESET "\n", ##__VA_ARGS__); }
     #define zdb_warning(fmt, ...) { zdb_timelog(stdout); printf(COLOR_YELLOW fmt COLOR_RESET "\n", ##__VA_ARGS__); }
@@ -142,7 +144,6 @@
 
     #include "data.h"
     #include "filesystem.h"
-    #include "hook.h"
     #include "index.h"
     #include "index_branch.h"
     #include "index_get.h"

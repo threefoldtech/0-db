@@ -62,6 +62,7 @@ made, a new entry is added, with a special flag. This have multiple advantages:
 - More efficient for SSD, longer life, since overwrite doesn't occures
 - Easy for backup or transfert: incremental copy work out-of-box
 - Easy for manipulation: data is flat
+- History support out-of-box, since all data are kept
 
 Of course, when we have advantages, some cons comes with them:
 - Any overwrite won't clean previous data
@@ -69,7 +70,6 @@ Of course, when we have advantages, some cons comes with them:
 - You need some maintenance to keep your database not exploding
 
 Hopefuly, theses cons have their solution:
-- We always have previous data there, let's allows to walk throught it and support history out-of-box !
 - Since data are always append, you can at any time start another process reading that database
 and rewrite data somewhere else, with optimization (removed non-needed files). This is what we call
 `compaction`, and some tools are here to do so.
@@ -99,7 +99,9 @@ If you run `zdbd` without `--mode` argument, server will runs in `mixed mode` an
 information on how to choose runtime mode.
 
 ## User Key
-This is a default mode, a simple key-value store. User can `SET` their own keys, like any key-value store.
+This is a default mode, a simple key-value store.
+User can `SET` their own keys, like any key-value store.
+All the keys are kept in memory.
 
 Even in this mode, the key itself is returned by the `SET` command.
 
@@ -193,6 +195,7 @@ This mode is not possible if you don't have any data/index already available.
 - `WAIT command | * [timeout-ms]`
 - `HISTORY key [binary-data]`
 - `FLUSH`
+- `HOOKS`
 
 `SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
 
@@ -293,7 +296,30 @@ data_limits_bytes: 0   # namespace size limit (0 for unlimited)
 index_size_bytes: 0    # index size in bytes (thanks captain obvious)
 index_size_kb: 0.00    # index size in KB
 mode: userkey          # running mode (userkey/sequential)
+
+## new fields
+worm: no               # write-once-read-multiple mode enabled
+locked: no             # lock (read-only or even write disabled) mode
+
+next_internal_id: 0x00000000    # internal next key id
+stats_index_io_errors: 0        # amount of index read/write io error
+stats_index_io_error_last: 0    # last timestamp of index io error
+stats_index_faults: 0           # always 0 for now
+stats_data_io_errors: 0         # amount of data read/write io error
+stats_data_io_error_last: 0     # timestamp of last io error
+stats_data_faults: 0            # always 0 for now
+
+index_disk_freespace_bytes: 57676599296    # free space on index partition (bytes)
+index_disk_freespace_mb: 55004.69          # free space on index partition (megabytes)
+data_disk_freespace_bytes: 57676599296     # free space on data partition (bytes)
+data_disk_freespace_mb: 55004.69           # free space on data partition (metabytes)
+
+data_path: /tmp/zdb-data/default           # namespace physical data path (only available for admin)
+index_path: /tmp/zdb-index/default         # namespace physical index path (only available for admin)
 ```
+
+Fields `stats_index_` and `stats_data_` fields are useful to know if partition on which data and index
+live had issues during running time.
 
 ## NSLIST
 Returns an array of all available namespaces.
@@ -307,6 +333,8 @@ Properties:
 * `public`: change the public flag, a public namespace can be read-only if a password is set (0 or 1)
 * `worm`: « write only read multiple » flag which disable overwrite and deletion (0 or 1)
 * `mode`: change index mode (`user` or `seq`)
+* `lock`: set namespace in read-only or normal mode (0 or 1)
+* `freeze`: set namespace in read-write protected or normal mode (0 or 1)
 
 About mode selection: it's now possible to mix modes (user and sequential) on the same 0-db instance.
 This is only possible if you don't provide any `--mode` argument on runtime, otherwise 0-db will be available
@@ -317,13 +345,19 @@ namespace. You can change `default` namespace aswell if it's empty.
 
 As soon as there are a single object in the namespace, you won't be able to change mode.
 
+`LOCK` mode won't change anything for read queries, but any update (set, del, ...) will be
+denied with an error message (eg: `Namespace is temporarily locked`).
+
+`FREEZE` mode will deny any operation on the specific namespace, read, write, update, delete operations
+will be denied with an error message (eg: `Namespace is temporarily frozen`)
+
 ## SELECT
 Change your current namespace. If the requested namespace is password-protected, you need
 to add the password as extra parameter. If the namespace is `public` but password protected,
 and you don't provide any password, the namespace will be accessible in read-only.
 
 You can use SECURE password, like authentication (see below). A challenge is required first
-(using `AUTH SECURE CHALLENGE` command).
+(using `AUTH SECURE CHALLENGE` command). See `AUTH` below for more information.
 
 ```
 >> AUTH SECURE CHALLENGE
@@ -407,6 +441,52 @@ recovery is possible (history, etc. are deleted).
 This is only allowed on private and password protected namespace. You need to select the namespace
 before running the command.
 
+## HOOKS
+
+This command is reserved to admin. It lists running (or recently running) hooks and their status.
+
+This list contains a list of hooks. Each entry contains 6 fields:
+```
+> HOOKS
+1) 1) "ready"
+   2) (empty array)
+   3) (integer) 18621
+   4) (integer) 1615511907
+   5) (integer) 1615511907
+   6) (integer) 0
+```
+
+Values are:
+1. Hook Type (name)
+2. Extra arguments (depend of the type)
+3. Process ID (pid)
+4. Timestamp when hook were created
+5. Timestamp when hook finished
+6. Status Code (return code)
+
+A still running hook will have a positive created timestamp but zero
+finished timestamp.
+
+Example of a hook triggered when 'namespace2' namespace were created:
+```
+> HOOKS
+1) 1) "namespace-created"
+   2) 1) "namespace2"
+   3) (integer) 18447
+   4) (integer) 1615511807
+   5) (integer) 1615511818
+   6) (integer) 2
+```
+
+The database keep a volatile list, only recent hooks are kept and list
+is cleaned up after some time for now it's 60 seconds. This could changes.
+
+If no recent hooks were executed, list is empty:
+```
+> HOOKS
+(empty array)
+```
+
 # Namespaces
 A namespace is a dedicated directory on index and data root directory.
 A namespace is a complete set of key/data. Each namespace can be optionally protected by a password
@@ -426,12 +506,12 @@ You can request 0-db to call an external program/script, as hook-system. This al
 machine running 0-db to adapt itself when something happen.
 
 To use the hook system, just set `--hook /path/to/executable` on argument.
-The file must be executable, no shell are invoked.
+The file must be executable, no shell are invoked. Executing a shell script with shebang is valid.
 
-When 0-db starts, it create it own pseudo `identifier` based on listening address/port/socket.
+When 0-db starts, it create it's own pseudo `identifier` based on listening address/port/socket.
 This id is used on hooks arguments.
 
-First argument is `Hook Name`, second argument is `Generated ID`, next arguments depends of the hook.
+First argument is `Hook name`, second argument is `Generated ID`, next arguments depends of the hook.
 
 Current supported hooks:
 
@@ -446,6 +526,12 @@ Current supported hooks:
 | `namespace-deleted`   | Namespace removed       | Namespace name             |
 | `namespace-reloaded`  | Namespace reloaded      | Namespace name             |
 | `missing-data`        | Data file not found     | Missing filename           |
+
+**WARNING**: as soon as hook system is enabled, `ready` event needs to be handled correctly.
+If hook returns something else than `0`, database initialization will be stopped.
+
+In order to get `zdbd` starting with hook, `ready` _needs_ to returns `0` to valdate server that everything
+is okay and database can operate.
 
 # Limitation
 By default, datafiles are split when bigger than 256 MB.
