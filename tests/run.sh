@@ -14,24 +14,24 @@ rm -rf /tmp/zdbtest
 ./zdbd/zdb --datasize $((8 * 1024 * 1024 * 1024)) || true
 
 # test load with slashes
-./zdbd/zdb -v --dump --data /tmp/zdbtest --index /tmp/zdbtest
-./zdbd/zdb -v --dump --data /tmp/zdbtest/ --index /tmp/zdbtest/
+./zdbd/zdb --verbose --dump --data /tmp/zdbtest --index /tmp/zdbtest
+./zdbd/zdb --verbose --dump --data /tmp/zdbtest/ --index /tmp/zdbtest/
 
 # first real test suite
-./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true --datasize $((128 * 1024 * 1024))
+./zdbd/zdb --background --verbose --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true --datasize $((128 * 1024 * 1024))
 ./tests/zdbtests
 sleep 1
 
 # reopen existing data
-./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --dump
+./zdbd/zdb --background --verbose --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --dump
 
 # simulate a segmentation fault
-./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true
+./zdbd/zdb --background --verbose --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true
 pkill -SEGV zdb
 sleep 1
 
 # simulate a SIGINT (ctrl+c)
-./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true
+./zdbd/zdb --background --verbose --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true
 pkill -INT zdb
 sleep 1
 
@@ -39,7 +39,7 @@ sleep 1
 rm -rf /tmp/zdbtest
 
 # starting test suite with small datasize, generating lot of file jump
-./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true --datasize 32
+./zdbd/zdb --background --verbose --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true --datasize 32
 ./tests/zdbtests
 sleep 1
 
@@ -47,7 +47,7 @@ sleep 1
 rm -rf /tmp/zdbtest
 
 # starting with authentification
-./zdbd/zdb --background -v --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ \
+./zdbd/zdb --background --verbose --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ \
     --admin protect \
     --synctime 10 \
     --mode user
@@ -59,7 +59,7 @@ rm -rf /tmp/zdbtest
 
 # launch tcp testsuite
 # by the way, separate data and index directories
-./zdbd/zdb --background -v --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --admin root \
+./zdbd/zdb --background --verbose --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --admin root \
   --logfile /tmp/zdb.logs \
   --listen 127.0.0.1 --port 9900 \
   --sync
@@ -67,11 +67,11 @@ rm -rf /tmp/zdbtest
 ./tests/zdbtests
 
 # open in sequential (will fails because created in another mode)
-./zdbd/zdb -v --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --dump --mode seq || true
+./zdbd/zdb --verbose --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --dump --mode seq || true
 
 # truncate index
 echo nopenopenope > /tmp/zdbtest-index/default/zdb-index-00000
-./zdbd/zdb -v --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --dump || true
+./zdbd/zdb --verbose --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --dump || true
 
 # clean
 rm -rf /tmp/zdbtest-data
