@@ -151,7 +151,7 @@ int socket_handler(redis_handler_t *handler) {
         // of commands, otherwise spamming the server enough
         // would never trigger it
         if(dstats->netevents % 100 == 0) {
-            zdbd_debug("[+] sockets: forcing idle process [%lu]\n", dstats->netevents);
+            zdbd_debug("[+] sockets: forcing idle process [%llu]\n", dstats->netevents);
             redis_idle_process();
         }
     }
