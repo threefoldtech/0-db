@@ -825,3 +825,32 @@ int index_dirty_get(index_root_t *root, uint32_t id) {
     return !!(root->dirty.map[index] & (1 << shift));
 }
 
+index_dirty_list_t index_dirty_list(index_root_t *index) {
+    // allocate an array as long as many entries
+    // is possible, in order to be sure we have enough space
+    index_dirty_list_t dirty = {
+        .length = 0,
+        .list = NULL,
+    };
+
+    if(!(dirty.list = calloc(sizeof(int), index->indexid + 1))) {
+        zdb_warnp("dirty: list: calloc");
+        return dirty;
+    }
+
+    // building list array
+    for(size_t i = 0; i < index->dirty.length; i++) {
+        for(int a = 0; a < 8; a++) {
+            int fileid = (i * 8) + a;
+
+            if(index_dirty_get(index, fileid) == 1)
+                dirty.list[dirty.length++] = fileid;
+        }
+    }
+
+    return dirty;
+}
+
+void index_dirty_list_free(index_dirty_list_t *dirty) {
+    free(dirty->list);
+}

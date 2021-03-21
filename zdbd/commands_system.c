@@ -194,33 +194,28 @@ static int command_index_dirty(redis_client_t *client) {
         return 1;
     }
 
-    if(!(response = calloc(sizeof(char), 2048))) {
+    index_dirty_list_t dirty = index_dirty_list(index);
+    if(!dirty.list) {
+        redis_hardsend(client, "-Internal Memory Error");
+        return 1;
+    }
+
+    // allocation assume 10 chars per id would be enough
+    // we already need 3 chars min per entry (: \r\n)
+    if(!(response = calloc(sizeof(char), dirty.length * 10))) {
         zdbd_warnp("index: dirty: calloc");
         redis_hardsend(client, "-Internal Memory Error");
         return 1;
     }
 
-    size_t compute = 0;
+    int length = 0;
+    length += sprintf(response, "*%lu\r\n", dirty.length);
 
-    // FIXME: avoid double loop
-    for(size_t i = 0; i < index->dirty.length; i++)
-        for(int a = 0; a < 8; a++)
-            if(index_dirty_get(index, (i * 8) + a) == 1)
-                compute += 1;
+    for(size_t i = 0; i < dirty.length; i++)
+        length += sprintf(response + length, ":%d\r\n", dirty.list[i]);
 
-    sprintf(response, "*%lu\r\n", compute);
-
-    // listing dirty index files
-    for(size_t i = 0; i < index->dirty.length; i++) {
-        for(int a = 0; a < 8; a++) {
-            int fileid = (i * 8) + a;
-
-            if(index_dirty_get(index, fileid) == 1)
-                sprintf(response + strlen(response), ":%d\r\n", fileid);
-        }
-    }
-
-    redis_reply_heap(client, response, strlen(response), free);
+    redis_reply_heap(client, response, length, free);
+    index_dirty_list_free(&dirty);
 
     return 0;
 }
