@@ -341,7 +341,6 @@ size_t index_jump_next(index_root_t *root) {
         }
 
         // reset dirty list
-        index_dirty_reset(root);
         index_dirty_list_free(&dirty);
     }
 
@@ -369,7 +368,12 @@ size_t index_jump_next(index_root_t *root) {
     if(zdb_rootsettings.hook) {
         hook_append(hook, root->indexfile);
         hook_append(hook, dirtylist ? dirtylist : "");
-        hook_execute(hook);
+
+        int retval = hook_execute_wait(hook);
+        if(retval == 0) {
+            zdb_debug("[+] index: hook: success call, cleaning dirty index\n");
+            index_dirty_reset(root);
+        }
 
         free(dirtylist);
     }
