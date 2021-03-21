@@ -135,6 +135,7 @@ int socket_handler(redis_handler_t *handler) {
 
     while(1) {
         int n = kevent(handler->evfd, NULL, 0, evlist, MAXEVENTS, &timeout);
+        dstats->netevents += 1;
 
         if(n == 0) {
             // timeout reached, checking for background
@@ -149,8 +150,8 @@ int socket_handler(redis_handler_t *handler) {
         // force idle process trigger after fixed amount
         // of commands, otherwise spamming the server enough
         // would never trigger it
-        if(dstats->cmdsvalid % 100 == 0) {
-            zdbd_debug("[+] sockets: forcing idle process [%lu]\n", dstats->cmdsvalid);
+        if(dstats->netevents % 100 == 0) {
+            zdbd_debug("[+] sockets: forcing idle process [%lu]\n", dstats->netevents);
             redis_idle_process();
         }
     }
