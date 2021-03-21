@@ -26,6 +26,9 @@ jobs:
 
       - name: Upload codecov
         run: |
-          cd src
+          cd libzdb
+          bash <(curl -s https://codecov.io/bash)
+
+          cd ../zdbd
           bash <(curl -s https://codecov.io/bash)
 
