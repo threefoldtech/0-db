@@ -117,6 +117,7 @@ static int socket_event(struct epoll_event *events, int notified, redis_handler_
 int socket_handler(redis_handler_t *handler) {
     struct epoll_event event;
     struct epoll_event *events = NULL;
+    zdbd_stats_t *dstats = &zdbd_rootsettings.stats;
 
     // initialize empty struct
     memset(&event, 0, sizeof(struct epoll_event));
@@ -153,6 +154,14 @@ int socket_handler(redis_handler_t *handler) {
         if(socket_event(events, n, handler) == 1) {
             free(events);
             return 1;
+        }
+
+        // force idle process trigger after fixed amount
+        // of commands, otherwise spamming the server enough
+        // would never trigger it
+        if(dstats->cmdsvalid % 100 == 0) {
+            zdbd_debug("[+] sockets: forcing idle process [%lu]\n", dstats->cmdsvalid);
+            redis_idle_process();
         }
     }
 
