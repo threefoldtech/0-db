@@ -313,13 +313,36 @@ void index_close(index_root_t *root) {
 // triggered by a datafile too big event
 size_t index_jump_next(index_root_t *root) {
     hook_t *hook = NULL;
+    char *dirtylist = NULL;
 
     zdb_verbose("[+] index: jumping to the next file [closing %s]\n", root->indexfile);
 
     if(zdb_rootsettings.hook) {
-        hook = hook_new("jump-index", 3);
+        hook = hook_new("jump-index", 4);
         hook_append(hook, zdb_rootsettings.zdbid);
         hook_append(hook, root->indexfile);
+
+        // build dirty list
+        index_dirty_list_t dirty = index_dirty_list(root);
+        if(!dirty.list)
+            zdb_diep("index: jump: dirty: get list");
+
+        if(!(dirtylist = calloc(sizeof(char), (dirty.length + 1) * 8)))
+            zdb_diep("index: jump: dirty: calloc");
+
+        int offset = 0;
+
+        for(size_t i = 0; i < dirty.length; i++)
+            offset += sprintf(dirtylist + offset, "%d ", dirty.list[i]);
+
+        if(dirty.length > 0) {
+            // strip last space
+            dirtylist[offset - 1] = '\0';
+        }
+
+        // reset dirty list
+        index_dirty_reset(root);
+        index_dirty_list_free(&dirty);
     }
 
     // flushing current index file
@@ -345,7 +368,10 @@ size_t index_jump_next(index_root_t *root) {
 
     if(zdb_rootsettings.hook) {
         hook_append(hook, root->indexfile);
+        hook_append(hook, dirtylist ? dirtylist : "");
         hook_execute(hook);
+
+        free(dirtylist);
     }
 
     if(root->seqid)
