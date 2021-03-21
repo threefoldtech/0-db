@@ -128,7 +128,7 @@ int command_hooks(redis_client_t *client) {
     if(!command_admin_authorized(client))
         return 1;
 
-    if(!(info = calloc(sizeof(char), 8192)))
+    if(!(info = calloc(sizeof(char), (hooks->active + 1) * 1024)))
         return 1;
 
     len += sprintf(info, "*%lu\r\n", hooks->active);
