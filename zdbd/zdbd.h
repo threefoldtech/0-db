@@ -39,6 +39,7 @@
         // network
         uint64_t networkrx;       // amount of bytes received over the network
         uint64_t networktx;       // amount of bytes transmitted over the network
+        uint64_t netevents;       // amount of socket events received
 
     } zdbd_stats_t;
 

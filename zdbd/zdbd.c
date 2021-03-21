@@ -52,6 +52,7 @@ static struct option long_options[] = {
     {"maxsize",    required_argument, 0, 'M'},
     {"protect",    no_argument,       0, 'P'},
     {"rotate",     required_argument, 0, 'r'},
+    {"version",    no_argument,       0, 'V'},
     {"help",       no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
@@ -291,6 +292,7 @@ void usage() {
     printf("  --background        run in background (daemon), when ready\n");
     printf("  --logfile <file>    log file (only in daemon mode)\n");
     printf("  --rotate <secs>     force file (index and data) rotation after x seconds\n");
+    printf("  --version           print version and exit\n");
     printf("  --help              print this message\n");
 
     exit(EXIT_FAILURE);
@@ -315,6 +317,10 @@ int main(int argc, char *argv[]) {
             break;
 
         switch(i) {
+            case 'V':
+                // version printed above, exiting
+                return 0;
+
             case 'd':
                 zdb_settings->datapath = optarg;
                 break;

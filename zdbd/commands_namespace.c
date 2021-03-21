@@ -295,30 +295,31 @@ int command_nsinfo(redis_client_t *client) {
 
     // compute free space available
     size_t available = namespace->maxsize - namespace->index->stats.datasize;
+    int len = 0;
 
-    sprintf(info, "# namespace\n");
-    sprintf(info + strlen(info), "name: %s\n", namespace->name);
-    sprintf(info + strlen(info), "entries: %lu\n", namespace->index->stats.entries);
-    sprintf(info + strlen(info), "public: %s\n", namespace->public ? "yes" : "no");
-    sprintf(info + strlen(info), "worm: %s\n", namespace->worm ? "yes" : "no");
-    sprintf(info + strlen(info), "locked: %s\n", namespace->locked ? "yes" : "no");
-    sprintf(info + strlen(info), "password: %s\n", namespace->password ? "yes" : "no");
-    sprintf(info + strlen(info), "data_size_bytes: %lu\n", namespace->index->stats.datasize);
-    sprintf(info + strlen(info), "data_size_mb: %.2f\n", MB(namespace->index->stats.datasize));
-    sprintf(info + strlen(info), "data_limits_bytes: %lu\n", namespace->maxsize);
-    sprintf(info + strlen(info), "index_size_bytes: %lu\n", namespace->index->stats.size);
-    sprintf(info + strlen(info), "index_size_kb: %.2f\n", KB(namespace->index->stats.size));
-    sprintf(info + strlen(info), "next_internal_id: 0x%08x\n", bswap_32(nextid));
-    sprintf(info + strlen(info), "mode: %s\n", index_modename(namespace->index));
-    sprintf(info + strlen(info), "stats_index_io_errors: %lu\n", namespace->index->stats.errors);
-    sprintf(info + strlen(info), "stats_index_io_error_last: %ld\n", namespace->index->stats.lasterr);
-    sprintf(info + strlen(info), "stats_index_faults: %lu\n", namespace->index->stats.faults);
-    sprintf(info + strlen(info), "stats_data_io_errors: %lu\n", namespace->data->stats.errors);
-    sprintf(info + strlen(info), "stats_data_io_error_last: %ld\n", namespace->data->stats.lasterr);
-    sprintf(info + strlen(info), "stats_data_faults: %lu\n", namespace->data->stats.faults);
+    len += sprintf(info, "# namespace\n");
+    len += sprintf(info + len, "name: %s\n", namespace->name);
+    len += sprintf(info + len, "entries: %lu\n", namespace->index->stats.entries);
+    len += sprintf(info + len, "public: %s\n", namespace->public ? "yes" : "no");
+    len += sprintf(info + len, "worm: %s\n", namespace->worm ? "yes" : "no");
+    len += sprintf(info + len, "locked: %s\n", namespace->locked ? "yes" : "no");
+    len += sprintf(info + len, "password: %s\n", namespace->password ? "yes" : "no");
+    len += sprintf(info + len, "data_size_bytes: %lu\n", namespace->index->stats.datasize);
+    len += sprintf(info + len, "data_size_mb: %.2f\n", MB(namespace->index->stats.datasize));
+    len += sprintf(info + len, "data_limits_bytes: %lu\n", namespace->maxsize);
+    len += sprintf(info + len, "index_size_bytes: %lu\n", namespace->index->stats.size);
+    len += sprintf(info + len, "index_size_kb: %.2f\n", KB(namespace->index->stats.size));
+    len += sprintf(info + len, "next_internal_id: 0x%08x\n", bswap_32(nextid));
+    len += sprintf(info + len, "mode: %s\n", index_modename(namespace->index));
+    len += sprintf(info + len, "stats_index_io_errors: %lu\n", namespace->index->stats.errors);
+    len += sprintf(info + len, "stats_index_io_error_last: %ld\n", namespace->index->stats.lasterr);
+    len += sprintf(info + len, "stats_index_faults: %lu\n", namespace->index->stats.faults);
+    len += sprintf(info + len, "stats_data_io_errors: %lu\n", namespace->data->stats.errors);
+    len += sprintf(info + len, "stats_data_io_error_last: %ld\n", namespace->data->stats.lasterr);
+    len += sprintf(info + len, "stats_data_faults: %lu\n", namespace->data->stats.faults);
 
     if(namespace->maxsize > 0)
-        sprintf(info + strlen(info), "space_available: %lu\n", available);
+        len += sprintf(info + len, "space_available: %lu\n", available);
 
     // underneath disk free space
     struct statvfs buf;
@@ -328,8 +329,8 @@ int command_nsinfo(redis_client_t *client) {
     if(statvfs(namespace->indexpath, &buf) == 0) {
         sfree = buf.f_bsize * buf.f_bavail;
 
-        sprintf(info + strlen(info), "index_disk_freespace_bytes: %lu\n", sfree);
-        sprintf(info + strlen(info), "index_disk_freespace_mb: %.2f\n", MB(sfree));
+        len += sprintf(info + len, "index_disk_freespace_bytes: %lu\n", sfree);
+        len += sprintf(info + len, "index_disk_freespace_mb: %.2f\n", MB(sfree));
 
     } else {
         zdbd_warnp(namespace->indexpath);
@@ -339,8 +340,8 @@ int command_nsinfo(redis_client_t *client) {
     if(statvfs(namespace->datapath, &buf) == 0) {
         sfree = buf.f_bsize * buf.f_bavail;
 
-        sprintf(info + strlen(info), "data_disk_freespace_bytes: %lu\n", sfree);
-        sprintf(info + strlen(info), "data_disk_freespace_mb: %.2f\n", MB(sfree));
+        len += sprintf(info + len, "data_disk_freespace_bytes: %lu\n", sfree);
+        len += sprintf(info + len, "data_disk_freespace_mb: %.2f\n", MB(sfree));
 
     } else {
         zdbd_warnp(namespace->datapath);
@@ -349,15 +350,15 @@ int command_nsinfo(redis_client_t *client) {
 
     // master client response
     if(client->master && namespace->password) {
-        sprintf(info + strlen(info), "password_raw: %s\n", namespace->password);
+        len += sprintf(info + len, "password_raw: %s\n", namespace->password);
     }
 
     if(client->admin) {
-        sprintf(info + strlen(info), "data_path: %s\n", namespace->data->datadir);
-        sprintf(info + strlen(info), "index_path: %s\n", namespace->index->indexdir);
+        len += sprintf(info + len, "data_path: %s\n", namespace->data->datadir);
+        len += sprintf(info + len, "index_path: %s\n", namespace->index->indexdir);
     }
 
-    redis_bulk_t response = redis_bulk(info, strlen(info));
+    redis_bulk_t response = redis_bulk(info, len);
     if(!response.buffer) {
         redis_hardsend(client, "$-1");
         free(info);

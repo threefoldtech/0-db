@@ -64,47 +64,49 @@ int command_info(redis_client_t *client) {
     zdb_settings_t *zdb_settings = zdb_settings_get();
     zdb_stats_t *lstats = &zdb_settings->stats;
     zdbd_stats_t *dstats = &zdbd_rootsettings.stats;
+    int len = 0;
+
     gettimeofday(&current, NULL);
 
-    sprintf(info, "# server\n");
-    sprintf(info + strlen(info), "server_name: 0-db (zdb)\n");
-    sprintf(info + strlen(info), "server_revision: " ZDBD_REVISION "\n");
-    sprintf(info + strlen(info), "engine_revision: %s\n", zdb_revision());
-    sprintf(info + strlen(info), "instance_id: %u\n", zdb_instanceid_get());
-    sprintf(info + strlen(info), "boot_time: %ld\n", dstats->boottime.tv_sec);
-    sprintf(info + strlen(info), "uptime: %ld\n", current.tv_sec - dstats->boottime.tv_sec);
+    len += sprintf(info, "# server\n");
+    len += sprintf(info + len, "server_name: 0-db (zdb)\n");
+    len += sprintf(info + len, "server_revision: " ZDBD_REVISION "\n");
+    len += sprintf(info + len, "engine_revision: %s\n", zdb_revision());
+    len += sprintf(info + len, "instance_id: %u\n", zdb_instanceid_get());
+    len += sprintf(info + len, "boot_time: %ld\n", dstats->boottime.tv_sec);
+    len += sprintf(info + len, "uptime: %ld\n", current.tv_sec - dstats->boottime.tv_sec);
 
 
-    sprintf(info + strlen(info), "\n# clients\n");
-    sprintf(info + strlen(info), "clients_lifetime: %" PRIu32 "\n", dstats->clients);
+    len += sprintf(info + len, "\n# clients\n");
+    len += sprintf(info + len, "clients_lifetime: %" PRIu32 "\n", dstats->clients);
 
 
-    sprintf(info + strlen(info), "\n# stats\n");
-    sprintf(info + strlen(info), "commands_executed: %" PRIu64 "\n", dstats->cmdsvalid);
-    sprintf(info + strlen(info), "commands_failed: %" PRIu64 "\n", dstats->cmdsfailed);
-    sprintf(info + strlen(info), "commands_unauthorized: %" PRIu64 "\n", dstats->adminfailed);
+    len += sprintf(info + len, "\n# stats\n");
+    len += sprintf(info + len, "commands_executed: %" PRIu64 "\n", dstats->cmdsvalid);
+    len += sprintf(info + len, "commands_failed: %" PRIu64 "\n", dstats->cmdsfailed);
+    len += sprintf(info + len, "commands_unauthorized: %" PRIu64 "\n", dstats->adminfailed);
 
-    sprintf(info + strlen(info), "index_disk_read_failed: %" PRIu64 "\n", lstats->idxreadfailed);
-    sprintf(info + strlen(info), "index_disk_write_failed: %" PRIu64 "\n", lstats->idxwritefailed);
-    sprintf(info + strlen(info), "data_disk_read_failed: %" PRIu64 "\n", lstats->datareadfailed);
-    sprintf(info + strlen(info), "data_disk_write_failed: %" PRIu64 "\n", lstats->datawritefailed);
+    len += sprintf(info + len, "index_disk_read_failed: %" PRIu64 "\n", lstats->idxreadfailed);
+    len += sprintf(info + len, "index_disk_write_failed: %" PRIu64 "\n", lstats->idxwritefailed);
+    len += sprintf(info + len, "data_disk_read_failed: %" PRIu64 "\n", lstats->datareadfailed);
+    len += sprintf(info + len, "data_disk_write_failed: %" PRIu64 "\n", lstats->datawritefailed);
 
-    sprintf(info + strlen(info), "index_disk_read_bytes: %" PRIu64 "\n", lstats->idxdiskread);
-    sprintf(info + strlen(info), "index_disk_read_mb: %.2f\n", lstats->idxdiskread / (1024 * 1024.0));
-    sprintf(info + strlen(info), "index_disk_write_bytes: %" PRIu64 "\n", lstats->idxdiskwrite);
-    sprintf(info + strlen(info), "index_disk_write_mb: %.2f\n", lstats->idxdiskwrite / (1024 * 1024.0));
+    len += sprintf(info + len, "index_disk_read_bytes: %" PRIu64 "\n", lstats->idxdiskread);
+    len += sprintf(info + len, "index_disk_read_mb: %.2f\n", lstats->idxdiskread / (1024 * 1024.0));
+    len += sprintf(info + len, "index_disk_write_bytes: %" PRIu64 "\n", lstats->idxdiskwrite);
+    len += sprintf(info + len, "index_disk_write_mb: %.2f\n", lstats->idxdiskwrite / (1024 * 1024.0));
 
-    sprintf(info + strlen(info), "data_disk_read_bytes: %" PRIu64 "\n", lstats->datadiskread);
-    sprintf(info + strlen(info), "data_disk_read_mb: %.2f\n", lstats->datadiskread / (1024 * 1024.0));
-    sprintf(info + strlen(info), "data_disk_write_bytes: %" PRIu64 "\n", lstats->datadiskwrite);
-    sprintf(info + strlen(info), "data_disk_write_mb: %.2f\n", lstats->datadiskwrite / (1024 * 1024.0));
+    len += sprintf(info + len, "data_disk_read_bytes: %" PRIu64 "\n", lstats->datadiskread);
+    len += sprintf(info + len, "data_disk_read_mb: %.2f\n", lstats->datadiskread / (1024 * 1024.0));
+    len += sprintf(info + len, "data_disk_write_bytes: %" PRIu64 "\n", lstats->datadiskwrite);
+    len += sprintf(info + len, "data_disk_write_mb: %.2f\n", lstats->datadiskwrite / (1024 * 1024.0));
 
-    sprintf(info + strlen(info), "network_rx_bytes: %" PRIu64 "\n", dstats->networkrx);
-    sprintf(info + strlen(info), "network_rx_mb: %.2f\n", dstats->networkrx / (1024 * 1024.0));
-    sprintf(info + strlen(info), "network_tx_bytes: %" PRIu64 "\n", dstats->networktx);
-    sprintf(info + strlen(info), "network_tx_mb: %.2f\n", dstats->networktx / (1024 * 1024.0));
+    len += sprintf(info + len, "network_rx_bytes: %" PRIu64 "\n", dstats->networkrx);
+    len += sprintf(info + len, "network_rx_mb: %.2f\n", dstats->networkrx / (1024 * 1024.0));
+    len += sprintf(info + len, "network_tx_bytes: %" PRIu64 "\n", dstats->networktx);
+    len += sprintf(info + len, "network_tx_mb: %.2f\n", dstats->networktx / (1024 * 1024.0));
 
-    redis_bulk_t response = redis_bulk(info, strlen(info));
+    redis_bulk_t response = redis_bulk(info, len);
     if(!response.buffer) {
         redis_hardsend(client, "$-1");
         return 0;
@@ -121,14 +123,15 @@ int command_hooks(redis_client_t *client) {
     zdb_hooks_t *hooks = &zdb_settings->hooks;
     hook_t *hook = NULL;
     char *info;
+    int len = 0;
 
     if(!command_admin_authorized(client))
         return 1;
 
-    if(!(info = calloc(sizeof(char), 8192)))
+    if(!(info = calloc(sizeof(char), (hooks->active + 1) * 1024)))
         return 1;
 
-    sprintf(info, "*%lu\r\n", hooks->active);
+    len += sprintf(info, "*%lu\r\n", hooks->active);
 
     for(size_t i = 0; i < hooks->length; i++) {
         if(!(hook = hooks->hooks[i]))
@@ -136,13 +139,13 @@ int command_hooks(redis_client_t *client) {
 
         char *type = hook->argv[1];
 
-        sprintf(info + strlen(info), "*6\r\n");
+        len += sprintf(info + len, "*6\r\n");
 
         // hook type
-        sprintf(info + strlen(info), "$%lu\r\n%s\r\n", strlen(type), type);
+        len += sprintf(info + len, "$%lu\r\n%s\r\n", strlen(type), type);
 
         // hook arguments
-        sprintf(info + strlen(info), "*%lu\r\n", hook->argc - 4);
+        len += sprintf(info + len, "*%lu\r\n", hook->argc - 4);
 
         // skipping:
         //  - 1st argument: hook binary
@@ -151,23 +154,23 @@ int command_hooks(redis_client_t *client) {
         //  - last argument: which is always null
         for(size_t s = 3; s < hook->argc - 1; s++) {
             char *arg = hook->argv[s];
-            sprintf(info + strlen(info), "$%lu\r\n%s\r\n", strlen(arg), arg);
+            len += sprintf(info + len, "$%lu\r\n%s\r\n", strlen(arg), arg);
         }
 
         // hook pid
-        sprintf(info + strlen(info), ":%d\r\n", hook->pid);
+        len += sprintf(info + len, ":%d\r\n", hook->pid);
 
         // timestamp when started
-        sprintf(info + strlen(info), ":%ld\r\n", hook->created);
+        len += sprintf(info + len, ":%ld\r\n", hook->created);
 
         // timestamp when finished
-        sprintf(info + strlen(info), ":%ld\r\n", hook->finished);
+        len += sprintf(info + len, ":%ld\r\n", hook->finished);
 
         // exit code value
-        sprintf(info + strlen(info), ":%d\r\n", hook->status);
+        len += sprintf(info + len, ":%d\r\n", hook->status);
     }
 
-    redis_reply_heap(client, info, strlen(info), free);
+    redis_reply_heap(client, info, len, free);
 
     return 0;
 }
@@ -194,33 +197,28 @@ static int command_index_dirty(redis_client_t *client) {
         return 1;
     }
 
-    if(!(response = calloc(sizeof(char), 2048))) {
+    index_dirty_list_t dirty = index_dirty_list(index);
+    if(!dirty.list) {
+        redis_hardsend(client, "-Internal Memory Error");
+        return 1;
+    }
+
+    // allocation assume 10 chars per id would be enough
+    // we already need 3 chars min per entry (: \r\n)
+    if(!(response = calloc(sizeof(char), dirty.length * 10))) {
         zdbd_warnp("index: dirty: calloc");
         redis_hardsend(client, "-Internal Memory Error");
         return 1;
     }
 
-    size_t compute = 0;
+    int length = 0;
+    length += sprintf(response, "*%lu\r\n", dirty.length);
 
-    // FIXME: avoid double loop
-    for(size_t i = 0; i < index->dirty.length; i++)
-        for(int a = 0; a < 8; a++)
-            if(index_dirty_get(index, (i * 8) + a) == 1)
-                compute += 1;
+    for(size_t i = 0; i < dirty.length; i++)
+        length += sprintf(response + length, ":%d\r\n", dirty.list[i]);
 
-    sprintf(response, "*%lu\r\n", compute);
-
-    // listing dirty index files
-    for(size_t i = 0; i < index->dirty.length; i++) {
-        for(int a = 0; a < 8; a++) {
-            int fileid = (i * 8) + a;
-
-            if(index_dirty_get(index, fileid) == 1)
-                sprintf(response + strlen(response), ":%d\r\n", fileid);
-        }
-    }
-
-    redis_reply_heap(client, response, strlen(response), free);
+    redis_reply_heap(client, response, length, free);
+    index_dirty_list_free(&dirty);
 
     return 0;
 }

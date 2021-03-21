@@ -248,6 +248,12 @@
 
     } __attribute__((packed)) index_ekey_t;
 
+    typedef struct index_dirty_list_t {
+        size_t length;
+        int *list;
+
+    } index_dirty_list_t;
+
 
     // key length is uint8_t
     #define MAX_KEY_LENGTH  (1 << 8) - 1
@@ -318,6 +324,9 @@
     void index_dirty_reset(index_root_t *root);
     void index_dirty_set(index_root_t *root, uint32_t id, uint8_t value);
     int index_dirty_get(index_root_t *root, uint32_t id);
+
+    index_dirty_list_t index_dirty_list(index_root_t *root);
+    void index_dirty_list_free(index_dirty_list_t *dirty);
 
     // statistics management
     void index_io_error(index_root_t *root);

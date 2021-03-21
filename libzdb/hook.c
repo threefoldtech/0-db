@@ -217,25 +217,24 @@ void libzdb_hooks_cleanup() {
 
     // some child were executed, check if they are done
     // if nothing are done, just wait next time
-    if((pid = waitpid(-1, &status, WNOHANG)) <= 0)
-        return;
+    while((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        zdb_debug("[+] hooks: pid %d terminated, status: %d\n", pid, WEXITSTATUS(status));
 
-    zdb_debug("[+] hooks: pid %d terminated, status: %d\n", pid, WEXITSTATUS(status));
+        // one child terminated
+        if(WIFEXITED(status) || WIFSIGNALED(status)) {
+            zdb_rootsettings.stats.childwait -= 1;
+        }
 
-    // one child terminated
-    if(WIFEXITED(status) || WIFSIGNALED(status)) {
-        zdb_rootsettings.stats.childwait -= 1;
-    }
+        // looking for matching hook
+        for(size_t i = 0; i < hooks->length; i++) {
+            hook_t *hook = hooks->hooks[i];
 
-    // looking for matching hook
-    for(size_t i = 0; i < hooks->length; i++) {
-        hook_t *hook = hooks->hooks[i];
-
-        // only match same pid and running (not finished) process
-        if(hook->pid == pid && hook->finished == 0) {
-            hook->finished = time(NULL);
-            hook->status = WEXITSTATUS(status);
-            return;
+            // only match same pid and running (not finished) process
+            if(hook->pid == pid && hook->finished == 0) {
+                hook->finished = time(NULL);
+                hook->status = WEXITSTATUS(status);
+                break;
+            }
         }
     }
 }

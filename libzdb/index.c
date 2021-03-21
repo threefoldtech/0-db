@@ -313,13 +313,35 @@ void index_close(index_root_t *root) {
 // triggered by a datafile too big event
 size_t index_jump_next(index_root_t *root) {
     hook_t *hook = NULL;
+    char *dirtylist = NULL;
 
     zdb_verbose("[+] index: jumping to the next file [closing %s]\n", root->indexfile);
 
     if(zdb_rootsettings.hook) {
-        hook = hook_new("jump-index", 2);
+        hook = hook_new("jump-index", 4);
         hook_append(hook, zdb_rootsettings.zdbid);
         hook_append(hook, root->indexfile);
+
+        // build dirty list
+        index_dirty_list_t dirty = index_dirty_list(root);
+        if(!dirty.list)
+            zdb_diep("index: jump: dirty: get list");
+
+        if(!(dirtylist = calloc(sizeof(char), (dirty.length + 1) * 8)))
+            zdb_diep("index: jump: dirty: calloc");
+
+        int offset = 0;
+
+        for(size_t i = 0; i < dirty.length; i++)
+            offset += sprintf(dirtylist + offset, "%d ", dirty.list[i]);
+
+        if(dirty.length > 0) {
+            // strip last space
+            dirtylist[offset - 1] = '\0';
+        }
+
+        // reset dirty list
+        index_dirty_list_free(&dirty);
     }
 
     // flushing current index file
@@ -345,7 +367,15 @@ size_t index_jump_next(index_root_t *root) {
 
     if(zdb_rootsettings.hook) {
         hook_append(hook, root->indexfile);
-        hook_execute(hook);
+        hook_append(hook, dirtylist ? dirtylist : "");
+
+        int retval = hook_execute_wait(hook);
+        if(retval == 0) {
+            zdb_debug("[+] index: hook: success call, cleaning dirty index\n");
+            index_dirty_reset(root);
+        }
+
+        free(dirtylist);
     }
 
     if(root->seqid)
@@ -825,3 +855,32 @@ int index_dirty_get(index_root_t *root, uint32_t id) {
     return !!(root->dirty.map[index] & (1 << shift));
 }
 
+index_dirty_list_t index_dirty_list(index_root_t *index) {
+    // allocate an array as long as many entries
+    // is possible, in order to be sure we have enough space
+    index_dirty_list_t dirty = {
+        .length = 0,
+        .list = NULL,
+    };
+
+    if(!(dirty.list = calloc(sizeof(int), index->indexid + 1))) {
+        zdb_warnp("dirty: list: calloc");
+        return dirty;
+    }
+
+    // building list array
+    for(size_t i = 0; i < index->dirty.length; i++) {
+        for(int a = 0; a < 8; a++) {
+            int fileid = (i * 8) + a;
+
+            if(index_dirty_get(index, fileid) == 1)
+                dirty.list[dirty.length++] = fileid;
+        }
+    }
+
+    return dirty;
+}
+
+void index_dirty_list_free(index_dirty_list_t *dirty) {
+    free(dirty->list);
+}

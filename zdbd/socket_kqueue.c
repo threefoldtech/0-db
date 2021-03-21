@@ -109,6 +109,7 @@ static int socket_event(struct kevent *events, int notified, redis_handler_t *re
 }
 
 int socket_handler(redis_handler_t *handler) {
+    zdbd_stats_t *dstats = &zdbd_rootsettings.stats;
     struct kevent evlist[MAXEVENTS];
     struct timespec timeout = {
         .tv_sec = 0,
@@ -134,6 +135,7 @@ int socket_handler(redis_handler_t *handler) {
 
     while(1) {
         int n = kevent(handler->evfd, NULL, 0, evlist, MAXEVENTS, &timeout);
+        dstats->netevents += 1;
 
         if(n == 0) {
             // timeout reached, checking for background
@@ -144,6 +146,14 @@ int socket_handler(redis_handler_t *handler) {
 
         if(socket_event(evlist, n, handler) == 1)
             return 1;
+
+        // force idle process trigger after fixed amount
+        // of commands, otherwise spamming the server enough
+        // would never trigger it
+        if(dstats->netevents % 100 == 0) {
+            zdbd_debug("[+] sockets: forcing idle process [%llu]\n", dstats->netevents);
+            redis_idle_process();
+        }
     }
 
     return 0;

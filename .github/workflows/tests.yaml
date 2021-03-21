@@ -1,0 +1,29 @@
+name: Tests and Coverage
+on: [push]
+jobs:
+  generate:
+    name: Run tests
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@master
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libhiredis-dev build-essential curl
+
+      - name: Building 0-db
+        run: |
+          make COVERAGE=1
+          cd tests
+          make
+          cd ..
+
+      - name: Run tests suite
+        run: |
+          bash tests/run.sh
+
+      - name: Upload codecov
+        uses: codecov/codecov-action@v1
+
