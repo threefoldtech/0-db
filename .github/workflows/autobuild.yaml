@@ -35,7 +35,7 @@ jobs:
       - name: Publish flist (tf-autobuilder, ${{ steps.versions.outputs.commit }})
         uses: threefoldtech/publish-flist@master
         with:
-          token_threefold: ${{ secrets.HUB_TOKEN }}
+          threefold: ${{ secrets.HUB_TOKEN }}
           action: publish
           root: bin
           name: threefoldtech-0-db-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.flist
