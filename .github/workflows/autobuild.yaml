@@ -1,0 +1,88 @@
+name: Build release
+on: [push] 
+
+jobs:
+  debug:
+    name: Create debug artifacts
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@master
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git
+
+      - name: Get versions
+        id: versions
+        run: |
+          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+          echo "##[set-output name=commit;]$(echo ${GITHUB_SHA:0:10})"
+
+      - name: Building 0-db
+        run: |
+          pushd libzdb
+          make
+          popd
+
+          pushd zdbd
+          make STATIC=1
+          popd
+
+          make
+
+      - name: Create archive
+        run: |
+          tar -czf threefoldtech-0-db-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.tar.gz bin
+
+      - name: Publish flist (tf-autobuilder, ${{ steps.versions.outputs.commit }})
+        uses: threefoldtech/publish-flist@master
+        with:
+          threefold: ${{ secrets.HUB_TOKEN }}
+          action: upload
+          name: threefoldtech-0-db-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.tar.gz
+
+  release:
+    name: Create release artifacts
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@master
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git
+
+      - name: Get versions
+        id: versions
+        run: |
+          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+          echo "##[set-output name=commit;]$(echo ${GITHUB_SHA:0:10})"
+
+      - name: Building 0-db
+        run: |
+          pushd libzdb
+          make release
+          popd
+
+          pushd zdbd
+          make release STATIC=1
+          popd
+
+          make
+
+      - name: Create archive
+        run: |
+          tar -czf threefoldtech-0-db-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.tar.gz bin
+
+      - name: Publish flist (tf-autobuilder, ${{ steps.versions.outputs.commit }})
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          threefold: ${{ secrets.HUB_TOKEN }}
+          action: upload
+          name: threefoldtech-0-db-release-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.tar.gz
+
+
