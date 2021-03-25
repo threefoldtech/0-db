@@ -589,6 +589,9 @@ uint16_t data_dataid(data_root_t *root) {
 // data constructor and destructor
 //
 void data_destroy(data_root_t *root) {
+    if(root->datafd > 0)
+        close(root->datafd);
+
     free(root->datafile);
     free(root);
 }

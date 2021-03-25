@@ -569,6 +569,9 @@ index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespa
 // graceful clean everything allocated
 // by this loader
 void index_destroy(index_root_t *root) {
+    if(root->indexfd > 0)
+        close(root->indexfd);
+
     // delete root object
     free(root->indexfile);
     free(root->dirty.map);
