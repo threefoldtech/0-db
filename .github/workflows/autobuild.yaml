@@ -32,13 +32,16 @@ jobs:
 
           make
 
+      - name: Create archive
+        run: |
+          tar -czf threefoldtech-0-db-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.tar.gz bin
+
       - name: Publish flist (tf-autobuilder, ${{ steps.versions.outputs.commit }})
         uses: threefoldtech/publish-flist@master
         with:
           threefold: ${{ secrets.HUB_TOKEN }}
-          action: publish
-          root: bin
-          name: threefoldtech-0-db-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.flist
+          action: upload
+          name: threefoldtech-0-db-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.tar.gz
 
   release:
     name: Create release artifacts
@@ -70,13 +73,16 @@ jobs:
 
           make
 
+      - name: Create archive
+        run: |
+          tar -czf threefoldtech-0-db-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.tar.gz bin
+
       - name: Publish flist (tf-autobuilder, ${{ steps.versions.outputs.commit }})
         if: success()
         uses: threefoldtech/publish-flist@master
         with:
           threefold: ${{ secrets.HUB_TOKEN }}
-          action: publish
-          root: bin
-          name: threefoldtech-0-db-release-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.flist
+          action: upload
+          name: threefoldtech-0-db-release-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.tar.gz
 
 
