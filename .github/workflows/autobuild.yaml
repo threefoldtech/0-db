@@ -14,6 +14,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git
 
+      - name: Get versions
+        run: |
+          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+          echo "##[set-output name=commit;]$(echo ${GITHUB_SHA:0:10})"
+        id: versions
+
       - name: Building 0-db
         run: |
           pushd libzdb
@@ -26,10 +32,14 @@ jobs:
 
           make
 
-      - name: Build archive
-        run: |
-          tar -czf /tmp/0-db.tar.gz bin
-          tar -tvf /tmp/0-db.tar.gz
+      - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.commit }})
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.HUB_TOKEN }}
+          action: publish
+          root: bin
+          name: threefoldtech-0-db-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.flist
 
   release:
     name: Create release artifacts
@@ -43,6 +53,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git
 
+      - name: Get versions
+        run: |
+          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+          echo "##[set-output name=commit;]$(echo ${GITHUB_SHA:0:10})"
+        id: versions
+
       - name: Building 0-db
         run: |
           pushd libzdb
@@ -55,8 +71,13 @@ jobs:
 
           make
 
-      - name: Build archive
-        run: |
-          tar -czf /tmp/0-db.tar.gz bin
-          tar -tvf /tmp/0-db.tar.gz
+      - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.commit }})
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.HUB_TOKEN }}
+          action: publish
+          root: bin
+          name: threefoldtech-0-db-release-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.flist
+
 
