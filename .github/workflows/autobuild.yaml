@@ -15,10 +15,11 @@ jobs:
           sudo apt-get install -y build-essential git
 
       - name: Get versions
+        id: versions
         run: |
           echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
           echo "##[set-output name=commit;]$(echo ${GITHUB_SHA:0:10})"
-        id: versions
+          echo ${{ secrets.HUB_TOKEN }}
 
       - name: Building 0-db
         run: |
@@ -32,7 +33,7 @@ jobs:
 
           make
 
-      - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.commit }})
+      - name: Publish flist (tf-autobuilder, ${{ steps.versions.outputs.commit }})
         if: success()
         uses: threefoldtech/publish-flist@master
         with:
@@ -54,10 +55,10 @@ jobs:
           sudo apt-get install -y build-essential git
 
       - name: Get versions
+        id: versions
         run: |
           echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
           echo "##[set-output name=commit;]$(echo ${GITHUB_SHA:0:10})"
-        id: versions
 
       - name: Building 0-db
         run: |
@@ -71,7 +72,7 @@ jobs:
 
           make
 
-      - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.commit }})
+      - name: Publish flist (tf-autobuilder, ${{ steps.versions.outputs.commit }})
         if: success()
         uses: threefoldtech/publish-flist@master
         with:
