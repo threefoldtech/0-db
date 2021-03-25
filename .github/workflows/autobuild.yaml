@@ -75,7 +75,7 @@ jobs:
 
       - name: Create archive
         run: |
-          tar -czf threefoldtech-0-db-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.tar.gz bin
+          tar -czf threefoldtech-0-db-release-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.tar.gz bin
 
       - name: Publish flist (tf-autobuilder, ${{ steps.versions.outputs.commit }})
         if: success()
@@ -84,5 +84,4 @@ jobs:
           threefold: ${{ secrets.HUB_TOKEN }}
           action: upload
           name: threefoldtech-0-db-release-${{ steps.versions.outputs.branch }}-${{ steps.versions.outputs.commit }}.tar.gz
-
 
