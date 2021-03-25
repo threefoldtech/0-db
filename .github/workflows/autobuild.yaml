@@ -1,0 +1,62 @@
+name: Build release
+on: [push] 
+
+jobs:
+  debug:
+    name: Create debug artifacts
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@master
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git
+
+      - name: Building 0-db
+        run: |
+          pushd libzdb
+          make
+          popd
+
+          pushd zdbd
+          make STATIC=1
+          popd
+
+          make
+
+      - name: Build archive
+        run: |
+          tar -czf /tmp/0-db.tar.gz bin
+          tar -tvf /tmp/0-db.tar.gz
+
+  release:
+    name: Create release artifacts
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@master
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git
+
+      - name: Building 0-db
+        run: |
+          pushd libzdb
+          make release
+          popd
+
+          pushd zdbd
+          make release STATIC=1
+          popd
+
+          make
+
+      - name: Build archive
+        run: |
+          tar -czf /tmp/0-db.tar.gz bin
+          tar -tvf /tmp/0-db.tar.gz
+
