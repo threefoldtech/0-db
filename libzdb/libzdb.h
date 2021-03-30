@@ -26,8 +26,8 @@
     //
     // if some updates are made, upgrade tools should be written
     // to update the existing databases
-    #define ZDB_DATAFILE_VERSION    2
-    #define ZDB_IDXFILE_VERSION     2
+    #define ZDB_DATAFILE_VERSION    3
+    #define ZDB_IDXFILE_VERSION     3
 
     // define here version of 0-db itself
     // version is made as following:
