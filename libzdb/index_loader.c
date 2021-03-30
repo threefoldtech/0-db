@@ -239,7 +239,7 @@ static size_t index_load_file(index_root_t *root) {
     }
 
     if(!index_descriptor_validate(&header, root))
-        return 1;
+        exit(EXIT_FAILURE);
 
     zdb_debug("[+] index: running mode: %s\n", zdb_running_mode(header.mode));
 
