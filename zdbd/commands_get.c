@@ -6,8 +6,8 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <inttypes.h>
-#include "index.h"
 #include "libzdb.h"
+#include "index.h"
 #include "zdbd.h"
 #include "redis.h"
 #include "commands.h"
