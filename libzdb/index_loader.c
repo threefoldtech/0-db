@@ -83,7 +83,7 @@ static void index_dump_statistics(index_root_t *root) {
 // initialize an index file
 // this basicly create the header and write it
 //
-index_header_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
+index_header_t index_initialize(int fd, fileid_t indexid, index_root_t *root) {
     index_header_t header;
 
     memcpy(header.magic, "IDX0", 4);

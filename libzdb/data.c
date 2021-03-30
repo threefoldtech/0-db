@@ -126,7 +126,7 @@ int data_open_notfound_hook(char *filename) {
 // open one datafile based on it's id
 // in case of error, the reason will be printed and -1 will be returned
 // otherwise the file descriptor is returned
-int data_open_id_mode(data_root_t *root, uint16_t id, int mode) {
+int data_open_id_mode(data_root_t *root, fileid_t id, int mode) {
     char temp[ZDB_PATH_MAX];
     int retried = 0;
     int fd;
@@ -158,7 +158,7 @@ int data_open_id_mode(data_root_t *root, uint16_t id, int mode) {
 }
 
 // default mode, read-only datafile
-static int data_open_id(data_root_t *root, uint16_t id) {
+static int data_open_id(data_root_t *root, fileid_t id) {
     return data_open_id_mode(root, id, O_RDONLY);
 }
 
@@ -168,7 +168,7 @@ static int data_open_id(data_root_t *root, uint16_t id) {
 #if 0
 // special case (for deletion) where read-write is needed
 // and not in append mode
-static int data_get_dataid_rw(data_root_t *root, uint16_t id) {
+static int data_get_dataid_rw(data_root_t *root, fileid_t id) {
     return data_open_id_mode(root, id, O_RDWR);
 }
 #endif
@@ -215,7 +215,7 @@ data_header_t *data_descriptor_validate(data_header_t *header, data_root_t *root
 // file open, if a new one was opened
 //
 // if the data id could not be opened, -1 is returned
-static inline int data_grab_dataid(data_root_t *root, uint16_t dataid) {
+static inline int data_grab_dataid(data_root_t *root, fileid_t dataid) {
     int fd = root->datafd;
 
     if(root->dataid != dataid) {
@@ -229,7 +229,7 @@ static inline int data_grab_dataid(data_root_t *root, uint16_t dataid) {
     return fd;
 }
 
-static inline void data_release_dataid(data_root_t *root, uint16_t dataid, int fd) {
+static inline void data_release_dataid(data_root_t *root, fileid_t dataid, int fd) {
     // if the requested data id (or fd) is not the one
     // currently in use by the main structure, we close it
     // since it was temporary
@@ -308,7 +308,7 @@ static void data_open_final(data_root_t *root) {
 
 // jumping to the next id close the current data file
 // and open the next id file, it will create the new file
-size_t data_jump_next(data_root_t *root, uint16_t newid) {
+size_t data_jump_next(data_root_t *root, fileid_t newid) {
     hook_t *hook = NULL;
 
     zdb_verbose("[+] data: jumping to the next file\n");
@@ -418,7 +418,7 @@ static inline data_payload_t data_get_real(int fd, size_t offset, size_t length,
 // wrapper for data_get_real, which opens the right dataid
 // allowing to do only what's necessary and this wrapper
 // just prepares the right data id
-data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_t dataid, uint8_t idlength) {
+data_payload_t data_get(data_root_t *root, size_t offset, size_t length, fileid_t dataid, uint8_t idlength) {
     int fd;
     data_payload_t payload = {
         .buffer = NULL,
@@ -484,7 +484,7 @@ static inline int data_check_real(int fd, size_t offset) {
 
 // check payload integrity from any datafile
 // function wrapper to load the correct file id
-int data_check(data_root_t *root, size_t offset, uint16_t dataid) {
+int data_check(data_root_t *root, size_t offset, fileid_t dataid) {
     int fd;
 
     // acquire data id fd
@@ -581,7 +581,7 @@ int data_delete(data_root_t *root, void *id, uint8_t idlength) {
     return 1;
 }
 
-uint16_t data_dataid(data_root_t *root) {
+fileid_t data_dataid(data_root_t *root) {
     return root->dataid;
 }
 
@@ -596,7 +596,7 @@ void data_destroy(data_root_t *root) {
     free(root);
 }
 
-data_root_t *data_init_lazy(zdb_settings_t *settings, char *datapath, uint16_t dataid) {
+data_root_t *data_init_lazy(zdb_settings_t *settings, char *datapath, fileid_t dataid) {
     data_root_t *root = (data_root_t *) malloc(sizeof(data_root_t));
 
     root->datafd = 0;
@@ -615,7 +615,7 @@ data_root_t *data_init_lazy(zdb_settings_t *settings, char *datapath, uint16_t d
     return root;
 }
 
-data_root_t *data_init(zdb_settings_t *settings, char *datapath, uint16_t dataid) {
+data_root_t *data_init(zdb_settings_t *settings, char *datapath, fileid_t dataid) {
     data_root_t *root = data_init_lazy(settings, datapath, dataid);
 
     // opening the file and creating it if needed

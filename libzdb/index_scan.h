@@ -22,12 +22,12 @@
                           // target will be updated if the offset is in another file
         index_item_t *header;        // target header, set when found
         index_scan_status_t status;  // status code
-        uint16_t fileid;             // index file id
+        fileid_t fileid;             // index file id
 
     } index_scan_t;
 
-    index_scan_t index_previous_header(index_root_t *root, uint16_t fileid, size_t offset);
-    index_scan_t index_next_header(index_root_t *root, uint16_t fileid, size_t offset);
+    index_scan_t index_previous_header(index_root_t *root, fileid_t fileid, size_t offset);
+    index_scan_t index_next_header(index_root_t *root, fileid_t fileid, size_t offset);
     index_scan_t index_first_header(index_root_t *root);
     index_scan_t index_last_header(index_root_t *root);
 #endif
