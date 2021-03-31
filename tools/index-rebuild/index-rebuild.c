@@ -18,7 +18,7 @@ static struct option long_options[] = {
     {0, 0, 0, 0}
 };
 
-int index_data_jump_to(uint16_t fileid, index_root_t *zdbindex, data_root_t *zdbdata) {
+int index_data_jump_to(fileid_t fileid, index_root_t *zdbindex, data_root_t *zdbdata) {
     data_header_t *header;
     char datestr[64];
 
@@ -131,7 +131,7 @@ ssize_t index_rebuild_pass(index_root_t *zdbindex, data_root_t *zdbdata, time_t 
 
 
 int index_rebuild(index_root_t *zdbindex, data_root_t *zdbdata, time_t timestamp) {
-    uint16_t fileid = 0;
+    fileid_t fileid = 0;
     ssize_t entries = 0;
     size_t entrycount = 0;
 

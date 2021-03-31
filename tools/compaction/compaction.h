@@ -12,7 +12,7 @@
     typedef struct datamap_t {
         size_t length;
         size_t allocated;
-        uint16_t fileid;
+        fileid_t fileid;
         datamap_entry_t *entries;
 
     } datamap_t;

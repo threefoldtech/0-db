@@ -9,7 +9,7 @@ int index_dump_files(index_root_t *zdbindex, uint64_t maxfile) {
     char datestr[64];
     size_t totalentries = 0;
 
-    for(uint16_t fileid = 0; fileid < maxfile; fileid += 1) {
+    for(fileid_t fileid = 0; fileid < maxfile; fileid += 1) {
         //
         // loading index file
         //
