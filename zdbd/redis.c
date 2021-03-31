@@ -1096,8 +1096,10 @@ void redis_files_rotate() {
 
         if(diffsec > zdbd_rootsettings.rotatesec) {
             zdbd_log("[+] system: rotation requested (%s, %ld seconds)\n", ns->name, diffsec);
-            size_t newid = index_jump_next(ns->index);
-            data_jump_next(ns->data, newid);
+            size_t newid;
+
+            if((newid = index_jump_next(ns->index)) > 0)
+                data_jump_next(ns->data, newid);
         }
     }
 }

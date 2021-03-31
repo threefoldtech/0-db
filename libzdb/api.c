@@ -298,7 +298,11 @@ zdb_api_t *zdb_api_set(namespace_t *ns, void *key, size_t ksize, void *payload, 
     // if we do this after adding data, we could have an empty data file
     // which will fake the 'previous' offset when computing it on reload
     if(data_next_offset(ns->data) + psize > zdb_rootsettings.datasize) {
-        size_t newid = index_jump_next(ns->index);
+        size_t newid;
+
+        if((newid = index_jump_next(ns->index)) == 0)
+            return zdb_api_reply_error("Namespace definitely full");
+
         data_jump_next(ns->data, newid);
     }
 

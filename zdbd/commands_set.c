@@ -316,7 +316,14 @@ int command_set(redis_client_t *client) {
     zdb_settings_t *zdb_settings = zdb_settings_get();
 
     if(data_next_offset(client->ns->data) + request->argv[2]->length > zdb_settings->datasize) {
-        size_t newid = index_jump_next(client->ns->index);
+        size_t newid;
+
+        // do not jump if next id is zero, this mean an error occured
+        if((newid = index_jump_next(client->ns->index)) == 0) {
+            redis_hardsend(client, "-Namespace definitely full");
+            return 1;
+        }
+
         data_jump_next(client->ns->data, newid);
     }
 

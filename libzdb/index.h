@@ -261,6 +261,9 @@
     size_t index_jump_next(index_root_t *root);
     int index_emergency(index_root_t *root);
 
+    // returns maximum availables index/data files
+    size_t index_max_files();
+
     uint64_t index_next_id(index_root_t *root);
     uint32_t index_next_objectid(index_root_t *root);
 

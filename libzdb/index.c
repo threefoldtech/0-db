@@ -173,6 +173,12 @@ void index_set_id(index_root_t *root, fileid_t fileid) {
     index_dirty_resize(root, fileid);
 }
 
+size_t index_max_files() {
+    // max files is limited by length of index/dataid, which is uint16 by default
+    // taking field size in bytes, multiplied by 8 for bits
+    return (1ULL << (sizeof(((index_root_t *) 0)->indexid) * 8)) - 1;
+}
+
 //
 // open index _without_ changing internal fd
 static int index_open_file_mode(index_root_t *root, fileid_t fileid, int mode) {
@@ -316,6 +322,12 @@ size_t index_jump_next(index_root_t *root) {
     char *dirtylist = NULL;
 
     zdb_verbose("[+] index: jumping to the next file [closing %s]\n", root->indexfile);
+
+    // 16 bits limitation
+    if(root->indexid == index_max_files()) {
+        zdb_verbose("[-] index: maximum files reached, denying jump\n");
+        return 0;
+    }
 
     if(zdb_rootsettings.hook) {
         hook = hook_new("jump-index", 4);

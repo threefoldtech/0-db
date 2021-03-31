@@ -460,11 +460,8 @@ int main(int argc, char *argv[]) {
     //
     zdb_log("[+] system: running mode: " COLOR_GREEN "%s" COLOR_RESET "\n", zdb_running_mode(zdb_settings->mode));
 
-    // max files is limited by type length of dataid, which is uint16 by default
-    // taking field size in bytes, multiplied by 8 for bits
-    size_t maxfiles = (1ULL << (sizeof(((data_root_t *) 0)->dataid) * 8)) - 1;
-
     // max database size is maximum datafile size multiplied by amount of files
+    size_t maxfiles = index_max_files();
     uint64_t maxsize = maxfiles * zdb_settings->datasize;
 
     zdbd_verbose("[+] system: maximum namespace size: %.2f GB\n", GB(maxsize));
