@@ -372,7 +372,7 @@ static size_t index_load_file(index_root_t *root) {
 
 // returns the amount of index files available (if any)
 uint64_t index_availity_check(index_root_t *root) {
-    uint64_t maxfiles = (1 << (sizeof(((index_entry_t *) 0)->dataid) * 8));
+    uint64_t maxfiles = (1ULL << (sizeof(((index_entry_t *) 0)->dataid) * 8)) - 1;
     uint64_t fileid;
 
     for(fileid = 0; fileid < maxfiles; fileid++) {
