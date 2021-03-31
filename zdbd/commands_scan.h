@@ -7,8 +7,8 @@
     int command_kscan(redis_client_t *client);
 
     typedef struct scan_info_t {
-        uint16_t dataid;
-        uint16_t idxid;
+        fileid_t dataid;
+        fileid_t idxid;
         size_t idxoffset;
 
     } scan_info_t;

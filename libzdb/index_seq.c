@@ -9,8 +9,8 @@
 // perform a binary search on the seqmap to get
 // the fileid back based on the index mapped with fileid
 static index_seqmap_t *index_seqmap_from_seq(index_seqid_t *seqid, uint32_t id) {
-    int lower = 0;
-    int higher = seqid->length;
+    uint32_t lower = 0;
+    uint32_t higher = seqid->length;
 
     // binary search
     while(lower < higher) {
@@ -47,7 +47,7 @@ index_seqmap_t *index_fileid_from_seq(index_root_t *root, uint32_t seqid) {
     return seqmap;
 }
 
-void index_seqid_push(index_root_t *root, uint32_t id, uint16_t indexid) {
+void index_seqid_push(index_root_t *root, uint32_t id, fileid_t indexid) {
     zdb_debug("[+] index seq: mapping id %u to file %u\n", id, indexid);
 
     if(root->seqid->length + 1 == root->seqid->allocated) {
@@ -82,7 +82,7 @@ size_t index_seq_offset(uint32_t relative) {
 }
 
 void index_seqid_dump(index_root_t *root) {
-    for(uint16_t i = 0; i < root->seqid->length; i++) {
+    for(fileid_t i = 0; i < root->seqid->length; i++) {
         index_seqmap_t *item = &root->seqid->seqmap[i];
         zdb_log("[+] index seq: seqid %d -> file %d\n", item->seqid, item->fileid);
     }

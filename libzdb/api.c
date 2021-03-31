@@ -440,11 +440,11 @@ void zdb_index_set_id(index_root_t *root, uint64_t fileid) {
     return index_set_id(root, fileid);
 }
 
-int zdb_index_open_readonly(index_root_t *root, uint16_t fileid) {
+int zdb_index_open_readonly(index_root_t *root, fileid_t fileid) {
     return index_open_readonly(root, fileid);
 }
 
-int zdb_index_open_readwrite(index_root_t *root, uint16_t fileid) {
+int zdb_index_open_readwrite(index_root_t *root, fileid_t fileid) {
     return index_open_readwrite(root, fileid);
 }
 
@@ -469,7 +469,7 @@ uint32_t zdb_checksum_crc32(const uint8_t *bytes, ssize_t length) {
     return data_crc32(bytes, length);
 }
 
-data_root_t *zdb_data_init_lazy(zdb_settings_t *settings, char *datapath, uint16_t dataid) {
+data_root_t *zdb_data_init_lazy(zdb_settings_t *settings, char *datapath, fileid_t dataid) {
     return data_init_lazy(settings, datapath, dataid);
 }
 

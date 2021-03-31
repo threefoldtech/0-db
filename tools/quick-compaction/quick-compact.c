@@ -47,7 +47,7 @@ typedef struct session_t {
 
 } session_t;
 
-int index_data_jump_to(uint16_t fileid, index_root_t *zdbindex, data_root_t *zdbdata) {
+int index_data_jump_to(fileid_t fileid, index_root_t *zdbindex, data_root_t *zdbdata) {
     data_header_t *header;
     char datestr[64];
 
@@ -129,7 +129,7 @@ static int quick_initialize(instance_t *input, instance_t *output) {
     return 0;
 }
 
-size_t quick_compact_pass(instance_t *input, instance_t *output, uint16_t fileid, session_t *session) {
+size_t quick_compact_pass(instance_t *input, instance_t *output, fileid_t fileid, session_t *session) {
     size_t entrycount = 0;
     int indexfd, datafd;
     char buffer[2048];
@@ -294,7 +294,7 @@ size_t quick_compact_pass(instance_t *input, instance_t *output, uint16_t fileid
 }
 
 int quick_compaction(instance_t *input, instance_t *output) {
-    uint16_t fileid = 0;
+    fileid_t fileid = 0;
     size_t entrycount = 0;
     session_t session = {
         .dataprev = 0,

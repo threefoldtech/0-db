@@ -115,6 +115,11 @@
 
     } zdb_settings_t;
 
+    // fileid_t represent internal size of fileid type, which was
+    // historically hardcoded to uint16_t everywhere, but make code less
+    // easy to update if this size need to change
+    typedef uint16_t fileid_t;
+
     void zdb_tools_fulldump(void *_data, size_t len);
     void zdb_tools_hexdump(void *input, size_t length);
     char *zdb_header_date(uint32_t epoch, char *target, size_t length);

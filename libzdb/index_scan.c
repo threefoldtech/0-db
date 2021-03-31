@@ -170,7 +170,7 @@ static index_scan_t index_previous_header_real(index_scan_t scan) {
     return scan;
 }
 
-index_scan_t index_previous_header(index_root_t *root, uint16_t fileid, size_t offset) {
+index_scan_t index_previous_header(index_root_t *root, fileid_t fileid, size_t offset) {
     index_scan_t scan = {
         .fd = 0,
         .fileid = fileid,
@@ -286,7 +286,7 @@ static index_scan_t index_next_header_real(index_scan_t scan) {
     return scan;
 }
 
-index_scan_t index_next_header(index_root_t *root, uint16_t fileid, size_t offset) {
+index_scan_t index_next_header(index_root_t *root, fileid_t fileid, size_t offset) {
     index_scan_t scan = {
         .fd = 0,
         .fileid = fileid,

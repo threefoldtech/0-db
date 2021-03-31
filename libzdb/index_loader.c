@@ -83,7 +83,7 @@ static void index_dump_statistics(index_root_t *root) {
 // initialize an index file
 // this basicly create the header and write it
 //
-index_header_t index_initialize(int fd, uint16_t indexid, index_root_t *root) {
+index_header_t index_initialize(int fd, fileid_t indexid, index_root_t *root) {
     index_header_t header;
 
     memcpy(header.magic, "IDX0", 4);
@@ -239,7 +239,7 @@ static size_t index_load_file(index_root_t *root) {
     }
 
     if(!index_descriptor_validate(&header, root))
-        return 1;
+        exit(EXIT_FAILURE);
 
     zdb_debug("[+] index: running mode: %s\n", zdb_running_mode(header.mode));
 
@@ -372,7 +372,7 @@ static size_t index_load_file(index_root_t *root) {
 
 // returns the amount of index files available (if any)
 uint64_t index_availity_check(index_root_t *root) {
-    uint64_t maxfiles = (1 << (sizeof(((index_entry_t *) 0)->dataid) * 8));
+    uint64_t maxfiles = (1ULL << (sizeof(((index_entry_t *) 0)->dataid) * 8)) - 1;
     uint64_t fileid;
 
     for(fileid = 0; fileid < maxfiles; fileid++) {

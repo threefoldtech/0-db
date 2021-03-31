@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    uint16_t dataid = atoi(datafile + 9);
+    fileid_t dataid = atoi(datafile + 9);
 
     printf("[+] datafile path: %s\n", filedir);
     printf("[+] datafile name: %s\n", datafile);

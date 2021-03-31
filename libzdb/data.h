@@ -19,7 +19,7 @@
     typedef struct data_root_t {
         char *datadir;      // root path of the data files
         char *datafile;     // name of current datafile in use
-        uint16_t dataid;    // id of the datafile currently in use
+        fileid_t dataid;    // id of the datafile currently in use
         int datafd;         // file descriptor of the current datafile in use
         int sync;           // flag to force data write sync
         int synctime;       // force to sync data after this timeout (on next write)
@@ -38,7 +38,7 @@
         uint32_t version;  // file version, for eventual upgrade compatibility
         uint64_t created;  // unix timestamp of creation time
         uint64_t opened;   // unix timestamp of last opened time
-        uint16_t fileid;   // current index file id (sync with dataid)
+        fileid_t fileid;   // current index file id (sync with dataid)
 
     } __attribute__((packed)) data_header_t;
 
@@ -110,25 +110,25 @@
 
     } data_request_t;
 
-    data_root_t *data_init(zdb_settings_t *settings, char *datapath, uint16_t dataid);
-    data_root_t *data_init_lazy(zdb_settings_t *settings, char *datapath, uint16_t dataid);
-    int data_open_id_mode(data_root_t *root, uint16_t id, int mode);
+    data_root_t *data_init(zdb_settings_t *settings, char *datapath, fileid_t dataid);
+    data_root_t *data_init_lazy(zdb_settings_t *settings, char *datapath, fileid_t dataid);
+    int data_open_id_mode(data_root_t *root, fileid_t id, int mode);
 
     data_header_t *data_descriptor_load(data_root_t *root);
     data_header_t *data_descriptor_validate(data_header_t *header, data_root_t *root);
 
     void data_destroy(data_root_t *root);
-    size_t data_jump_next(data_root_t *root, uint16_t newid);
+    size_t data_jump_next(data_root_t *root, fileid_t newid);
     void data_emergency(data_root_t *root);
-    uint16_t data_dataid(data_root_t *root);
+    fileid_t data_dataid(data_root_t *root);
     void data_delete_files(data_root_t *root);
 
     uint32_t data_crc32(const uint8_t *bytes, ssize_t length);
 
-    data_payload_t data_get(data_root_t *root, size_t offset, size_t length, uint16_t dataid, uint8_t idlength);
-    int data_check(data_root_t *root, size_t offset, uint16_t dataid);
+    data_payload_t data_get(data_root_t *root, size_t offset, size_t length, fileid_t dataid, uint8_t idlength);
+    int data_check(data_root_t *root, size_t offset, fileid_t dataid);
 
-    // size_t data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, uint16_t dataid);
+    // size_t data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, fileid_t dataid);
 
     int data_delete(data_root_t *root, void *id, uint8_t idlength);
 
@@ -136,8 +136,8 @@
     size_t data_insert(data_root_t *root, data_request_t *source);
     size_t data_next_offset(data_root_t *root);
 
-    data_scan_t data_previous_header(data_root_t *root, uint16_t dataid, size_t offset);
-    data_scan_t data_next_header(data_root_t *root, uint16_t dataid, size_t offset);
+    data_scan_t data_previous_header(data_root_t *root, fileid_t dataid, size_t offset);
+    data_scan_t data_next_header(data_root_t *root, fileid_t dataid, size_t offset);
     data_scan_t data_first_header(data_root_t *root);
     data_scan_t data_last_header(data_root_t *root);
 

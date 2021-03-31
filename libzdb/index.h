@@ -42,7 +42,7 @@
         uint32_t version;  // file version, for possible upgrade compatibility
         uint64_t created;  // unix timestamp of creation time
         uint64_t opened;   // unix timestamp of last opened time
-        uint16_t fileid;   // current index file id (sync with dataid)
+        fileid_t fileid;   // current index file id (sync with dataid)
         uint8_t mode;      // running mode when index was created
 
     } __attribute__((packed)) index_header_t;
@@ -60,10 +60,10 @@
         //          (previous entry in the file doesn't change even if new entries comes)
 
         uint8_t flags;       // key flags (eg: deleted)
-        uint16_t dataid;     // datafile id where is stored the payload
+        fileid_t dataid;     // datafile id where is stored the payload
         uint32_t timestamp;  // when was the key created (unix timestamp)
         uint32_t crc;        // the data payload crc32
-        uint16_t parentid;   // history parent dataid ]
+        fileid_t parentid;   // history parent dataid ]
         uint32_t parentoff;  // history parent offset ]- used to keep history tracking
         unsigned char id[];  // the id accessor, dynamically loaded
 
@@ -93,10 +93,10 @@
         uint32_t idxoffset;  // offset on the index file (index file id is the same as data file)
         uint32_t length;     // length of the payload on the datafile
         uint8_t flags;       // keep deleted flags (should be index_flags_t type)
-        uint16_t dataid;     // datafile id where payload is located
-        uint16_t indexid;    // indexfile id where this index entry is located
+        fileid_t dataid;     // datafile id where payload is located
+        fileid_t indexid;    // indexfile id where this index entry is located
         uint32_t crc;        // the data payload crc32
-        uint16_t parentid;   // parent index file id (history)
+        fileid_t parentid;   // parent index file id (history)
         uint32_t parentoff;  // parent index file offset (history)
         uint32_t timestamp;  // unix timestamp of key creation
         unsigned char id[];  // the id accessor, dynamically loaded
@@ -138,13 +138,13 @@
     // index sequential id mapping
     typedef struct index_seqmap_t {
         uint32_t seqid;
-        uint16_t fileid;
+        fileid_t fileid;
 
     } index_seqmap_t;
 
     typedef struct index_seqid_t {
-        uint16_t allocated;
-        uint16_t length;
+        uint32_t allocated;
+        uint32_t length;
         index_seqmap_t *seqmap;
 
     } index_seqid_t;
@@ -174,7 +174,7 @@
     typedef struct index_root_t {
         char *indexdir;     // directory of index files
         char *indexfile;    // current index filename in use
-        uint16_t indexid;   // current index file id in use (sync with data id)
+        fileid_t indexid;   // current index file id in use (sync with data id)
         int indexfd;        // current file descriptor in use
         uint64_t nextentry; // next-entry is a global id used in sequential mode (next seq-id)
         uint32_t nextid;    // next-id is a localfile id used in direct mode (next id on this file)
@@ -213,7 +213,7 @@
     // objectid, since all object are made of
     // the same length, we can compute offset like this
     typedef struct index_dkey_t {
-        uint16_t indexid;
+        fileid_t indexid;
         uint32_t objectid;
 
     } __attribute__((packed)) index_dkey_t;
@@ -233,7 +233,7 @@
     //     quite impossible
     typedef struct index_bkey_t {
         uint8_t idlength;
-        uint16_t fileid;
+        fileid_t fileid;
         uint32_t length;
         uint32_t idxoffset;
         uint32_t crc;
@@ -243,7 +243,7 @@
     // key used to represent exact position
     // in index file (aka: dkey resolved)
     typedef struct index_ekey_t {
-        uint16_t indexid;
+        fileid_t indexid;
         uint32_t offset;
 
     } __attribute__((packed)) index_ekey_t;
@@ -265,7 +265,7 @@
     uint32_t index_next_objectid(index_root_t *root);
 
     index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t length);
-    index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t offset, uint8_t idlength);
+    index_item_t *index_item_get_disk(index_root_t *root, fileid_t indexid, size_t offset, uint8_t idlength);
 
     index_dkey_t *index_dkey_from_key(index_dkey_t *dkey, unsigned char *buffer, uint8_t length);
 
@@ -284,7 +284,7 @@
     // extern but not really public functions
     // used by index_loader
     int index_write(int fd, void *buffer, size_t length, index_root_t *root);
-    void index_set_id(index_root_t *root, uint16_t fileid);
+    void index_set_id(index_root_t *root, fileid_t fileid);
     void index_open_final(index_root_t *root);
 
     extern index_item_t *index_transition;
@@ -292,14 +292,14 @@
 
     size_t index_next_offset(index_root_t *root);
     size_t index_offset_objectid(uint32_t idobj);
-    uint16_t index_indexid(index_root_t *root);
+    fileid_t index_indexid(index_root_t *root);
 
-    index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset, uint16_t idxfileid);
+    index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset, fileid_t idxfileid);
     index_bkey_t index_entry_serialize(index_entry_t *entry);
     index_entry_t *index_entry_deserialize(index_root_t *root, index_bkey_t *key);
 
-    int index_grab_fileid(index_root_t *root, uint16_t fileid);
-    void index_release_fileid(index_root_t *root, uint16_t fileid, int fd);
+    int index_grab_fileid(index_root_t *root, fileid_t fileid);
+    void index_release_fileid(index_root_t *root, fileid_t fileid, int fd);
 
     void index_item_header_dump(index_item_t *item);
     void index_entry_dump(index_entry_t *entry);
@@ -307,13 +307,13 @@
     uint32_t index_key_hash(unsigned char *id, uint8_t idlength);
 
     // open index _without_ setting internal fd
-    int index_open_file_readonly(index_root_t *root, uint16_t fileid);
-    int index_open_file_readwrite(index_root_t *root, uint16_t fileid);
+    int index_open_file_readonly(index_root_t *root, fileid_t fileid);
+    int index_open_file_readwrite(index_root_t *root, fileid_t fileid);
 
     // open index by setting index fd
-    int index_open_readonly(index_root_t *root, uint16_t fileid);
-    int index_open_readwrite(index_root_t *root, uint16_t fileid);
-    int index_open_readwrite_oneshot(index_root_t *root, uint16_t fileid);
+    int index_open_readonly(index_root_t *root, fileid_t fileid);
+    int index_open_readwrite(index_root_t *root, fileid_t fileid);
+    int index_open_readwrite_oneshot(index_root_t *root, fileid_t fileid);
 
     void index_close(index_root_t *root);
 

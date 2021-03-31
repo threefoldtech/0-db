@@ -159,13 +159,13 @@ static int index_read(int fd, void *buffer, size_t length) {
     return 1;
 }
 
-static char *index_set_id_buffer(char *buffer, char *indexdir, uint16_t indexid) {
+static char *index_set_id_buffer(char *buffer, char *indexdir, fileid_t indexid) {
     sprintf(buffer, "%s/zdb-index-%05u", indexdir, indexid);
     return buffer;
 }
 
 // set global filename based on the index id
-void index_set_id(index_root_t *root, uint16_t fileid) {
+void index_set_id(index_root_t *root, fileid_t fileid) {
     root->indexid = fileid;
     index_set_id_buffer(root->indexfile, root->indexdir, root->indexid);
 
@@ -175,7 +175,7 @@ void index_set_id(index_root_t *root, uint16_t fileid) {
 
 //
 // open index _without_ changing internal fd
-static int index_open_file_mode(index_root_t *root, uint16_t fileid, int mode) {
+static int index_open_file_mode(index_root_t *root, fileid_t fileid, int mode) {
     char filename[512];
     int fd;
 
@@ -190,18 +190,18 @@ static int index_open_file_mode(index_root_t *root, uint16_t fileid, int mode) {
     return fd;
 }
 
-int index_open_file_readonly(index_root_t *root, uint16_t fileid) {
+int index_open_file_readonly(index_root_t *root, fileid_t fileid) {
     return index_open_file_mode(root, fileid, O_RDONLY);
 }
 
-int index_open_file_readwrite(index_root_t *root, uint16_t fileid) {
+int index_open_file_readwrite(index_root_t *root, fileid_t fileid) {
     return index_open_file_mode(root, fileid, O_RDWR);
 }
 
 //
 // open index _with_ internal fd set
 //
-static int index_open_mode(index_root_t *root, uint16_t fileid, int mode) {
+static int index_open_mode(index_root_t *root, fileid_t fileid, int mode) {
     #ifndef RELEASE
     char *roenabled = (mode == O_RDONLY) ? "yes" : "no";
     #endif
@@ -217,15 +217,15 @@ static int index_open_mode(index_root_t *root, uint16_t fileid, int mode) {
     return root->indexfd;
 }
 
-int index_open_readonly(index_root_t *root, uint16_t fileid) {
+int index_open_readonly(index_root_t *root, fileid_t fileid) {
     return index_open_mode(root, fileid, O_RDONLY);
 }
 
-int index_open_readwrite(index_root_t *root, uint16_t fileid) {
+int index_open_readwrite(index_root_t *root, fileid_t fileid) {
     return index_open_mode(root, fileid, O_RDWR);
 }
 
-int index_open_readwrite_oneshot(index_root_t *root, uint16_t fileid) {
+int index_open_readwrite_oneshot(index_root_t *root, fileid_t fileid) {
     int fd;
     char tempfile[2048];
 
@@ -249,7 +249,7 @@ int index_open_readwrite_oneshot(index_root_t *root, uint16_t fileid) {
 // file open, if a new one was opened
 //
 // if the index id could not be opened, -1 is returned
-inline int index_grab_fileid(index_root_t *root, uint16_t fileid) {
+inline int index_grab_fileid(index_root_t *root, fileid_t fileid) {
     int fd = root->indexfd;
 
     if(root->indexid != fileid) {
@@ -263,7 +263,7 @@ inline int index_grab_fileid(index_root_t *root, uint16_t fileid) {
     return fd;
 }
 
-inline void index_release_fileid(index_root_t *root, uint16_t fileid, int fd) {
+inline void index_release_fileid(index_root_t *root, fileid_t fileid, int fd) {
     // if the requested file id (or fd) is not the one
     // currently used by the main structure, we close it
     // since it was temporary
@@ -449,7 +449,7 @@ index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t id
 //
 // it is really important in direct mode to use indirection with index
 // to have benefit of compaction etc. and for history support
-index_item_t *index_item_get_disk(index_root_t *root, uint16_t indexid, size_t offset, uint8_t idlength) {
+index_item_t *index_item_get_disk(index_root_t *root, fileid_t indexid, size_t offset, uint8_t idlength) {
     int fd;
     size_t length;
     index_item_t *item;
@@ -601,7 +601,7 @@ int index_entry_delete(index_root_t *root, index_entry_t *entry) {
 
 // serialize into binary object a deserializable
 // object identifier
-index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset, uint16_t idxfileid) {
+index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset, fileid_t idxfileid) {
     zdb_debug("[+] index: item serialize: offset: %" PRIu32 ", fileid: %" PRIu16 "\n", idxoffset, idxfileid);
 
     index_bkey_t key = {
@@ -682,7 +682,7 @@ size_t index_next_offset(index_root_t *root) {
 }
 
 // return current fileid in use
-uint16_t index_indexid(index_root_t *root) {
+fileid_t index_indexid(index_root_t *root) {
     return root->indexid;
 }
 

@@ -81,7 +81,7 @@ int compaction_copy(int fdin, int fdout, size_t size) {
     return 0;
 }
 
-index_entry_t *compaction_handle_entry(index_root_t *index, data_entry_header_t *entry, char *id, compaction_t *compaction, uint16_t fileid) {
+index_entry_t *compaction_handle_entry(index_root_t *index, data_entry_header_t *entry, char *id, compaction_t *compaction, fileid_t fileid) {
     datamap_t *datamap = compaction->filesmap[fileid];
     index_entry_t *idxentry = NULL;
 
@@ -118,7 +118,7 @@ index_entry_t *compaction_handle_entry(index_root_t *index, data_entry_header_t 
     return idxentry;
 }
 
-size_t compaction_data_load(int fd, index_root_t *index, compaction_t *compaction, uint16_t fileid) {
+size_t compaction_data_load(int fd, index_root_t *index, compaction_t *compaction, fileid_t fileid) {
     datamap_t *datamap = compaction->filesmap[fileid];
     data_header_t header;
 
@@ -186,7 +186,7 @@ size_t compaction_data_load(int fd, index_root_t *index, compaction_t *compactio
     return datamap->length;
 }
 
-size_t compaction_data_convert(int fd, int outfd, compaction_t *compaction, uint16_t fileid) {
+size_t compaction_data_convert(int fd, int outfd, compaction_t *compaction, fileid_t fileid) {
     datamap_t *datamap = compaction->filesmap[fileid];
 
     // copying header
