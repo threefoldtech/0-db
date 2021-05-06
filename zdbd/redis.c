@@ -1235,6 +1235,9 @@ static void daemonize() {
         exit(EXIT_SUCCESS);
     }
 
+    // not needed anymore
+    close(STDIN_FILENO);
+
     if(zdbd_rootsettings.logfile) {
         if(!(freopen(zdbd_rootsettings.logfile, "w", stdout)))
             zdbd_diep(zdbd_rootsettings.logfile);
@@ -1244,6 +1247,11 @@ static void daemonize() {
 
         // reset stdout to line-buffered
         setvbuf(stdout, NULL, _IOLBF, 0);
+
+    } else {
+        // closing non-needed fds
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
     }
 
     zdbd_verbose("[+] system: working in background now\n");
