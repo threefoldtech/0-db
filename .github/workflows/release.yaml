@@ -30,7 +30,7 @@ jobs:
 
   generate-musl:
     name: Create release artifacts (musl)
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout the repository
         uses: actions/checkout@master
