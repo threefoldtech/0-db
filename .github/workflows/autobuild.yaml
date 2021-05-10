@@ -17,7 +17,7 @@ jobs:
       - name: Get versions
         id: versions
         run: |
-          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/*/})"
           echo "##[set-output name=commit;]$(echo ${GITHUB_SHA:0:10})"
 
       - name: Building 0-db
@@ -58,7 +58,7 @@ jobs:
       - name: Get versions
         id: versions
         run: |
-          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/*/})"
           echo "##[set-output name=commit;]$(echo ${GITHUB_SHA:0:10})"
 
       - name: Building 0-db
