@@ -1226,6 +1226,7 @@ static int redis_unix_listen(char *socketpath) {
 
 static void daemonize() {
     pid_t pid = fork();
+    int nfd;
 
     if(pid == -1)
         zdbd_diep("fork");
@@ -1235,8 +1236,13 @@ static void daemonize() {
         exit(EXIT_SUCCESS);
     }
 
-    // not needed anymore
-    close(STDIN_FILENO);
+
+    // reconnect stdin to /dev/null
+    if((nfd = open("/dev/null", O_RDONLY)) < 0)
+        zdbd_diep("open: stdin: /dev/null");
+
+    if(dup2(nfd, STDIN_FILENO) < 0)
+        zdbd_diep("stdin: dup2");
 
     if(zdbd_rootsettings.logfile) {
         if(!(freopen(zdbd_rootsettings.logfile, "w", stdout)))
@@ -1250,8 +1256,17 @@ static void daemonize() {
 
     } else {
         // closing non-needed fds
-        close(STDOUT_FILENO);
-        close(STDERR_FILENO);
+        if((nfd = open("/dev/null", O_WRONLY)) < 0)
+            zdbd_diep("open: stdout: /dev/null");
+
+        if(dup2(nfd, STDOUT_FILENO) < 0)
+            zdbd_diep("stdout: dup2");
+
+        if((nfd = open("/dev/null", O_WRONLY)) < 0)
+            zdbd_diep("open: stderr: /dev/null");
+
+        if(dup2(nfd, STDERR_FILENO) < 0)
+            zdbd_diep("stderr: dup2");
     }
 
     zdbd_verbose("[+] system: working in background now\n");
