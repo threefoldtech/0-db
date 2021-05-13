@@ -8,13 +8,13 @@
 
 // perform a binary search on the seqmap to get
 // the fileid back based on the index mapped with fileid
-static index_seqmap_t *index_seqmap_from_seq(index_seqid_t *seqid, uint32_t id) {
-    uint32_t lower = 0;
-    uint32_t higher = seqid->length;
+static index_seqmap_t *index_seqmap_from_seq(index_seqid_t *seqid, seqid_t id) {
+    seqid_t lower = 0;
+    seqid_t higher = seqid->length;
 
     // binary search
     while(lower < higher) {
-        int mid = (lower + higher) / 2;
+        seqid_t mid = (lower + higher) / 2;
 
         // exact match
         if(id == seqid->seqmap[mid].seqid)
@@ -40,15 +40,15 @@ static index_seqmap_t *index_seqmap_from_seq(index_seqid_t *seqid, uint32_t id) 
     return &seqid->seqmap[lower];
 }
 
-index_seqmap_t *index_fileid_from_seq(index_root_t *root, uint32_t seqid) {
+index_seqmap_t *index_fileid_from_seq(index_root_t *root, seqid_t seqid) {
     index_seqmap_t *seqmap = index_seqmap_from_seq(root->seqid, seqid);
-    zdb_debug("[+] index: seqmap: resolving %d -> file %u\n", seqid, seqmap->fileid);
+    zdb_debug("[+] index: seqmap: resolving %lu -> file %u\n", seqid, seqmap->fileid);
 
     return seqmap;
 }
 
-void index_seqid_push(index_root_t *root, uint32_t id, fileid_t indexid) {
-    zdb_debug("[+] index seq: mapping id %u to file %u\n", id, indexid);
+void index_seqid_push(index_root_t *root, seqid_t id, fileid_t indexid) {
+    zdb_debug("[+] index seq: mapping id %lu to file %u\n", id, indexid);
 
     if(root->seqid->length + 1 == root->seqid->allocated) {
         // growing up the vector
@@ -64,7 +64,7 @@ void index_seqid_push(index_root_t *root, uint32_t id, fileid_t indexid) {
     root->seqid->length += 1;
 }
 
-size_t index_seq_offset(uint32_t relative) {
+size_t index_seq_offset(seqid_t relative) {
     // skip index header
     size_t offset = sizeof(index_header_t);
 
@@ -76,7 +76,7 @@ size_t index_seq_offset(uint32_t relative) {
     // always fixed-length
     //
     //                       each entry            fixed-key-length
-    offset += (relative * (sizeof(index_item_t) + sizeof(uint32_t)));
+    offset += (relative * (sizeof(index_item_t) + sizeof(seqid_t)));
 
     return offset;
 }
@@ -84,8 +84,7 @@ size_t index_seq_offset(uint32_t relative) {
 void index_seqid_dump(index_root_t *root) {
     for(fileid_t i = 0; i < root->seqid->length; i++) {
         index_seqmap_t *item = &root->seqid->seqmap[i];
-        zdb_log("[+] index seq: seqid %d -> file %d\n", item->seqid, item->fileid);
+        zdb_log("[+] index seq: seqid %lu -> file %u\n", item->seqid, item->fileid);
     }
 }
-
 

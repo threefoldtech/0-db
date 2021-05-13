@@ -135,9 +135,12 @@
 
     } index_status_t;
 
+    // seqid_t represent a sequential id type
+    typedef uint64_t seqid_t;
+
     // index sequential id mapping
     typedef struct index_seqmap_t {
-        uint32_t seqid;
+        seqid_t seqid;
         fileid_t fileid;
 
     } index_seqmap_t;
@@ -214,7 +217,7 @@
     // the same length, we can compute offset like this
     typedef struct index_dkey_t {
         fileid_t indexid;
-        uint32_t objectid;
+        seqid_t objectid;
 
     } __attribute__((packed)) index_dkey_t;
 
@@ -262,6 +265,7 @@
     int index_emergency(index_root_t *root);
 
     uint64_t index_next_id(index_root_t *root);
+    seqid_t index_next_seqid(index_root_t *root);
     uint32_t index_next_objectid(index_root_t *root);
 
     index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t length);

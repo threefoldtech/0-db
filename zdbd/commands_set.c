@@ -138,8 +138,8 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
     // create some easier accessors
     // grab the next id, this may be replaced
     // by user input if the key exists
-    uint32_t id = index_next_id(index);
-    uint8_t idlength = sizeof(uint32_t);
+    seqid_t id = index_next_seqid(index);
+    uint8_t idlength = sizeof(seqid_t);
 
     // setting key to existing if we do an update
     if(existing)
