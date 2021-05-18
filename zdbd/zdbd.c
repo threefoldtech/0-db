@@ -51,6 +51,7 @@ static struct option long_options[] = {
     {"datasize",   required_argument, 0, 'D'},
     {"maxsize",    required_argument, 0, 'M'},
     {"protect",    no_argument,       0, 'P'},
+    {"secure",     no_argument,       0, 'S'},
     {"rotate",     required_argument, 0, 'r'},
     {"version",    no_argument,       0, 'V'},
     {"help",       no_argument,       0, 'h'},
@@ -289,6 +290,7 @@ void usage() {
     printf("  --verbose           enable verbose (debug) information\n");
     printf("  --dump              only dump index contents, then exit (debug)\n");
     printf("  --sync              force all write to be synced\n");
+    printf("  --secure            enable some intermediate flush\n");
     printf("  --background        run in background (daemon), when ready\n");
     printf("  --logfile <file>    log file (only in daemon mode)\n");
     printf("  --rotate <secs>     force file (index and data) rotation after x seconds\n");
@@ -357,7 +359,13 @@ int main(int argc, char *argv[]) {
                 break;
 
             case 's':
+                zdbd_verbose("[+] system: sync mode enabled\n");
                 zdb_settings->sync = 1;
+                break;
+
+            case 'S':
+                zdbd_verbose("[+] system: secure more enabled\n");
+                zdb_settings->secure = 1;
                 break;
 
             case 'k':
