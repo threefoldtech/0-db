@@ -184,6 +184,7 @@
         index_mode_t mode;  // running mode for that index
         time_t rotate;      // last time file were rotate (jumped to next file)
         int updated;        // does current index changed since opened
+        int secure;         // enable some safety (see secure zdb_settings_t)
 
         void *namespace;    // see index_entry_t, same reason
 

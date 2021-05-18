@@ -320,8 +320,10 @@ size_t data_jump_next(data_root_t *root, fileid_t newid) {
     }
 
     // flushing data
-    zdb_verbose("[+] data: flushing file before closing\n");
-    fsync(root->datafd);
+    if(root->secure) {
+        zdb_verbose("[+] data: flushing file before closing\n");
+        fsync(root->datafd);
+    }
 
     // closing current file descriptor
     zdb_verbose("[+] data: closing current datafile\n");
@@ -607,6 +609,7 @@ data_root_t *data_init_lazy(zdb_settings_t *settings, char *datapath, fileid_t d
     root->synctime = settings->synctime;
     root->lastsync = 0;
     root->previous = 0;
+    root->secure = settings->secure;
 
     memset(&root->stats, 0x00, sizeof(data_stats_t));
 

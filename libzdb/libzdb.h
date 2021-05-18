@@ -76,6 +76,11 @@
         size_t maxsize;    // default namespace maximum datasize
         int initialized;   // single instance lock flag
 
+        int secure;        // enable some security about data write, but will
+                           // reduce performance (eg: will fsync() before jumping
+                           // to another file, to ensure file is written, but on
+                           // write burst, this can dramatically reduce performance
+
         // right now, the library can't handle multiple instance on the
         // same time, there is a global zdb_settings variable shared with
         // the global program

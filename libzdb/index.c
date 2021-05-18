@@ -345,8 +345,10 @@ size_t index_jump_next(index_root_t *root) {
     }
 
     // flushing current index file
-    zdb_verbose("[+] index: flushing file before closing\n");
-    fsync(root->indexfd);
+    if(root->secure) {
+        zdb_verbose("[+] index: flushing file before closing\n");
+        fsync(root->indexfd);
+    }
 
     // closing current file descriptor
     zdb_verbose("[+] index: closing current index file\n");

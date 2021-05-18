@@ -25,6 +25,7 @@
         int synctime;       // force to sync data after this timeout (on next write)
         time_t lastsync;    // keep track when the last sync was explictly made
         size_t previous;    // keep latest offset inserted to the datafile
+        int secure;         // enable some safety (see secure zdb_settings_t)
         data_stats_t stats; // data statistics (session time)
 
     } data_root_t;
