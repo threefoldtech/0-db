@@ -23,7 +23,7 @@
     //        and not assure retro-compatibility
     //        (eg: files written on version 1.x.x won't works
     //             out of box on a version 2.x.x)
-    #define ZDBD_VERSION     "2.0.0-rc2"
+    #define ZDBD_VERSION     "2.0.0-rc3"
 
     typedef struct zdbd_stats_t {
         // boottime is kept for zdbd uptime statistics (for INFO command)
