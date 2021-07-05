@@ -77,12 +77,12 @@ static int dir_clean_cb(const char *fpath, const struct stat *sb, int tflag, str
 
     if(strncmp(fullpath + length - 14, "zdb-data-", 9) == 0) {
         zdb_debug("[+] filesystem: removing datafile: %s\n", fullpath);
-        remove(fullpath);
+        unlink(fullpath);
     }
 
     if(strncmp(fullpath + length - 15, "zdb-index-", 10) == 0) {
         zdb_debug("[+] filesystem: removing indexfile: %s\n", fullpath);
-        remove(fullpath);
+        unlink(fullpath);
     }
 
     return tflag;
