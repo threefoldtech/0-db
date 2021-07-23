@@ -658,16 +658,22 @@ int namespace_flush(namespace_t *namespace) {
     zdb_debug("[+] namespace: flushing: cleaning index\n");
     index_clean_namespace(namespace->index, namespace);
 
+    char *indexpath = strdup(namespace->index->indexdir);
+    char *datapath = strdup(namespace->data->datadir);
+
     zdb_debug("[+] namespace: flushing: destroying objects\n");
     index_destroy(namespace->index);
     data_destroy(namespace->data);
 
     zdb_debug("[+] namespace: flushing: removing files\n");
-    index_delete_files(namespace->index);
-    data_delete_files(namespace->data);
+    index_delete_files(indexpath);
+    data_delete_files(datapath);
 
     zdb_debug("[+] namespace: flushing: reloading data\n");
     namespace_load_lazy(nsroot, namespace);
+
+    free(indexpath);
+    free(datapath);
 
     return 0;
 }

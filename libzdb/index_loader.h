@@ -20,7 +20,7 @@
     int index_switch_mode(index_root_t *root);
 
     // gracefully clean everything
-    void index_delete_files(index_root_t *root);
+    void index_delete_files(char *indexdir);
     void index_destroy(index_root_t *root);
     void index_destroy_global();
 #endif

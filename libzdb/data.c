@@ -638,6 +638,6 @@ void data_emergency(data_root_t *root) {
 }
 
 // delete data files
-void data_delete_files(data_root_t *root) {
-    zdb_dir_clean_payload(root->datadir);
+void data_delete_files(char *datadir) {
+    zdb_dir_clean_payload(datadir);
 }
