@@ -54,6 +54,7 @@ int zdb_dir_create(char *path) {
 static int dir_remove_cb(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf) {
     (void) sb;
     (void) ftwbuf;
+    (void) tflag;
     char *fullpath = (char *) fpath;
     int value;
 
@@ -62,7 +63,7 @@ static int dir_remove_cb(const char *fpath, const struct stat *sb, int tflag, st
     if((value = remove(fullpath)))
         zdb_warnp(fullpath);
 
-    return tflag;
+    return 0;
 }
 
 int zdb_dir_remove(char *path) {
@@ -72,6 +73,7 @@ int zdb_dir_remove(char *path) {
 static int dir_clean_cb(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf) {
     (void) sb;
     (void) ftwbuf;
+    (void) tflag;
     char *fullpath = (char *) fpath;
     size_t length = strlen(fullpath);
 
@@ -85,7 +87,7 @@ static int dir_clean_cb(const char *fpath, const struct stat *sb, int tflag, str
         unlink(fullpath);
     }
 
-    return tflag;
+    return 0;
 }
 
 int zdb_dir_clean_payload(char *path) {
