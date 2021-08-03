@@ -68,9 +68,14 @@ jobs:
 
       - name: Build production 0-db
         run: |
+          cd libzdb
+          make release
+
+          cd ../zdbd
           make STATIC=1 release
-          version=$(grep ZDBD_VERSION zdbd/zdbd.h | awk '{ print $3 }' | sed s/'"'//g)
-          cp zdbd/zdb zdb-${version}-linux-amd64-static
+
+          version=$(grep ZDBD_VERSION zdbd.h | awk '{ print $3 }' | sed s/'"'//g)
+          cp zdb ../zdb-${version}-linux-amd64-static
 
       - name: Upload the artifacts
         uses: skx/github-action-publish-binaries@master
