@@ -42,7 +42,7 @@
     //        and not assure retro-compatibility
     //        (eg: files written on version 1.x.x won't works
     //             out of box on a version 2.x.x)
-    #define ZDB_VERSION     "2.0.0-rc2"
+    #define ZDB_VERSION     "2.0.0-rc5"
 
     typedef struct zdb_stats_t {
         struct timeval inittime;  // timestamp when zdb started (used for uptime)
@@ -75,6 +75,11 @@
         size_t datasize;   // maximum datafile size before jumping to next one
         size_t maxsize;    // default namespace maximum datasize
         int initialized;   // single instance lock flag
+
+        int secure;        // enable some security about data write, but will
+                           // reduce performance (eg: will fsync() before jumping
+                           // to another file, to ensure file is written, but on
+                           // write burst, this can dramatically reduce performance
 
         // right now, the library can't handle multiple instance on the
         // same time, there is a global zdb_settings variable shared with

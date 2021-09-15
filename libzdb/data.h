@@ -25,6 +25,7 @@
         int synctime;       // force to sync data after this timeout (on next write)
         time_t lastsync;    // keep track when the last sync was explictly made
         size_t previous;    // keep latest offset inserted to the datafile
+        int secure;         // enable some safety (see secure zdb_settings_t)
         data_stats_t stats; // data statistics (session time)
 
     } data_root_t;
@@ -121,7 +122,7 @@
     size_t data_jump_next(data_root_t *root, fileid_t newid);
     void data_emergency(data_root_t *root);
     fileid_t data_dataid(data_root_t *root);
-    void data_delete_files(data_root_t *root);
+    void data_delete_files(char *datadir);
 
     uint32_t data_crc32(const uint8_t *bytes, ssize_t length);
 

@@ -45,8 +45,11 @@ char *zdb_hash_password(char *salt, char *password) {
         return NULL;
     }
 
-    char buffer[ZDB_SHA1_DIGEST_LENGTH];
-    char bufferstr[ZDB_SHA1_DIGEST_STR_LENGTH];
+    char buffer[ZDB_SHA1_DIGEST_LENGTH + 1];
+    char bufferstr[ZDB_SHA1_DIGEST_STR_LENGTH + 1];
+
+    memset(buffer, 0, sizeof(buffer));
+    memset(bufferstr, 0, sizeof(bufferstr));
 
     // compute sha1 and build hex-string
     zdb_sha1(buffer, hashmatch, strlen(hashmatch));

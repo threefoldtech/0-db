@@ -517,6 +517,7 @@ index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir, void *na
     root->namespace = namespace;
     root->mode = settings->mode;
     root->rotate = time(NULL);
+    root->secure = settings->secure;
 
     index_dirty_resize(root, 1);
 
@@ -597,8 +598,8 @@ void index_destroy_global() {
 }
 
 // delete index files (not the namespace descriptor)
-void index_delete_files(index_root_t *root) {
-    zdb_dir_clean_payload(root->indexdir);
+void index_delete_files(char *indexdir) {
+    zdb_dir_clean_payload(indexdir);
 }
 
 // update (rewrite) current index header

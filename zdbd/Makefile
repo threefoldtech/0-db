@@ -20,6 +20,11 @@ ifeq ($(COVERAGE),1)
 	LDFLAGS += -lgcov --coverage
 endif
 
+ifeq ($(PROFILE),1)
+	CFLAGS += -pg
+	LDFLAGS += -pg
+endif
+
 all: $(EXEC)
 
 release: CFLAGS += -DRELEASE -O2
