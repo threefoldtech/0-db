@@ -82,6 +82,8 @@ int command_info(redis_client_t *client) {
 
     len += sprintf(info + len, "\n# internals\n");
     len += sprintf(info + len, "sequential_key_size: %ld\n", sizeof(seqid_t));
+    len += sprintf(info + len, "data_version: %d\n", ZDB_DATAFILE_VERSION);
+    len += sprintf(info + len, "index_version: %d\n", ZDB_IDXFILE_VERSION);
 
     len += sprintf(info + len, "\n# stats\n");
     len += sprintf(info + len, "commands_executed: %" PRIu64 "\n", dstats->cmdsvalid);
