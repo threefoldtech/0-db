@@ -1,4 +1,4 @@
-# 0-db [![Build Status](https://travis-ci.org/threefoldtech/0-db.svg?branch=master)](https://travis-ci.org/threefoldtech/0-db) [![codecov](https://codecov.io/gh/threefoldtech/0-db/branch/master/graph/badge.svg)](https://codecov.io/gh/threefoldtech/0-db)  
+# 0-db [![codecov](https://codecov.io/gh/threefoldtech/0-db/branch/master/graph/badge.svg)](https://codecov.io/gh/threefoldtech/0-db)  
 0-db (zdb) is a super fast and efficient key-value store which makes data persistant
 inside an always append datafile, with namespaces support.
 
@@ -9,8 +9,7 @@ The database is split in two part:
 Indexes are created to speedup restart/reload process, this index is always append too,
 except in sequential-mode (see below for more information).
 
-We use it as backend for many of our blockchain work. It might replace redis for basic request,
-but 0-db is not a redis replacement and never will.
+We use it as backend for many of our blockchain work, 0-db is not a redis replacement and never will.
 
 # Quick links
 1. [Build targets](#build-targets)
@@ -27,7 +26,7 @@ but 0-db is not a redis replacement and never will.
 
 # Build targets
 Currently supported system:
-* Linux (using `epoll`), kernel 3.17, glibc 2.25
+* Linux (using `epoll`), kernel 3.17+, glibc 2.25+
 * MacOS and FreeBSD (using `kqueue`)
 
 Currently supported hardware:
@@ -51,7 +50,8 @@ More documentation will comes about the library itself. The library is fresh new
 
 ## Default port
 0-db listens by default on port `9900` but this can be overidden on the commandline using `--port` option.
-Without argulent, datafiles and indexfiles will be stored on the current working directory, inside
+
+Without argument, datafiles and indexfiles will be stored on the current working directory, inside
 `zdb-data` and `zdb-index` directories.
 
 # Always append
@@ -113,10 +113,8 @@ If you provide a key, this key should exists (a valid generated key), and the `S
 
 Providing any other key will fails.
 
-The id is a little-endian integer key. All the keys are kept in memory.
-
-## Direct Key (Legacy)
-There was previously a `direct mode` which works the same way as `sequential mode` now. This mode doesn't exists anymore.
+The id is a little-endian integer key. Keys are not kept in memory, based on the key-id, location
+on disk can be known. Running a `zdbd` in sequential-mode-only have a **really** low memory footprint.
 
 # Implementation
 This project doesn't rely on any dependencies, it's from scratch.
@@ -144,7 +142,7 @@ Each time the server starts, it loads (basicly replay) the index in memory. The 
 **all the time** and only this in-memory index is reached to fetch a key, index files are
 never read again except during startup, reload or slow query (slow queries mean, doing some SCAN/RSCAN/HISTORY requests).
 
-In direct-mode, key is the location on the index, no memory usage is needed, but lot of disk access are needed.
+In sequential-mode, key is the location on the index, no memory usage is needed, but lot of disk access are needed.
 
 When a key-delete is requested, the key is kept in memory and is flagged as deleted. A new entry is added
 to the index file, with the according flags. When the server restart, the latest state of the entry is used.
@@ -536,13 +534,15 @@ is okay and database can operate.
 # Limitation
 By default, datafiles are split when bigger than 256 MB.
 
-The datafile id is stored on 16 bits, which makes maximum of 65536 files.
-Each namespaces have their own datafiles, one namespace can contains maximum ~16 TB of data.
-Since one single 0-db is made to be used on a single dedicated disk, this should be good out of box,
-but that's still a limitation. This limitation can be changed on startup via command line
-option `--datasize`, and provide (in bytes) the size limit of a datafile. Setting `536870912` for example
-(which is 512 MB) would set the namespace limit to ~32 TB. This limit is printed (with verbose flag) on
-the initializing process.
+The datafile id is stored on 32 bits, which makes maximum of 4,294,967,296 files.
+Each datafile cannot be larger than 4 GB.
+
+Each namespaces have their own datafiles, one namespace can contains maximum 16 EB (16,384 PB).
+
+Default values (256 MB datafiles) set the limits to 1024 PB.
+
+This limitation can be changed on startup via command line option `--datasize`, and provide (in bytes)
+the size limit of a datafile. Setting `536870912` for example (which is 512 MB).
 
 Please use always the same datasize accross multiple run, but using different size **should not** interfer.
 
