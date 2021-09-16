@@ -22,7 +22,7 @@ static index_entry_t *index_get_handler_sequential(index_root_t *index, void *id
     // converting key into binary format
     seqid_t key;
     memcpy(&key, id, sizeof(seqid_t));
-    key = be64toh(key);
+    // key = be64toh(key);
 
     // resolving key into file id
     index_seqmap_t *seqmap = index_fileid_from_seq(index, key);
@@ -34,7 +34,7 @@ static index_entry_t *index_get_handler_sequential(index_root_t *index, void *id
     // reading index on disk
     index_item_t *item;
 
-    if(!(item = index_item_get_disk(index, seqmap->fileid, offset, sizeof(uint32_t))))
+    if(!(item = index_item_get_disk(index, seqmap->fileid, offset, sizeof(seqid_t))))
         return NULL;
 
     memcpy(index_reusable_entry->id, item->id, item->idlength);

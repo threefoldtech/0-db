@@ -61,14 +61,14 @@ int index_seq_overwrite(index_root_t *root, index_set_t *set) {
     size_t entrylength = sizeof(index_item_t) + entry->idlength;
 
     // converting key into binary format
-    uint32_t key;
-    memcpy(&key, set->id, sizeof(uint32_t));
+    seqid_t key;
+    memcpy(&key, set->id, sizeof(seqid_t));
 
     // resolving key into file id
     index_seqmap_t *seqmap = index_fileid_from_seq(root, key);
 
     // resolving relative offset
-    uint32_t relative = key - seqmap->seqid;
+    uint64_t relative = key - seqmap->seqid;
     uint32_t offset = index_seq_offset(relative);
 
     // (re-)open the expected index file, in read-write mode

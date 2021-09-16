@@ -10,7 +10,6 @@
 #include <time.h>
 #include <limits.h>
 #include <x86intrin.h>
-#include <endian.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
 
@@ -397,12 +396,6 @@ uint64_t index_next_id(index_root_t *root) {
     // this is used on sequential-id
     // it gives the next id
     return root->nextentry;
-}
-
-seqid_t index_next_seqid(index_root_t *root) {
-    // this is used on sequential-id
-    // it gives the next id
-    return htobe64(root->nextentry);
 }
 
 uint32_t index_next_objectid(index_root_t *root) {
