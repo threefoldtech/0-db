@@ -182,8 +182,8 @@ static zdb_api_t *api_set_handler_sequential(namespace_t *ns, void *key, size_t 
     // create some easier accessor
     // grab the next id, this may be replaced
     // by user input if the key exists
-    uint32_t id = index_next_id(ns->index);
-    uint8_t idlength = sizeof(uint32_t);
+    seqid_t id = index_next_id(ns->index);
+    uint8_t idlength = sizeof(seqid_t);
 
     // setting key to existing if we do an update
     if(existing)

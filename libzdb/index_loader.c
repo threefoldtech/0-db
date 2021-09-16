@@ -396,6 +396,23 @@ void index_internal_load(index_root_t *root) {
     uint64_t maxfile = index_availity_check(root);
     uint64_t fileid;
 
+    // legacy check:
+    // check for old database file
+    char legacy[256];
+    sprintf(legacy, "%s/zdb-index-00000", root->indexdir);
+    if(zdb_file_exists(legacy) == ZDB_FILE_EXISTS) {
+        zdb_danger("[-] index: =================================");
+        zdb_danger("[-] index: unsupported database detected");
+        zdb_danger("[-] index: =================================");
+        zdb_danger("[-] index: ");
+        zdb_danger("[-] index: index directory seems to contains old database");
+        zdb_danger("[-] index: files like 'zdb-index-00000' which is not supported");
+        zdb_danger("[-] index: ");
+        zdb_danger("[-] index: retro-compability is not supported");
+
+        exit(EXIT_FAILURE);
+    }
+
     if(maxfile > 0) {
         // opening all index files one by one
         for(fileid = 0; fileid < maxfile; fileid++) {

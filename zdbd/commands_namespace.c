@@ -291,7 +291,7 @@ int command_nsinfo(redis_client_t *client) {
         return 1;
 
     // value is hard-capped to 32 bits, even if internal uses 64 bits
-    uint32_t nextid = (uint32_t) zdb_index_next_id(namespace->index);
+    uint64_t nextid = zdb_index_next_id(namespace->index);
 
     // compute free space available
     size_t available = namespace->maxsize - namespace->index->stats.datasize;
@@ -309,7 +309,7 @@ int command_nsinfo(redis_client_t *client) {
     len += sprintf(info + len, "data_limits_bytes: %lu\n", namespace->maxsize);
     len += sprintf(info + len, "index_size_bytes: %lu\n", namespace->index->stats.size);
     len += sprintf(info + len, "index_size_kb: %.2f\n", KB(namespace->index->stats.size));
-    len += sprintf(info + len, "next_internal_id: 0x%08x\n", bswap_32(nextid));
+    len += sprintf(info + len, "next_internal_id: 0x%08lx\n", bswap_64(nextid));
     len += sprintf(info + len, "mode: %s\n", index_modename(namespace->index));
     len += sprintf(info + len, "stats_index_io_errors: %lu\n", namespace->index->stats.errors);
     len += sprintf(info + len, "stats_index_io_error_last: %ld\n", namespace->index->stats.lasterr);

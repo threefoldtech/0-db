@@ -138,12 +138,15 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
     // create some easier accessors
     // grab the next id, this may be replaced
     // by user input if the key exists
-    uint32_t id = index_next_id(index);
-    uint8_t idlength = sizeof(uint32_t);
+    seqid_t id = index_next_id(index);
+    uint8_t idlength = sizeof(seqid_t);
 
     // setting key to existing if we do an update
-    if(existing)
+    if(existing) {
+        zdbd_debug("[+] command: set: updating existing id: ");
+        zdbd_debughex(existing->id, existing->idlength);
         memcpy(&id, existing->id, existing->idlength);
+    }
 
     unsigned char *value = request->argv[2]->buffer;
     uint32_t valuelength = request->argv[2]->length;
@@ -151,7 +154,9 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
     // setting the timestamp
     time_t timestamp = timestamp_from_set(request);
 
-    zdbd_debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
+    zdbd_debug("[+] command: set: sequential-key: ");
+    zdbd_debughex(&id, idlength);
+    zdbd_debug("[+] command: set: %u bytes data\n", valuelength);
 
     data_request_t dreq = {
         .data = value,
@@ -187,7 +192,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
         return 0;
     }
 
-    zdbd_debug("[+] command: set: sequential-key: ");
+    zdbd_debug("[+] command: set: writing data sequential-key: ");
     zdbd_debughex(&id, idlength);
 
     zdbd_debug("[+] command: set: offset: %lu\n", offset);

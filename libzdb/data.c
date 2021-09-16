@@ -131,7 +131,7 @@ int data_open_id_mode(data_root_t *root, fileid_t id, int mode) {
     int retried = 0;
     int fd;
 
-    sprintf(temp, "%s/zdb-data-%05u", root->datadir, id);
+    sprintf(temp, "%s/d%u", root->datadir, id);
     zdb_debug("[+] data: opening file: %s (ro: %s)\n", temp, (mode & O_RDONLY) ? "yes" : "no");
 
     while((fd = open(temp, mode, 0600)) < 0) {
@@ -269,7 +269,7 @@ void data_initialize(char *filename, data_root_t *root) {
 
 // simply set globally the current filename based on it's id
 static void data_set_id(data_root_t *root) {
-    sprintf(root->datafile, "%s/zdb-data-%05u", root->datadir, root->dataid);
+    sprintf(root->datafile, "%s/d%u", root->datadir, root->dataid);
 }
 
 static void data_open_final(data_root_t *root) {

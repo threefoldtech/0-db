@@ -160,7 +160,7 @@ static int index_read(int fd, void *buffer, size_t length) {
 }
 
 static char *index_set_id_buffer(char *buffer, char *indexdir, fileid_t indexid) {
-    sprintf(buffer, "%s/zdb-index-%05u", indexdir, indexid);
+    sprintf(buffer, "%s/i%u", indexdir, indexid);
     return buffer;
 }
 
@@ -179,7 +179,7 @@ static int index_open_file_mode(index_root_t *root, fileid_t fileid, int mode) {
     char filename[512];
     int fd;
 
-    sprintf(filename, "%s/zdb-index-%05u", root->indexdir, fileid);
+    sprintf(filename, "%s/i%u", root->indexdir, fileid);
     zdb_debug("[+] index: opening file: %s (ro: %s)\n", filename, (mode & O_RDONLY) ? "yes" : "no");
 
     if((fd = open(filename, mode)) < 0) {
