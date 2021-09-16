@@ -14,7 +14,7 @@
     typedef enum ns_flags_t {
         NS_FLAGS_PUBLIC = 1,   // public read-only namespace
         NS_FLAGS_WORM = 2,     // worm mode enabled or not
-        NS_FLAGS_EXTENDED = 4, // extended header is present
+        NS_FLAGS_EXTENDED = 4, // extended header is present (legacy, mandatory)
 
     } ns_flags_t;
 
@@ -22,35 +22,19 @@
         NS_LOCK_UNLOCKED = 0,
         NS_LOCK_READ_ONLY = 1,
         NS_LOCK_READ_WRITE = 2,
+
     } ns_lock_t;
 
-    // ns_header_legacy_t contains the header of a specific namespace for previous 0-db
-    // version, this header will be the only content of the namespace descriptor file
-    typedef struct ns_header_legacy_t {
+    // ns_header_t contains the header of a specific namespace
+    // this header will be the only content of the namespace descriptor file
+    typedef struct ns_header_t {
+        uint32_t version;      // keep track of this version
         uint8_t namelength;    // length of the namespace name
         uint8_t passlength;    // length of the password
-        uint32_t maxsize;      // old maximum size (ignored, see extended)
+        uint64_t maxsize;      // maximum namespace size (if defined)
         uint8_t flags;         // some flags (see define above)
 
-        // this header won't never change, this is the first version
-        // deployed, to keep retro-compatibility with old database
-        // we keep the same prefix
-        //
-        // new version contains more fields and contains a version
-        // identifier used to keep track of update
-        //
-        // the flag NS_FLAGS_EXTENDED is set when the header used is
-        // any new version, which means you can still load old version
-        // and new version will still works on previous version
-
-    } __attribute__((packed)) ns_header_legacy_t;
-
-    typedef struct ns_header_extended_t {
-        uint32_t version;  // keep track of this version
-        uint64_t maxsize;  // real maxsize encoded on 64 bits (no 4 GB limit)
-
-    } __attribute__((packed)) ns_header_extended_t;
-
+    } __attribute__((packed)) ns_header_t;
 
     typedef struct namespace_t {
         char *name;            // namespace string-name
