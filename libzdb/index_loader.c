@@ -400,7 +400,7 @@ void index_internal_load(index_root_t *root) {
     // check for old database file
     char legacy[256];
     sprintf(legacy, "%s/zdb-index-00000", root->indexdir);
-    if(zdb_file_exists(legacy)) {
+    if(zdb_file_exists(legacy) == ZDB_FILE_EXISTS) {
         zdb_danger("[-] index: =================================");
         zdb_danger("[-] index: unsupported database detected");
         zdb_danger("[-] index: =================================");
