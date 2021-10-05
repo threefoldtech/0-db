@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <time.h>
 #include <limits.h>
-#include <x86intrin.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
 
