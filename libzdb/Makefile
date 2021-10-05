@@ -2,8 +2,14 @@ LIB = libzdb
 SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 
-CFLAGS += -g -fPIC -std=gnu11 -O0 -W -Wall -Wextra -msse4.2 -Wno-implicit-fallthrough
+CFLAGS += -g -fPIC -std=gnu11 -O0 -W -Wall -Wextra -Wno-implicit-fallthrough
 LDFLAGS += -rdynamic
+
+MACHINE := $(shell uname -m)
+ifeq ($(MACHINE),x86_64)
+	# explicit sse4.2 flags
+	CFLAGS += -msse4.2
+endif
 
 # grab version from git, if possible
 REVISION := $(shell git describe --abbrev=8 --dirty --always --tags)
