@@ -408,17 +408,7 @@ uint32_t index_next_objectid(index_root_t *root) {
 // perform the basic "hashing" (crc based) used to point to the expected branch
 // we only keep partial amount of the result to not fill the memory too fast
 uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
-    uint64_t *input = (uint64_t *) id;
-    uint32_t hash = 0;
-    ssize_t i = 0;
-
-    for(i = 0; i < idlength - 8; i += 8)
-        hash = _mm_crc32_u64(hash, *input++);
-
-    for(; i < idlength; i++)
-        hash = _mm_crc32_u8(hash, id[i]);
-
-    return hash & buckets_mask;
+    return zdb_crc32((const uint8_t *) id, idlength) & buckets_mask;
 }
 
 // main look-up function, used to get an entry from the memory index

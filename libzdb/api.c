@@ -121,7 +121,7 @@ static zdb_api_t *api_set_handler_userkey(namespace_t *ns, void *key, size_t ksi
         .vid = key,
         .idlength = ksize,
         .flags = 0,
-        .crc = data_crc32(payload, psize),
+        .crc = zdb_crc32(payload, psize),
         .timestamp = timestamp,
     };
 
@@ -201,7 +201,7 @@ static zdb_api_t *api_set_handler_sequential(namespace_t *ns, void *key, size_t 
         .vid = &id,
         .idlength = idlength,
         .flags = 0,
-        .crc = data_crc32(payload, psize),
+        .crc = zdb_crc32(payload, psize),
         .timestamp = timestamp,
     };
 
@@ -466,7 +466,7 @@ void zdb_index_close(index_root_t *root) {
 
 // expose internal crc32 computing
 uint32_t zdb_checksum_crc32(const uint8_t *bytes, ssize_t length) {
-    return data_crc32(bytes, length);
+    return zdb_crc32(bytes, length);
 }
 
 data_root_t *zdb_data_init_lazy(zdb_settings_t *settings, char *datapath, fileid_t dataid) {

@@ -124,8 +124,6 @@
     fileid_t data_dataid(data_root_t *root);
     void data_delete_files(char *datadir);
 
-    uint32_t data_crc32(const uint8_t *bytes, ssize_t length);
-
     data_payload_t data_get(data_root_t *root, size_t offset, size_t length, fileid_t dataid, uint8_t idlength);
     int data_check(data_root_t *root, size_t offset, fileid_t dataid);
 

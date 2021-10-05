@@ -156,6 +156,7 @@
     #define TB(x)   (x / (1024 * 1024 * 1024 * 1024.0))
 
     #include "data.h"
+    #include "crc32.h"
     #include "filesystem.h"
     #include "index.h"
     #include "index_branch.h"

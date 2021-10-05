@@ -8,7 +8,6 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
-#include <x86intrin.h>
 #include <errno.h>
 #include <time.h>
 #include "libzdb.h"
@@ -344,22 +343,6 @@ size_t data_jump_next(data_root_t *root, fileid_t newid) {
     return root->dataid;
 }
 
-// compute a crc32 of the payload
-// this function uses Intel CRC32 (SSE4.2) intrinsic (SIMD)
-uint32_t data_crc32(const uint8_t *bytes, ssize_t length) {
-    uint64_t *input = (uint64_t *) bytes;
-    uint32_t hash = 0;
-    ssize_t i = 0;
-
-    for(i = 0; i < length - 8; i += 8)
-        hash = _mm_crc32_u64(hash, *input++);
-
-    for(; i < length; i++)
-        hash = _mm_crc32_u8(hash, bytes[i]);
-
-    return hash;
-}
-
 static size_t data_length_from_offset(int fd, size_t offset) {
     data_entry_header_t header;
 
@@ -475,7 +458,7 @@ static inline int data_check_real(int fd, size_t offset) {
     zdb_rootsettings.stats.datadiskread += header.datalength;
 
     // checking integrity of the payload
-    uint32_t integrity = data_crc32(buffer, header.datalength);
+    uint32_t integrity = zdb_crc32(buffer, header.datalength);
     free(buffer);
 
     zdb_debug("[+] data: checker: %08x <> %08x\n", integrity, header.integrity);
@@ -517,7 +500,7 @@ size_t data_insert(data_root_t *root, data_request_t *source) {
     header->idlength = source->idlength;
     header->datalength = source->datalength;
     header->previous = root->previous;
-    header->integrity = source->crc; // data_crc32(data, datalength);
+    header->integrity = source->crc; // zdb_crc32(data, datalength);
     header->flags = source->flags;
     header->timestamp = time(NULL);
 
