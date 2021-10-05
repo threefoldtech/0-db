@@ -90,15 +90,18 @@ static uint32_t crc32c_software(const uint8_t *data, unsigned int length) {
     return crc;
 }
 
-// sse4.2 hardware optimize
+// x86_64 sse4.2 hardware optimized implementation
 #ifdef __SSE4_2__
 static uint32_t crc32c_sse42(const uint8_t *bytes, size_t len) {
     uint64_t *input = (uint64_t *) bytes;
     uint32_t hash = 0;
     size_t i = 0;
 
-    for(i = 0; i < len - 8; i += 8)
-        hash = _mm_crc32_u64(hash, *input++);
+    if(len >= 8) {
+        // compute 64 bits chunks
+        for(i = 0; i < len - 8; i += 8)
+            hash = _mm_crc32_u64(hash, *input++);
+    }
 
     for(; i < len; i++)
         hash = _mm_crc32_u8(hash, bytes[i]);
@@ -107,14 +110,18 @@ static uint32_t crc32c_sse42(const uint8_t *bytes, size_t len) {
 }
 #endif
 
+// armv8 hardware optimized implementation
 #ifdef __ARM_FEATURE_CRC32
 static uint32_t crc32c_armv8(const uint8_t *bytes, size_t len) {
     uint64_t *input = (uint64_t *) bytes;
     uint32_t hash = 0;
     size_t i = 0;
 
-    for(i = 0; i < len - 8; i += 8)
-        hash = __crc32cd(hash, *input++);
+    if(len >= 8) {
+        // compute 64 bits chunks
+        for(i = 0; i < len - 8; i += 8)
+            hash = __crc32cd(hash, *input++);
+    }
 
     for(; i < len; i++)
         hash = __crc32cb(hash, bytes[i]);
