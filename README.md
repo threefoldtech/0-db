@@ -30,9 +30,13 @@ Currently supported system:
 * MacOS and FreeBSD (using `kqueue`)
 
 Currently supported hardware:
-* Any CPU supporting `SSE 4.2`
+* Any little-endian CPU
 
-This project won't compile on something else (for now).
+Currently optimized hardware:
+* `x86_64` with `SSE4.2`
+* `ARMv8` with `CRC32` flags (which include `Apple M1`)
+
+This project doesn't support big-endian system for now.
 
 # Build instructions
 To build the project (library, server, tools):
