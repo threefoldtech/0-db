@@ -309,7 +309,7 @@ int command_nsinfo(redis_client_t *client) {
     len += sprintf(info + len, "data_limits_bytes: %lu\n", namespace->maxsize);
     len += sprintf(info + len, "index_size_bytes: %lu\n", namespace->index->stats.size);
     len += sprintf(info + len, "index_size_kb: %.2f\n", KB(namespace->index->stats.size));
-    len += sprintf(info + len, "next_internal_id: 0x%08lx\n", bswap_64(nextid));
+    len += sprintf(info + len, "next_internal_id: 0x%08" PRIx64 "\n", bswap_64(nextid));
     len += sprintf(info + len, "mode: %s\n", index_modename(namespace->index));
     len += sprintf(info + len, "stats_index_io_errors: %lu\n", namespace->index->stats.errors);
     len += sprintf(info + len, "stats_index_io_error_last: %ld\n", namespace->index->stats.lasterr);

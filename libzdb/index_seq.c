@@ -84,7 +84,7 @@ size_t index_seq_offset(seqid_t relative) {
 void index_seqid_dump(index_root_t *root) {
     for(fileid_t i = 0; i < root->seqid->length; i++) {
         index_seqmap_t *item = &root->seqid->seqmap[i];
-        zdb_log("[+] index seq: seqid %lu -> file %u\n", item->seqid, item->fileid);
+        zdb_log("[+] index seq: seqid %" PRIu64 " -> file %u\n", item->seqid, item->fileid);
     }
 }
 
