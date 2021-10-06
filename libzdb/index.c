@@ -22,13 +22,13 @@ void index_item_header_dump(index_item_t *item) {
     (void) item;
 #else
     zdb_debug("[+] index: item dump: id length  : %" PRIu8  "\n", item->idlength);
-    zdb_debug("[+] index: item dump: data fileid: %" PRIu16 "\n", item->dataid);
+    zdb_debug("[+] index: item dump: data fileid: %" PRIu32 "\n", item->dataid);
     zdb_debug("[+] index: item dump: data offset: %" PRIu32 "\n", item->offset);
     zdb_debug("[+] index: item dump: data length: %" PRIu32 "\n", item->length);
     zdb_debug("[+] index: item dump: previous   : %" PRIx32 "\n", item->previous);
     zdb_debug("[+] index: item dump: flags      : %" PRIu8  "\n", item->flags);
     zdb_debug("[+] index: item dump: timestamp  : %" PRIu32 "\n", item->timestamp);
-    zdb_debug("[+] index: item dump: parent id  : %" PRIu16 "\n", item->parentid);
+    zdb_debug("[+] index: item dump: parent id  : %" PRIu32 "\n", item->parentid);
     zdb_debug("[+] index: item dump: parent offs: %" PRIu32 "\n", item->parentoff);
     zdb_debug("[+] index: item dump: crc        : %" PRIx32 "\n", item->crc);
 #endif
@@ -43,12 +43,12 @@ void index_entry_dump(index_entry_t *entry) {
     zdb_debug("[+] index: entry dump: id length  : %" PRIu8  "\n", entry->idlength);
     zdb_debug("[+] index: entry dump: idx offset : %" PRIu32 "\n", entry->idxoffset);
     zdb_debug("[+] index: entry dump: idx fileid : %" PRIu32 "\n", entry->indexid);
-    zdb_debug("[+] index: entry dump: data fileid: %" PRIu16 "\n", entry->dataid);
+    zdb_debug("[+] index: entry dump: data fileid: %" PRIu32 "\n", entry->dataid);
     zdb_debug("[+] index: entry dump: data offset: %" PRIu32 "\n", entry->offset);
     zdb_debug("[+] index: entry dump: data length: %" PRIu32 "\n", entry->length);
     zdb_debug("[+] index: entry dump: flags      : %" PRIu8  "\n", entry->flags);
     zdb_debug("[+] index: entry dump: timestamp  : %" PRIu32 "\n", entry->timestamp);
-    zdb_debug("[+] index: entry dump: parent id  : %" PRIu16 "\n", entry->parentid);
+    zdb_debug("[+] index: entry dump: parent id  : %" PRIu32 "\n", entry->parentid);
     zdb_debug("[+] index: entry dump: parent offs: %" PRIu32 "\n", entry->parentoff);
     zdb_debug("[+] index: entry dump: crc        : %" PRIx32 "\n", entry->crc);
 #endif
@@ -593,7 +593,7 @@ int index_entry_delete(index_root_t *root, index_entry_t *entry) {
 // serialize into binary object a deserializable
 // object identifier
 index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset, fileid_t idxfileid) {
-    zdb_debug("[+] index: item serialize: offset: %" PRIu32 ", fileid: %" PRIu16 "\n", idxoffset, idxfileid);
+    zdb_debug("[+] index: item serialize: offset: %" PRIu32 ", fileid: %" PRIu32 "\n", idxoffset, idxfileid);
 
     index_bkey_t key = {
         .idlength = item->idlength,
@@ -607,7 +607,7 @@ index_bkey_t index_item_serialize(index_item_t *item, uint32_t idxoffset, fileid
 }
 
 index_bkey_t index_entry_serialize(index_entry_t *entry) {
-    zdb_debug("[+] index: entry serialize: offset: %" PRIu32 ", fileid: %" PRIu16 "\n", entry->idxoffset, entry->indexid);
+    zdb_debug("[+] index: entry serialize: offset: %" PRIu32 ", fileid: %" PRIu32 "\n", entry->idxoffset, entry->indexid);
 
     index_bkey_t key = {
         .idlength = entry->idlength,
