@@ -40,7 +40,7 @@ sleep 1
 rm -rf /tmp/zdbtest
 
 # starting test suite with small datasize, generating lot of file jump
-./zdbd/zdb --background --verbose --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true --datasize 32
+./zdbd/zdb --background --verbose --socket /tmp/zdb.sock --data /tmp/zdbtest/ --index /tmp/zdbtest/ --hook /bin/true --datasize $((518 * 1024))
 ./tests/zdbtests
 sleep 1
 
