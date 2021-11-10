@@ -31,8 +31,8 @@ zdb_settings_t *zdb_initialize() {
         return NULL;
 
     // apply default settings
-    s->datapath = ZDB_DEFAULT_DATAPATH;
-    s->indexpath = ZDB_DEFAULT_INDEXPATH;
+    s->datapath = strdup(ZDB_DEFAULT_DATAPATH);
+    s->indexpath = strdup(ZDB_DEFAULT_INDEXPATH);
     s->datasize = ZDB_DEFAULT_DATA_MAXSIZE;
 
     // running 0-db in mixed mode by default
@@ -139,6 +139,8 @@ void zdb_close(zdb_settings_t *zdb_settings) {
 
     zdb_debug("[+] bootstrap: cleaning library\n");
     free(zdb_settings->zdbid);
+    free(zdb_settings->indexpath);
+    free(zdb_settings->datapath);
     zdb_settings->zdbid = NULL;
     zdb_settings->initialized = 0;
 

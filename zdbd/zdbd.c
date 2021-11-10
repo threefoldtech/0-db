@@ -325,11 +325,19 @@ int main(int argc, char *argv[]) {
                 return 0;
 
             case 'd':
-                zdb_settings->datapath = optarg;
+                // free default path allocated
+                free(zdb_settings->datapath);
+
+                // resolve data path passed
+                zdb_settings->datapath = realpath(optarg, NULL);
                 break;
 
             case 'i':
-                zdb_settings->indexpath = optarg;
+                // free default path allocated
+                free(zdb_settings->indexpath);
+
+                // resolve index path passed
+                zdb_settings->indexpath = realpath(optarg, NULL);
                 break;
 
             case 'l':
@@ -467,7 +475,12 @@ int main(int argc, char *argv[]) {
     }
 
     if(zdbd_settings->protect && !zdbd_settings->adminpwd) {
-        zdbd_danger("[-] protected mode only works with admin password");
+        zdbd_danger("[-] system: protected mode only works with admin password");
+        exit(EXIT_FAILURE);
+    }
+
+    if(strcmp(zdb_settings->datapath, zdb_settings->indexpath) == 0) {
+        zdbd_danger("[-] system: cannot use the same directory for index and data path");
         exit(EXIT_FAILURE);
     }
 
