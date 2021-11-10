@@ -31,8 +31,8 @@ zdb_settings_t *zdb_initialize() {
         return NULL;
 
     // apply default settings
-    s->datapath = strdup(ZDB_DEFAULT_DATAPATH);
-    s->indexpath = strdup(ZDB_DEFAULT_INDEXPATH);
+    s->datapath = ZDB_DEFAULT_DATAPATH;
+    s->indexpath = ZDB_DEFAULT_INDEXPATH;
     s->datasize = ZDB_DEFAULT_DATA_MAXSIZE;
 
     // running 0-db in mixed mode by default
@@ -108,6 +108,19 @@ zdb_settings_t *zdb_open(zdb_settings_t *zdb_settings) {
         zdb_dir_create(zdb_settings->indexpath);
     }
 
+    // ensure that data and index does not points to the
+    // same directory
+    char *datapath = realpath(zdb_settings->datapath, NULL);
+    char *indexpath = realpath(zdb_settings->indexpath, NULL);
+
+    if(strcmp(datapath, indexpath) == 0) {
+        zdb_danger("[-] system: cannot use the same directory for index and data path");
+        return NULL;
+    }
+
+    free(datapath);
+    free(indexpath);
+
     // check/install a lock on the index and data directory to avoid
     // multiple instance of zdb running on theses directories
     snprintf(lockpath, sizeof(lockpath), "%s/.lockfile", zdb_settings->indexpath);
@@ -139,8 +152,6 @@ void zdb_close(zdb_settings_t *zdb_settings) {
 
     zdb_debug("[+] bootstrap: cleaning library\n");
     free(zdb_settings->zdbid);
-    free(zdb_settings->indexpath);
-    free(zdb_settings->datapath);
     zdb_settings->zdbid = NULL;
     zdb_settings->initialized = 0;
 
