@@ -441,10 +441,17 @@ int main(int argc, char *argv[]) {
             case 'D':
                 zdb_settings->datasize = atol(optarg);
                 size_t maxsize = 0xffffffff;
+                size_t minsize = 512 * 1024;
 
                 // maximum 4 GB (32 bits) allowed
                 if(zdb_settings->datasize >= maxsize) {
                     zdbd_danger("[-] datasize cannot be larger than %lu bytes (%.0f MB)", maxsize, MB(maxsize));
+                    exit(EXIT_FAILURE);
+                }
+
+                // set soft limit of 512 KB, avoid too small chunks
+                if(zdb_settings->datasize < minsize) {
+                    zdbd_danger("[-] datasize cannot be smaller than %lu bytes (%.1f MB)", minsize, MB(minsize));
                     exit(EXIT_FAILURE);
                 }
 
