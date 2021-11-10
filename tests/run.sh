@@ -12,6 +12,7 @@ rm -rf /tmp/zdbtest
 ./zdbd/zdb --help || true
 ./zdbd/zdb --blabla || true
 ./zdbd/zdb --datasize $((8 * 1024 * 1024 * 1024)) || true
+./zdbd/zdb --datasize 32 || true
 
 # test load with slashes
 ./zdbd/zdb --verbose --dump --data /tmp/zdbtest --index /tmp/zdbtest
