@@ -56,7 +56,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
         .vid = id,
         .idlength = idlength,
         .flags = 0,
-        .crc = data_crc32(value, valuelength),
+        .crc = zdb_crc32(value, valuelength),
         .timestamp = timestamp,
     };
 
@@ -164,7 +164,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
         .vid = &id,
         .idlength = idlength,
         .flags = 0,
-        .crc = data_crc32(value, valuelength),
+        .crc = zdb_crc32(value, valuelength),
         .timestamp = timestamp,
     };
 

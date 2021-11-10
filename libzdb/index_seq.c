@@ -42,13 +42,13 @@ static index_seqmap_t *index_seqmap_from_seq(index_seqid_t *seqid, seqid_t id) {
 
 index_seqmap_t *index_fileid_from_seq(index_root_t *root, seqid_t seqid) {
     index_seqmap_t *seqmap = index_seqmap_from_seq(root->seqid, seqid);
-    zdb_debug("[+] index: seqmap: resolving %lu -> file %u\n", seqid, seqmap->fileid);
+    zdb_debug("[+] index: seqmap: resolving %" PRIu64 " -> file %u\n", seqid, seqmap->fileid);
 
     return seqmap;
 }
 
 void index_seqid_push(index_root_t *root, seqid_t id, fileid_t indexid) {
-    zdb_debug("[+] index seq: mapping id %lu to file %u\n", id, indexid);
+    zdb_debug("[+] index seq: mapping id %" PRIu64 " to file %u\n", id, indexid);
 
     if(root->seqid->length + 1 == root->seqid->allocated) {
         // growing up the vector
@@ -84,7 +84,7 @@ size_t index_seq_offset(seqid_t relative) {
 void index_seqid_dump(index_root_t *root) {
     for(fileid_t i = 0; i < root->seqid->length; i++) {
         index_seqmap_t *item = &root->seqid->seqmap[i];
-        zdb_log("[+] index seq: seqid %lu -> file %u\n", item->seqid, item->fileid);
+        zdb_log("[+] index seq: seqid %" PRIu64 " -> file %u\n", item->seqid, item->fileid);
     }
 }
 

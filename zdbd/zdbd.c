@@ -309,6 +309,7 @@ int main(int argc, char *argv[]) {
 
     zdbd_notice("[*] 0-db engine, v%s (commit %s)", zdb_version(), zdb_revision());
     zdbd_notice("[*] 0-db server, v" ZDBD_VERSION " (commit " ZDBD_REVISION ")");
+    zdb_log("[+] system: acceleration engine: " COLOR_GREEN "%s" COLOR_RESET "\n", zdb_crc32_engine_value());
 
     int option_index = 0;
 

@@ -156,6 +156,7 @@
     #define TB(x)   (x / (1024 * 1024 * 1024 * 1024.0))
 
     #include "data.h"
+    #include "crc32.h"
     #include "filesystem.h"
     #include "index.h"
     #include "index_branch.h"
@@ -170,4 +171,13 @@
     #include "sha1.h"
     #include "security.h"
     #include "api.h"
+
+    // stop compilation on big-endian platform, which is not
+    // supported yet
+    //
+    // this test is not fully accurate but this just prevent some
+    // unwanted compilation on known failure system
+    #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+        #error "Big Endian system unsupported"
+    #endif
 #endif
