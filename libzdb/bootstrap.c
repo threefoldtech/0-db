@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/file.h>
+#include <fcntl.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
 
