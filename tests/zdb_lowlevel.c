@@ -212,6 +212,9 @@ runtest_prio(sp, lowlevel_mirror) {
     const char *argv[] = {"MIRROR"};
     int value = zdb_command(test, argvsz(argv), argv);
 
+    if(test->type != CONNECTION_TYPE_TCP)
+        return TEST_SKIPPED;
+
     if(value != TEST_SUCCESS)
         return value;
 
