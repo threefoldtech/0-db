@@ -74,26 +74,25 @@ echo nopenopenope > /tmp/zdbtest-index/default/zdb-index-00000
 ./zdbd/zdb --verbose --data /tmp/zdbtest-data/ --index /tmp/zdbtest-index/ --dump || true
 
 # clean
-rm -rf /tmp/zdbtest-data
-rm -rf /tmp/zdbtest-index
+rm -rf /tmp/zdbtest-data /tmp/zdbtest-index
 
 # test protected mode
 ./zdbd/zdb --data /tmp/zdbtest-data --index /tmp/zdbtest-index --dump --protect || true
 ./zdbd/zdb --data /tmp/zdbtest-data --index /tmp/zdbtest-index --dump --protect --admin helloworld
 ./zdbd/zdb --data /tmp/zdbtest-data --index /tmp/zdbtest-index --dump --maxsize 131072
-rm -rf /tmp/zdbtest
+rm -rf /tmp/zdbtest-data /tmp/zdbtest-index
 
 # create empty dataset in direct mode
 ./zdbd/zdb --data /tmp/zdbtest-data --index /tmp/zdbtest-index --dump --mode direct
-rm -rf /tmp/zdbtest
+rm -rf /tmp/zdbtest-data /tmp/zdbtest-index
 
 # create empty dataset in sequential mode
 ./zdbd/zdb --data /tmp/zdbtest-data --index /tmp/zdbtest-index --dump --mode seq
-rm -rf /tmp/zdbtest
+rm -rf /tmp/zdbtest-data /tmp/zdbtest-index
 
 # trying non existing mode
 ./zdbd/zdb --data /tmp/zdbtest-data --index /tmp/zdbtest-index --dump --mode nonexist || true
-rm -rf /tmp/zdbtest
+rm -rf /tmp/zdbtest-data /tmp/zdbtest-index
 
 # run tests in sequential mode
 ./zdbd/zdb --background --socket /tmp/zdb.sock --data /tmp/zdbtest-data --index /tmp/zdbtest-index --mode seq
