@@ -5,6 +5,9 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <unistd.h>
+#include <errno.h>
+#include <sys/file.h>
 #include "libzdb.h"
 #include "libzdb_private.h"
 
@@ -65,7 +68,32 @@ zdb_settings_t *zdb_initialize() {
     return s;
 }
 
+static int zdb_lock(char *lockpath) {
+    int fd;
+
+    zdb_debug("[+] bootstrap: checking lockfile: %s\n", lockpath);
+
+    if((fd = open(lockpath, O_CREAT | O_RDONLY, 0664)) < 0) {
+        zdb_warnp(lockpath);
+        return -1;
+    }
+
+    if(flock(fd, LOCK_EX | LOCK_NB) < 0) {
+        if(errno != EWOULDBLOCK) {
+            zdb_warnp(lockpath);
+            return 1;
+        }
+
+        zdb_danger("[-] bootstrap: an instance of zdb is already using: %s", lockpath);
+        return -1;
+    }
+
+    return fd;
+}
+
 zdb_settings_t *zdb_open(zdb_settings_t *zdb_settings) {
+    char lockpath[512];
+
     //
     // ensure default directories exists
     // for a fresh start if this is a new instance
@@ -79,6 +107,16 @@ zdb_settings_t *zdb_open(zdb_settings_t *zdb_settings) {
         zdb_verbose("[+] system: creating indexpath: %s\n", zdb_settings->indexpath);
         zdb_dir_create(zdb_settings->indexpath);
     }
+
+    // check/install a lock on the index and data directory to avoid
+    // multiple instance of zdb running on theses directories
+    snprintf(lockpath, sizeof(lockpath), "%s/.lockfile", zdb_settings->indexpath);
+    if((zdb_settings->indexlock = zdb_lock(lockpath)) < 0)
+        return NULL;
+
+    snprintf(lockpath, sizeof(lockpath), "%s/.lockfile", zdb_settings->datapath);
+    if((zdb_settings->datalock = zdb_lock(lockpath)) < 0)
+        return NULL;
 
     // namespace is the root of the whole index/data system
     // anything related to data is always attached to at least
@@ -103,5 +141,9 @@ void zdb_close(zdb_settings_t *zdb_settings) {
     free(zdb_settings->zdbid);
     zdb_settings->zdbid = NULL;
     zdb_settings->initialized = 0;
+
+    zdb_debug("[+] bootstrap: releasing locks\n");
+    close(zdb_settings->indexlock);
+    close(zdb_settings->datalock);
 }
 

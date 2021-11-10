@@ -93,6 +93,9 @@
         zdb_stats_t stats;   // global 0-db statistics
         zdb_hooks_t hooks;   // global hooks running list
 
+        int indexlock;       // index path lock file descriptor
+        int datalock;        // data path lock file descriptor
+
         // the synctime can be useful to add basic security without killing
         // performance
         //

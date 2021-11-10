@@ -230,7 +230,7 @@ static int proceed(zdb_settings_t *zdb_settings, zdbd_settings_t *zdbd_settings)
     zdbd_id_set(zdbd_settings->listen, zdbd_settings->port, zdbd_settings->socket);
 
     if(!zdb_open(zdb_settings)) {
-        zdbd_danger("[-] zdb_open: cannot open database");
+        zdbd_danger("[-] system: database unavailable");
         return 1;
     }
 

@@ -385,6 +385,10 @@ static int namespace_scanload(ns_root_t *root) {
         if(!namespace_valid_name(ep->d_name))
             continue;
 
+        // skipping non-directory entries
+        if(ep->d_type != DT_DIR)
+            continue;
+
         zdb_debug("[+] namespaces: extra found: %s\n", ep->d_name);
 
         // load the namespace
