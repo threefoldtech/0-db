@@ -525,6 +525,7 @@ Current supported hooks:
 | `jump-data`           | Data incremented        | Closing and new data file  |
 | `crash`               | Server crashed          | (none)                     |
 | `namespace-created`   | New namespace created   | Namespace name             |
+| `namespace-updated`   | Namespace config update | Namespace name             |
 | `namespace-deleted`   | Namespace removed       | Namespace name             |
 | `namespace-reloaded`  | Namespace reloaded      | Namespace name             |
 | `missing-data`        | Data file not found     | Missing filename           |
@@ -534,6 +535,9 @@ If hook returns something else than `0`, database initialization will be stopped
 
 In order to get `zdbd` starting with hook, `ready` _needs_ to returns `0` to valdate server that everything
 is okay and database can operate.
+
+Namespace configuration is any metadata which can be set via `NSSET` command. Any metadata change
+imply an update of `zdb-namespace` file.
 
 # Limitation
 By default, datafiles are split when bigger than 256 MB.
