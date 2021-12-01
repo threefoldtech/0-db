@@ -1,6 +1,6 @@
 # 0-db [![codecov](https://codecov.io/gh/threefoldtech/0-db/branch/master/graph/badge.svg)](https://codecov.io/gh/threefoldtech/0-db)  
 0-db (zdb) is a super fast and efficient key-value store which makes data persistant
-inside an always append datafile, with namespaces support.
+inside an always append datafile, with namespaces support and data offloading.
 
 The database is split in two part:
 - The database engine, which can be used as static or shared library
@@ -21,8 +21,10 @@ We use it as backend for many of our blockchain work, 0-db is not a redis replac
 7. [Supported commands](#supported-commands)
 8. [Namespaces](#namespaces)
 9. [Hook system](#hook-system)
-10. [Limitation](#limitation)
-11. [Tests](#tests)
+9. [Hook system](#hook-system)
+10. [Data offload](#data-offload)
+11. [Limitation](#limitation)
+12. [Tests](#tests)
 
 # Build targets
 Currently supported system:
@@ -548,6 +550,42 @@ is okay and database can operate.
 
 Namespace configuration is any metadata which can be set via `NSSET` command. Any metadata change
 imply an update of `zdb-namespace` file.
+
+# Data offload
+One latest feature of 0-db is `data offloading`. When a datafile is full (reaches `--datasize`),
+the file becomes immuable (thanks always-append).
+
+You can offload theses datafiles to make some space locally and still get a fully working database
+if you're able to restore that file on demand.
+
+The database only needs the index to fully operate, except when payload is requested (eg: with a `GET`).
+This means even if datafiles are not present, you still can list, scan, delete and even update a key.
+If you need the payload, the datafile needs to be restored.
+
+**WARNING**: index cannot be offloaded and needs to be always present and available, index is not immuable !
+
+## How to use offloader
+In order to make offloader working correctly, you need to use the hook system.
+
+Each time a datafile is full and a new one is created, hook `jump-data` (and `jump-index`) are triggered.
+On theses hooks, you can copy the datafile somewhere else (eg: a slow but safe backup solution). This file will
+never be updated anymore.
+
+You can remove any datafile **except the current active one**. You only can offload (remove)
+an immuable datafile. When that datafile will be needed, if it's not found, a hook will be triggered
+(`missing-data`) with the filename as argument. Note that during that time, 0-db will wait for the hook,
+blocking everything else.
+
+## Dirty index
+If datafiles are immuable, indexfiles is another story. Previous files can be updated, this is needed
+to keep history working and other things. In order to keep the index sane in your backup solution, there
+is a new way in place to keep track of what was changed, to avoid saving the full index each time.
+
+You can issue `INDEX DIRTY` command to zdb to get a list of index id which were updated since the last reset.
+The reset is made via `INDEX DIRTY RESET` command.
+
+On the `missing-data` hook, there is an extra argument which provide the dirty index list automatically and reset
+the list after. You can use that list to copy index files updated in the same time.
 
 # Limitation
 By default, datafiles are split when bigger than 256 MB.
