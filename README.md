@@ -21,7 +21,6 @@ We use it as backend for many of our blockchain work, 0-db is not a redis replac
 7. [Supported commands](#supported-commands)
 8. [Namespaces](#namespaces)
 9. [Hook system](#hook-system)
-9. [Hook system](#hook-system)
 10. [Data offload](#data-offload)
 11. [Limitation](#limitation)
 12. [Tests](#tests)
