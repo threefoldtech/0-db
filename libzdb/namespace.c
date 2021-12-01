@@ -164,6 +164,16 @@ static int namespace_descriptor_load(namespace_t *namespace) {
     return 1;
 }
 
+static void namespace_commit_hook(namespace_t *namespace) {
+    if(!zdb_rootsettings.hook)
+        return;
+
+    hook_t *hook = hook_new("namespace-updated", 2);
+    hook_append(hook, zdb_rootsettings.zdbid ? zdb_rootsettings.zdbid : "unknown-id");
+    hook_append(hook, namespace->name);
+    hook_execute(hook);
+}
+
 // update persistence data of a namespace
 // basically, this rewrites it's metadata on disk
 int namespace_commit(namespace_t *namespace) {
@@ -176,6 +186,9 @@ int namespace_commit(namespace_t *namespace) {
     namespace_descriptor_update(namespace, fd);
 
     close(fd);
+
+    // trigger updated hook
+    namespace_commit_hook(namespace);
 
     return 0;
 }
