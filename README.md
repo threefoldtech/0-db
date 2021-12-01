@@ -199,6 +199,7 @@ This mode is not possible if you don't have any data/index already available.
 - `HISTORY key [binary-data]`
 - `FLUSH`
 - `HOOKS`
+- `INDEX DIRTY [RESET]`
 
 `SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
 
