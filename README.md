@@ -489,6 +489,16 @@ If no recent hooks were executed, list is empty:
 (empty array)
 ```
 
+## INDEX
+
+This command have only a small subset of commands. This covers some information about index.
+
+### INDEX DIRTY
+List the current namespace index files id which were modified since last reset
+
+### INDEX DIRTY RESET
+Reset the dirty list
+
 # Namespaces
 A namespace is a dedicated directory on index and data root directory.
 A namespace is a complete set of key/data. Each namespace can be optionally protected by a password
