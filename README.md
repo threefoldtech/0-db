@@ -551,6 +551,8 @@ is okay and database can operate.
 Namespace configuration is any metadata which can be set via `NSSET` command. Any metadata change
 imply an update of `zdb-namespace` file.
 
+Hook `ready`, `close` and `missing-data` are blocking.
+
 # Data offload
 One latest feature of 0-db is `data offloading`. When a datafile is full (reaches `--datasize`),
 the file becomes immuable (thanks always-append).
