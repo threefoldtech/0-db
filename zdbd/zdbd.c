@@ -210,7 +210,7 @@ static void sighandler(int signal) {
             if(zdb_settings->hook) {
                 hook_t *hook = hook_new("close", 1);
                 hook_append(hook, zdb_id());
-                hook_execute(hook);
+                hook_execute_wait(hook);
             }
 
             namespaces_emergency();
