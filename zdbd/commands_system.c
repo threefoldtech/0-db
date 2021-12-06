@@ -208,8 +208,8 @@ static int command_index_dirty(redis_client_t *client) {
     }
 
     // allocation assume 10 chars per id would be enough
-    // we already need 3 chars min per entry (: \r\n)
-    if(!(response = calloc(sizeof(char), dirty.length * 10))) {
+    // we already need 3 char min per entry (:\r\n) + list prefix
+    if(!(response = calloc(sizeof(char), (dirty.length * 10) + 32))) {
         zdbd_warnp("index: dirty: calloc");
         redis_hardsend(client, "-Internal Memory Error");
         return 1;
