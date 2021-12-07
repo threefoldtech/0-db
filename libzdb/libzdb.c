@@ -65,6 +65,30 @@ void zdb_fulldump(void *_data, size_t len) {
     printf("\n");
 }
 
+// human-readable size parser
+static char *human_readable_suffix = "kMGT";
+
+size_t *zdb_human_readable_parse(char *input, size_t *target) {
+    char *endp = input;
+    char *match = NULL;
+    size_t shift = 0;
+    errno = 0;
+
+    long double value = strtold(input, &endp);
+    if(errno || endp == input || value < 0)
+        return NULL;
+
+    if(!(match = strchr(human_readable_suffix, *endp)))
+        return NULL;
+
+    if(*match)
+        shift = (match - human_readable_suffix + 1) * 10;
+
+    *target = value * (1LU << shift);
+
+    return target;
+}
+
 // public wrapper
 void zdb_tools_fulldump(void *_data, size_t len) {
     return zdb_fulldump(_data, len);

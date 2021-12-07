@@ -134,6 +134,7 @@
     void zdb_tools_fulldump(void *_data, size_t len);
     void zdb_tools_hexdump(void *input, size_t length);
     char *zdb_header_date(uint32_t epoch, char *target, size_t length);
+    size_t *zdb_human_readable_parse(char *input, size_t *target);
 
     void zdb_timelog(FILE *fp);
     void *zdb_warnp(char *str);
