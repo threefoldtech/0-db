@@ -313,6 +313,9 @@ int main(int argc, char *argv[]) {
 
     int option_index = 0;
 
+    // temporary transit size variable
+    size_t size;
+
     while(1) {
         int i = getopt_long_only(argc, argv, "", long_options, &option_index);
 
@@ -439,7 +442,13 @@ int main(int argc, char *argv[]) {
                 break;
 
             case 'D':
-                zdb_settings->datasize = atol(optarg);
+                if(!zdb_human_readable_parse(optarg, &size)) {
+                    zdbd_danger("[-] datasize invalid");
+                    exit(EXIT_FAILURE);
+                }
+
+                zdb_settings->datasize = size;
+
                 size_t maxsize = 0xffffffff;
                 size_t minsize = 512 * 1024;
 
@@ -486,6 +495,9 @@ int main(int argc, char *argv[]) {
 
     zdbd_verbose("[+] system: maximum namespace size: %.2f GB\n", GB(maxsize));
     #endif
+
+    // print datasize in human readable format
+    zdbd_verbose("[+] system: data chunk size: %.2f MB\n", MB(zdb_settings->datasize));
 
     // dump instance id
     zdbd_verbose("[+] system: instance id: %u\n", zdb_instanceid_get());
