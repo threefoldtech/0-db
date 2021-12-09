@@ -433,12 +433,6 @@ void index_internal_load(index_root_t *root) {
         }
     }
 
-    if(root->seqid && root->seqid->length == 0) {
-        zdb_debug("[+] index: loader: fresh database created in sequential mode\n");
-        zdb_debug("[+] index: loader: initializing default seqmap\n");
-        index_seqid_push(root, 0, 0);
-    }
-
     if(root->status & INDEX_READ_ONLY) {
         zdb_warning("[-] ========================================================");
         zdb_warning("[-] WARNING: running in read-only mode");
@@ -550,6 +544,15 @@ index_root_t *index_rehash(index_root_t *root) {
     if(root->mode == ZDB_MODE_SEQUENTIAL)
         if(root->seqid == NULL)
             root->seqid = index_allocate_seqid();
+
+    // automatically push id 0 and initialize seqmap
+    // this is made in rehash because it's required on mode change
+    // aswell and not only during load (was previously in index_internal_load only)
+    if(root->seqid && root->seqid->length == 0) {
+        zdb_debug("[+] index: loader: fresh database created in sequential mode\n");
+        zdb_debug("[+] index: loader: initializing default seqmap\n");
+        index_seqid_push(root, 0, 0);
+    }
 
     // since this function will be called for each namespace
     // we will not allocate all the time the reusable variables
