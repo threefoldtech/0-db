@@ -519,6 +519,9 @@ int namespaces_destroy() {
         free(nsroot->branches);
     }
 
+    // calling emergency to ensure we flushed everything
+    namespaces_emergency();
+
     // freeing each namespace's index and data buffers
     zdb_debug("[+] namespaces: cleaning index and data\n");
 
