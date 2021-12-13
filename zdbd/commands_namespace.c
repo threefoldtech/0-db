@@ -355,7 +355,9 @@ int command_nsinfo(redis_client_t *client) {
 
     if(client->admin) {
         len += sprintf(info + len, "data_path: %s\n", namespace->data->datadir);
+        len += sprintf(info + len, "data_active: %s\n", namespace->data->datafile);
         len += sprintf(info + len, "index_path: %s\n", namespace->index->indexdir);
+        len += sprintf(info + len, "index_active: %s\n", namespace->index->indexfile);
     }
 
     redis_bulk_t response = redis_bulk(info, len);
