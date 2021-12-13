@@ -33,8 +33,8 @@ int payload_execute(test_t *test, char *key, size_t keylen, size_t length, cmdpt
     memset(payload, 0x42, length);
 
     int response = command(test, key, keylen, payload, length);
-
     free(payload);
+
     return response;
 
 }
@@ -56,9 +56,9 @@ int set_fixed_payload(test_t *test, size_t index) {
     return payload_execute(test, key, keylen, sizes_payload[index], zdb_bset);
 }
 
-int get_fixed_payload(test_t *test, uint32_t index) {
+int get_fixed_payload(test_t *test, uint64_t index) {
     char key[64];
-    size_t keylen ;
+    size_t keylen;
 
     if(test->mode == USERKEY) {
         sprintf(key, "data-%lu", sizes_payload[index]);
@@ -66,8 +66,8 @@ int get_fixed_payload(test_t *test, uint32_t index) {
     }
 
     if(test->mode == SEQUENTIAL) {
-        memcpy(key, &index, sizeof(uint32_t));
-        keylen = sizeof(uint32_t);
+        memcpy(key, &index, sizeof(uint64_t));
+        keylen = sizeof(uint64_t);
     }
 
     return payload_execute(test, key, keylen, sizes_payload[index], zdb_bcheck);

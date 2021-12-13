@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <unistd.h>
@@ -121,7 +122,7 @@ runtest_prio(110, default_set_hello_seq) {
     if(test->mode == USERKEY)
         return TEST_SKIPPED;
 
-    uint32_t key = 0;
+    uint64_t key = 0;
     int response = zdb_set_seq(test, SEQNEW, "world", &key);
 
     if(response == TEST_SUCCESS && key == 0)
@@ -134,7 +135,7 @@ runtest_prio(110, default_set_hello_seq_overwrite) {
     if(test->mode == USERKEY)
         return TEST_SKIPPED;
 
-    uint32_t key = 0;
+    uint64_t key = 0;
     int response = zdb_set_seq(test, key, "worldnewdata", &key);
 
     if(response == TEST_SUCCESS && key == 0)
@@ -148,10 +149,10 @@ runtest_prio(110, default_get_hello_seq) {
     if(test->mode == USERKEY)
         return TEST_SKIPPED;
 
-    uint32_t key = 0;
+    uint64_t key = 0;
     char *value = "world";
 
-    return zdb_bcheck(test, &key, sizeof(uint32_t), value, strlen(value));
+    return zdb_bcheck(test, &key, sizeof(uint64_t), value, strlen(value));
 }
 
 runtest_prio(110, default_del_hello_seq) {
@@ -159,7 +160,7 @@ runtest_prio(110, default_del_hello_seq) {
         return TEST_SKIPPED;
 
     redisReply *reply;
-    uint32_t key = 0;
+    uint64_t key = 0;
 
     if(!(reply = redisCommand(test->zdb, "DEL %b", &key, sizeof(key))))
         return zdb_result(reply, TEST_FAILED_FATAL);
@@ -174,7 +175,7 @@ runtest_prio(110, default_set_hello_again_seq) {
     if(test->mode == USERKEY)
         return TEST_SKIPPED;
 
-    uint32_t key = 0;
+    uint64_t key = 0;
     int response = zdb_set_seq(test, SEQNEW, "helloworld", &key);
 
     if(response == TEST_SUCCESS && key == 2)
@@ -187,10 +188,10 @@ runtest_prio(110, default_get_hello_new_seq) {
     if(test->mode == USERKEY)
         return TEST_SKIPPED;
 
-    uint32_t key = 2;
+    uint64_t key = 2;
     char *value = "helloworld";
 
-    return zdb_bcheck(test, &key, sizeof(uint32_t), value, strlen(value));
+    return zdb_bcheck(test, &key, sizeof(uint64_t), value, strlen(value));
 }
 
 //

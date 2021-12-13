@@ -6,7 +6,7 @@
     int zdb_command_str(test_t *test, int argc, const char *argv[]);
     int zdb_command_error(test_t *test, int argc, const char *argv[]);
     int zdb_set(test_t *test, char *key, char *value);
-    int zdb_set_seq(test_t *test, uint32_t key, char *value, uint32_t *response);
+    int zdb_set_seq(test_t *test, uint64_t key, char *value, uint64_t *response);
     int zdb_bset(test_t *test, void *key, size_t keylen, void *payload, size_t paylen);
     int zdb_check(test_t *test, char *key, char *value);
     int zdb_bcheck(test_t *test, void *key, size_t keylen, void *payload, size_t paylen);
