@@ -330,6 +330,7 @@
     int index_dirty_get(index_root_t *root, uint32_t id);
 
     index_dirty_list_t index_dirty_list(index_root_t *root);
+    char *index_dirty_list_generate(index_root_t *root);
     void index_dirty_list_free(index_dirty_list_t *dirty);
 
     // statistics management

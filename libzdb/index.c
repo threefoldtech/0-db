@@ -307,6 +307,34 @@ void index_close(index_root_t *root) {
     close(root->indexfd);
 }
 
+char *index_dirty_list_generate(index_root_t *root) {
+    char *dirtylist = NULL;
+
+    // build dirty list
+    index_dirty_list_t dirty = index_dirty_list(root);
+
+    if(!dirty.list)
+        zdb_diep("index: dirty: get list");
+
+    if(!(dirtylist = calloc(sizeof(char), (dirty.length + 1) * 16)))
+        zdb_diep("index: dirty: calloc");
+
+    int offset = 0;
+
+    for(size_t i = 0; i < dirty.length; i++)
+        offset += sprintf(dirtylist + offset, "%d ", dirty.list[i]);
+
+    if(dirty.length > 0) {
+        // strip last space
+        dirtylist[offset - 1] = '\0';
+    }
+
+    // reset dirty list
+    index_dirty_list_free(&dirty);
+
+    return dirtylist;
+}
+
 // jumping to the next index id file, this needs to be in sync with the
 // data file, we only do this when datafile changes basicly, this is
 // triggered by a datafile too big event
@@ -321,26 +349,8 @@ size_t index_jump_next(index_root_t *root) {
         hook_append(hook, zdb_rootsettings.zdbid);
         hook_append(hook, root->indexfile);
 
-        // build dirty list
-        index_dirty_list_t dirty = index_dirty_list(root);
-        if(!dirty.list)
-            zdb_diep("index: jump: dirty: get list");
-
-        if(!(dirtylist = calloc(sizeof(char), (dirty.length + 1) * 8)))
-            zdb_diep("index: jump: dirty: calloc");
-
-        int offset = 0;
-
-        for(size_t i = 0; i < dirty.length; i++)
-            offset += sprintf(dirtylist + offset, "%d ", dirty.list[i]);
-
-        if(dirty.length > 0) {
-            // strip last space
-            dirtylist[offset - 1] = '\0';
-        }
-
-        // reset dirty list
-        index_dirty_list_free(&dirty);
+        // generate dirty list string
+        dirtylist = index_dirty_list_generate(root);
     }
 
     // flushing current index file
