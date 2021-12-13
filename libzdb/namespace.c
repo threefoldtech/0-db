@@ -464,7 +464,21 @@ ns_root_t *namespaces_allocate(zdb_settings_t *settings) {
     return root;
 }
 
+static void namespaces_init_hook(zdb_settings_t *settings) {
+    if(!settings->hook)
+        return;
+
+    hook_t *hook = hook_new("namespaces-init", 3);
+    hook_append(hook, settings->zdbid ? settings->zdbid : "unknown-id");
+    hook_append(hook, settings->indexpath);
+    hook_append(hook, settings->datapath);
+    hook_execute_wait(hook);
+}
+
 int namespaces_init(zdb_settings_t *settings) {
+    zdb_verbose("[+] namespaces: pre-initializing\n");
+    namespaces_init_hook(settings);
+
     zdb_verbose("[+] namespaces: initializing\n");
 
     // allocating global namespaces
