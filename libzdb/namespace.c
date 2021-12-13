@@ -701,12 +701,30 @@ int namespace_delete(namespace_t *namespace) {
     return 0;
 }
 
+static void namespace_flushing_hook(namespace_t *namespace) {
+    if(!zdb_rootsettings.hook)
+        return;
+
+    // generate dirty list string
+    char *dirtylist = index_dirty_list_generate(namespace->index);
+
+    hook_t *hook = hook_new("namespace-closing", 5);
+    hook_append(hook, zdb_rootsettings.zdbid ? zdb_rootsettings.zdbid : "unknown-id");
+    hook_append(hook, namespace->name);
+    hook_append(hook, namespace->index->indexfile);
+    hook_append(hook, namespace->data->datafile);
+    hook_append(hook, dirtylist ? dirtylist : "");
+    hook_execute(hook);
+
+    free(dirtylist);
+}
 
 int namespaces_emergency() {
     namespace_t *ns;
 
     for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
         zdb_log("[+] namespaces: flushing: %s\n", ns->name);
+        namespace_flushing_hook(ns);
 
         zdb_debug("[+] namespaces: flushing index [%s]\n", ns->name);
 
