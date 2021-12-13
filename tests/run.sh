@@ -97,6 +97,7 @@ rm -rf /tmp/zdbtest-data /tmp/zdbtest-index
 # run tests in sequential mode
 ./zdbd/zdb --background --socket /tmp/zdb.sock --data /tmp/zdbtest-data --index /tmp/zdbtest-index --mode seq
 ./tests/zdbtests
+sleep 1
 
 # reload sequential database
 ./zdbd/zdb --socket /tmp/zdb.sock --data /tmp/zdbtest-data --index /tmp/zdbtest-index --mode seq --dump
