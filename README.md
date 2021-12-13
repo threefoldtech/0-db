@@ -529,18 +529,20 @@ First argument is `Hook name`, second argument is `Generated ID`, next arguments
 
 Current supported hooks:
 
-| Hook Name             | Action                  | Arguments                  |
-| --------------------- | ----------------------- | -------------------------- |
-| `ready`               | Server is ready         | (none)                     |
-| `close`               | Server closing (nicely) | (none)                     |
-| `jump-index`          | Index incremented       | Closing and new index file |
-| `jump-data`           | Data incremented        | Closing and new data file  |
-| `crash`               | Server crashed          | (none)                     |
-| `namespace-created`   | New namespace created   | Namespace name             |
-| `namespace-updated`   | Namespace config update | Namespace name             |
-| `namespace-deleted`   | Namespace removed       | Namespace name             |
-| `namespace-reloaded`  | Namespace reloaded      | Namespace name             |
-| `missing-data`        | Data file not found     | Missing filename           |
+| Hook Name             | Action                  | Blk | Arguments                  |
+| --------------------- | ----------------------- | --- | -------------------------- |
+| `ready`               | Server is ready         |  *  | (none)                     |
+| `close`               | Server closing (nicely) |  *  | (none)                     |
+| `jump-index`          | Index incremented       |     | See below                  |
+| `jump-data`           | Data incremented        |     | See below                  |
+| `crash`               | Server crashed          |     | (none)                     |
+| `namespaces-init`     | Pre-loading namespaces  |  *  | Index and data path        |
+| `namespace-created`   | New namespace created   |     | Namespace name             |
+| `namespace-updated`   | Namespace config update |     | Namespace name             |
+| `namespace-deleted`   | Namespace removed       |     | Namespace name             |
+| `namespace-reloaded`  | Namespace reloaded      |     | Namespace name             |
+| `namespace-closing`   | Unloading namespace     |     | Namespace name             |
+| `missing-data`        | Data file not found     |  *  | Missing filename           |
 
 **WARNING**: as soon as hook system is enabled, `ready` event needs to be handled correctly.
 If hook returns something else than `0`, database initialization will be stopped.
@@ -551,7 +553,24 @@ is okay and database can operate.
 Namespace configuration is any metadata which can be set via `NSSET` command. Any metadata change
 imply an update of `zdb-namespace` file.
 
-Hook `ready`, `close` and `missing-data` are blocking.
+Hook flagged `Blk` are blocking (waiting for hook to finish).
+
+Special notes about:
+ - `jump-index`: arguments contains old index file and new index file, in addition, last argument
+    will contains a list (space separated) of id of dirty indexes. See INDEX DIRTY command above.
+ - `jump-data`: arguments contains old data and new data file.
+ - `namespaces-init`: blocking hook used to prepare or restore anything the database needs before
+    starting namespaces initialization. This hook can be used to restore state or create empty
+    namespaces. Arguments are:
+     - Index path
+     - Data path
+ - `namespace-closing`: called when namespace is unloaded, basically this is only called on server
+    stop (gracefully or crash). This hook can be used to save namespace state.
+    Each namespace will trigger that hook with as arguments:
+     - Namespace name
+     - Current index filename
+     - Current data filename
+     - Dirty index list (see `jump-index` hook)
 
 # Data offload
 One latest feature of 0-db is `data offloading`. When a datafile is full (reaches `--datasize`),
