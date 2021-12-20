@@ -5,8 +5,8 @@
     index_header_t index_initialize(int fd, fileid_t indexid, index_root_t *root);
 
     // initialize the whole index system
-    index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches);
-    index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir, void *namespace);
+    index_root_t *index_init(zdb_settings_t *settings, char *indexdir);
+    index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir);
 
     // internal functions
     index_root_t *index_rehash(index_root_t *root);

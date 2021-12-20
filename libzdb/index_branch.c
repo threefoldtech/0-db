@@ -6,169 +6,301 @@
 #include "libzdb.h"
 #include "libzdb_private.h"
 
-// maximum allowed branch in memory
-//
-// this settings is mainly the most important to
-// determine the keys lookup time
-//
-// the more bits you allows here, the more buckets
-// can be used for lookup without collision
-//
-// the index works like a hash-table and uses crc32 'hash'
-// algorithm, the result of the crc32 is used to point to
-// the bucket, but using a full 32-bits hashlist would
-// consume more than (2^32 * 8) bytes of memory (on 64-bits)
-//
-// the default settings sets this to 24 bits, which allows
-// 16 millions direct entries, collisions uses linked-list
-//
-// makes sur mask and amount of branch are always in relation
-// use 'index_set_buckets_bits' to be sure
-uint32_t buckets_branches = (1 << 24);
-uint32_t buckets_mask = (1 << 24) - 1;
+#define INDEX_HASH_SUB  1
+#define INDEX_HASH_LIST 2
 
-// WARNING: this doesn't resize anything, you should calls this
-//          only before initialization
-int index_set_buckets_bits(uint8_t bits) {
-    buckets_branches = 1 << bits;
-    buckets_mask = (1 << bits) - 1;
-
-    return buckets_branches;
-}
+#define BITS_PER_ROWS     4    // 4 bits per entry (0x00 -> 0x0f)
+#define KEY_LENGTH        20   // using crc32 but only using 20 bits
+#define DEEP_LEVEL        KEY_LENGTH / BITS_PER_ROWS  // 5 levels (20 bits total, 4 bits per entry)
+#define ENTRIES_PER_ROWS  1 << BITS_PER_ROWS          // 0x00 -> 0x0f = 16
 
 //
-// index branch
-// this implementation uses a lazy load of branches
-// this allows us to use a lot of branches (buckets_branches) in this case)
-// without consuming all the memory if we don't need it
+// CRC32 => 0x10320af
+//       => 0x10320..    # we only use 20 bits
 //
-index_branch_t **index_buckets_init() {
-    return (index_branch_t **) calloc(sizeof(index_branch_t *), buckets_branches);
-}
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |0|1|2|3|4|5|6|7|8|9|A|B|C|D|E|F|
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//    ^                                            0x1xxxxxxx
+//    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//    |0|1|2|3|4|5|6|7|8|9|A|B|C|D|E|F|
+//    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//     ^                                           0x10xxxxxx
+//     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//     |0|1|2|3|4|5|6|7|8|9|A|B|C|D|E|F|
+//     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//            ^                                    0x103xxxxx
+//            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//            |0|1|2|3|4|5|6|7|8|9|A|B|C|D|E|F|
+//            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//                 ^                               0x1032xxxx
+//                 ...
+//
+// when the last level is reached, list object point to the
+// head of a linked-list of entries
 
-index_branch_t *index_branch_init(index_branch_t **branches, uint32_t branchid) {
-    // zdb_debug("[+] initializing branch id 0x%x\n", branchid);
+index_hash_t *index_hash_new(int type) {
+    index_hash_t *root;
 
-    branches[branchid] = malloc(sizeof(index_branch_t));
-    index_branch_t *branch = branches[branchid];
+    if(!(root = calloc(sizeof(index_hash_t), 1)))
+        zdb_diep("index: hash: root calloc");
 
-    branch->length = 0;
-    branch->last = NULL;
-    branch->list = NULL;
-
-    return branch;
-}
-
-void index_branch_free(index_branch_t **branches, uint32_t branchid) {
-    // this branch was not allocated
-    if(!branches[branchid])
-        return;
-
-    index_entry_t *entry = branches[branchid]->list;
-    index_entry_t *next = NULL;
-
-    // deleting branch content by
-    // iterate over the linked-list
-    for(; entry; entry = next) {
-        next = entry->next;
-        free(entry);
+    if(type == INDEX_HASH_SUB) {
+        root->type = INDEX_HASH_SUB;
+        if(!(root->sub = calloc(sizeof(index_hash_t **), ENTRIES_PER_ROWS)))
+            zdb_diep("index: hash: sub calloc");
     }
 
-    // deleting branch
-    free(branches[branchid]);
+    if(type == INDEX_HASH_LIST)
+        root->type = INDEX_HASH_LIST;
+
+    return root;
 }
 
-// returns branch from rootindex, if branch is not allocated yet, returns NULL
-// useful for any read on the index in memory
-index_branch_t *index_branch_get(index_branch_t **branches, uint32_t branchid) {
-    if(!branches)
-        return NULL;
-
-    return branches[branchid];
+index_hash_t *index_hash_init() {
+    return index_hash_new(INDEX_HASH_SUB);
 }
 
-// returns branch from rootindex, if branch doesn't exists, it will be allocated
-// (useful for any write in the index in memory)
-index_branch_t *index_branch_get_allocate(index_branch_t **branches, uint32_t branchid) {
-    if(!branches[branchid])
-        return index_branch_init(branches, branchid);
+void *index_hash_push(index_hash_t *root, uint32_t lookup, index_entry_t *entry) {
+    // start with mask 0x0000000f (with 4 bits per rows)
+    uint32_t shift = ~(0xffffffff << BITS_PER_ROWS);
 
-    // zdb_debug("[+] branch: exists: %lu entries\n", branches[branchid]->length);
-    return branches[branchid];
-}
+    // same algorythm than lookup, but with allocation
+    for(int i = 0; i < DEEP_LEVEL; i++) {
+        unsigned int mask = (lookup & shift);
+        unsigned int check = mask >> (i * BITS_PER_ROWS);
 
-// append an entry (item) to the memory list
-// since we use a linked-list, the logic of appending
-// only occures here
-//
-// if there is no index, we just skip the appending
-index_entry_t *index_branch_append(index_branch_t **branches, uint32_t branchid, index_entry_t *entry) {
-    index_branch_t *branch;
+        if(root->sub[check] == NULL) {
+            if(i < DEEP_LEVEL - 1)
+                root->sub[check] = index_hash_new(INDEX_HASH_SUB);
 
-    if(!branches)
-        return NULL;
+            if(i == DEEP_LEVEL - 1)
+                root->sub[check] = index_hash_new(INDEX_HASH_LIST);
+        }
 
-    // grabbing the branch
-    branch = index_branch_get_allocate(branches, branchid);
-    branch->length += 1;
+        if(i == DEEP_LEVEL - 1) {
+            entry->next = root->sub[check]->list;
+            root->sub[check]->list = entry;
 
-    // adding this item and pointing previous last one
-    // to this new one
-    if(!branch->list)
-        branch->list = entry;
+            return entry;
+        }
 
-    if(branch->last)
-        branch->last->next = entry;
-
-    branch->last = entry;
-    entry->next = NULL;
-
-    return entry;
-}
-
-// remove one entry on this branch
-// since it's a linked-list, we need to know which entry was the previous one
-// we use a single-direction linked-list
-//
-// removing an entry from the list don't free this entry, is just re-order
-// list to keep it coherent
-index_entry_t *index_branch_remove(index_branch_t *branch, index_entry_t *entry, index_entry_t *previous) {
-    // removing the first entry
-    if(branch->list == entry)
-        branch->list = entry->next;
-
-    // skipping this entry, linking next from previous
-    // to our next one
-    if(previous)
-        previous->next = entry->next;
-
-    // if our entry was the last one
-    // the new last one is the previous one
-    if(branch->last == entry)
-        branch->last = previous;
-
-    branch->length -= 1;
-
-    return entry;
-}
-
-// iterate over a branch and try to find the previous entry of the given entry
-// if by mystake, the entry was not found on the branch, we returns the entry itself
-// if entry was the first entry, previous will also be NULL
-index_entry_t *index_branch_get_previous(index_branch_t *branch, index_entry_t *entry) {
-    index_entry_t *previous = NULL;
-    index_entry_t *iterator = branch->list;
-
-    while(iterator && iterator != entry) {
-        previous = iterator;
-        iterator = iterator->next;
+        root = root->sub[check];
+        shift <<= BITS_PER_ROWS;
     }
 
-    // we reached the end of the list, without finding
-    // a matching entry, this is mostly a mistake from caller
-    // let's notify it by replying with it's own object
-    if(!iterator)
+    // insertion failed, should never happen
+    return NULL;
+
+}
+
+static index_hash_t *index_hash_lookup_member(index_hash_t *root, uint32_t lookup) {
+    // BITS_PER_ROWS specifies how many bits we use to compare each level
+    // we need to use a mask we shift for each level, we hardcode maximum
+    // to 32 bits mask
+    //
+    // starting from 0xffffffff (all bits sets)
+    //
+    // with 4 bits:
+    //     Shifting with amount of bits: 0xfffffff0
+    //     Then negate that            : 0x0000000f
+    //
+    // with 16 bits:
+    //     Shifting with amount of bits: 0xffff0000
+    //     Then negate that            : 0x0000ffff
+
+    // start with mask 0x0000000f (with 4 bits per rows)
+    uint32_t shift = ~(0xffffffff << BITS_PER_ROWS);
+
+    // printf(">> %x\n", lookup);
+
+    for(int i = 0; i < DEEP_LEVEL; i++) {
+        unsigned int mask = (lookup & shift);
+        unsigned int check = mask >> (i * BITS_PER_ROWS);
+
+        if(root->sub[check] == NULL)
+            return NULL;
+
+        root = root->sub[check];
+        shift <<= BITS_PER_ROWS;
+    }
+
+    return root;
+}
+
+index_entry_t *index_hash_lookup(index_hash_t *root, uint32_t lookup) {
+    index_hash_t *member;
+
+    if(!(member = index_hash_lookup_member(root, lookup)))
+        return NULL;
+
+    // point to the head of the list
+    return member->list;
+}
+
+index_entry_t *index_hash_remove(index_hash_t *root, uint32_t lookup, index_entry_t *entry) {
+    index_hash_t *member = index_hash_lookup_member(root, lookup);
+    if(!member)
+        return NULL;
+
+    // entry is the list head, replace
+    // head with next entry and we are done
+    if(member->list == entry) {
+        member->list = entry->next;
         return entry;
+    }
 
-    return previous;
+    // looking for the entry in the list
+    index_entry_t *previous = member->list;
+    while(previous->next != entry)
+        previous = previous->next;
+
+    // update linked list
+    previous->next = entry->next;
+
+    return entry;
 }
+
+// call user function pointer (with user argument) for
+// each entries available on the index, the order follow memory
+// order and is not related to entries
+int index_hash_walk(index_hash_t *root, int (*callback)(index_entry_t *, void *), void *userptr) {
+    index_entry_t *entry;
+    int value;
+
+    for(int i = 0; i < ENTRIES_PER_ROWS; i++) {
+        // ignore unallocated sub
+        if(!root->sub[i])
+            continue;
+
+        if(root->sub[i]->type == INDEX_HASH_LIST) {
+            for(entry = root->sub[i]->list; entry; entry = entry->next) {
+                if((value = callback(entry, userptr)) != 0) {
+                    // callback interruption
+                    return value;
+                }
+            }
+        }
+
+        if(root->sub[i]->type == INDEX_HASH_SUB) {
+            if((value = index_hash_walk(root->sub[i], callback, userptr)) != 0) {
+                // callback interruption
+                return value;
+            }
+        }
+    }
+
+    return 0;
+}
+
+// compute statistics on index entries and size
+static index_hash_stats_t index_hash_stats_level(index_hash_t *root) {
+    index_hash_stats_t stats = {
+        .subs = 0,
+        .subsubs = 0,
+        .entries = 0,
+        .max_entries = 0,
+        .lists = 0,
+        .entries_size = 0,
+        .ids_size = 0,
+    };
+
+    for(int i = 0; i < ENTRIES_PER_ROWS; i++) {
+        if(root->sub[i]) {
+            stats.subs += 1;
+
+            if(root->sub[i]->type == INDEX_HASH_LIST) {
+                size_t localent = 0;
+                stats.lists += 1;
+
+                for(index_entry_t *entry = root->sub[i]->list; entry; entry = entry->next) {
+                    stats.entries_size += sizeof(index_entry_t) + entry->idlength;
+                    stats.ids_size += entry->idlength;
+                    localent += 1;
+                }
+
+                if(localent > stats.max_entries)
+                    stats.max_entries = localent;
+
+                stats.entries += localent;
+            }
+
+            if(root->sub[i]->type == INDEX_HASH_SUB) {
+                stats.subsubs += 1;
+                index_hash_stats_t extra = index_hash_stats_level(root->sub[i]);
+
+                stats.subs += extra.subs;
+                stats.subsubs += extra.subsubs;
+                stats.entries += extra.entries;
+                stats.lists += extra.lists;
+                stats.entries_size += extra.entries_size;
+                stats.ids_size += extra.ids_size;
+
+                if(extra.max_entries > stats.max_entries)
+                    stats.max_entries = extra.max_entries;
+            }
+        }
+    }
+
+    return stats;
+}
+
+void index_hash_stats(index_hash_t *root) {
+    index_hash_stats_t stats = index_hash_stats_level(root);
+    size_t subs_size = stats.subs * sizeof(index_hash_t);
+    size_t lists_size = stats.lists * sizeof(index_entry_t *);
+    size_t arrays_size = stats.subsubs * sizeof(index_hash_t **) * ENTRIES_PER_ROWS;
+
+    zdb_debug("[+] index: metrics: subs alloc : %lu\n", stats.subs);
+    zdb_debug("[+] index: metrics: lists alloc: %lu\n", stats.lists);
+    zdb_debug("[+] index: metrics: subsubs    : %lu\n", stats.subsubs);
+    zdb_verbose("[+] index: metrics: entries    : %lu\n", stats.entries);
+    zdb_debug("[+] index: metrics: max entries: %lu\n", stats.max_entries);
+    zdb_verbose("[+] index: metrics: items size : %lu (%.2f MB)\n", stats.entries_size, MB(stats.entries_size));
+    zdb_verbose("[+] index: metrics: items ids  : %lu (%.2f MB)\n", stats.ids_size, MB(stats.ids_size));
+    zdb_verbose("[+] index: metrics: subs size  : %lu (%.2f MB)\n", subs_size, MB(subs_size));
+    zdb_verbose("[+] index: metrics: lists size : %lu (%.2f MB)\n", lists_size, MB(lists_size));
+    zdb_verbose("[+] index: metrics: subs array : %lu (%.2f MB)\n", arrays_size, MB(arrays_size));
+
+    if(stats.lists) {
+        zdb_debug("[+] index: metrics: avg entries: %lu\n", stats.entries / stats.lists);
+    }
+
+    size_t total = stats.entries_size + subs_size + lists_size + arrays_size;
+
+    zdb_verbose("[+] index: metrics: total size : %lu (%.2f MB)\n", total, MB(total));
+}
+
+static void index_hash_free_list(index_entry_t *head) {
+    index_entry_t *entry = head;
+
+    while(entry) {
+        // copy current entry and saving next address
+        // before freeing the object
+        index_entry_t *current = entry;
+        entry = current->next;
+
+        // free object
+        free(current);
+    }
+}
+
+void index_hash_free(index_hash_t *root) {
+    for(int i = 0; i < ENTRIES_PER_ROWS; i++) {
+        if(root->sub[i]) {
+            // clean the linked list
+            if(root->sub[i]->type == INDEX_HASH_LIST) {
+                index_hash_free_list(root->sub[i]->list);
+                free(root->sub[i]);
+                continue;
+            }
+
+            if(root->sub[i]->type == INDEX_HASH_SUB)
+                index_hash_free(root->sub[i]);
+        }
+    }
+
+    free(root->sub);
+    free(root);
+}
+

@@ -227,7 +227,7 @@ namespace_t *namespace_ensure(namespace_t *namespace) {
 static int namespace_load_lazy(ns_root_t *nsroot, namespace_t *namespace) {
     // now, we are sure the namespace exists, but it could be empty
     // let's call index and data initializer, they will take care of that
-    namespace->index = index_init(nsroot->settings, namespace->indexpath, namespace, nsroot->branches);
+    namespace->index = index_init(nsroot->settings, namespace->indexpath);
     namespace->data = data_init(nsroot->settings, namespace->datapath, namespace->index->indexid);
 
     return 0;
@@ -447,19 +447,9 @@ ns_root_t *namespaces_allocate(zdb_settings_t *settings) {
     root->length = 1;             // we start with the default one, only
     root->effective = 1;          // no namespace has been loaded yet
     root->settings = settings;    // keep the reference to the settings, needed for paths
-    root->branches = NULL;        // maybe we don't need the branches, see below
 
     if(!(root->namespaces = (namespace_t **) malloc(sizeof(namespace_t *) * root->length)))
         zdb_diep("namespace malloc");
-
-    // allocating (if needed, only some modes need it) the big (single) index branches
-    if(settings->mode == ZDB_MODE_KEY_VALUE || settings->mode == ZDB_MODE_MIX) {
-        zdb_debug("[+] namespaces: pre-allocating index (%d lazy branches)\n", buckets_branches);
-
-        // allocating minimal branches array
-        if(!(root->branches = index_buckets_init()))
-            zdb_diep("buckets allocation");
-    }
 
     return root;
 }
@@ -506,19 +496,6 @@ void namespace_free(namespace_t *namespace) {
 // this is called when we receive a graceful exit request
 // let's clean all indices, data and namespace arrays
 int namespaces_destroy() {
-    // freeing the big index buffer
-    // since branches want an index as argument, let's use
-    // the first namespace (default), since they all share
-    // the same buffer
-    if(nsroot->branches) {
-        zdb_debug("[+] namespaces: cleaning branches\n");
-        for(uint32_t b = 0; b < buckets_branches; b++)
-            index_branch_free(nsroot->namespaces[0]->index->branches, b);
-
-        // freeing the big index array
-        free(nsroot->branches);
-    }
-
     // calling emergency to ensure we flushed everything
     namespaces_emergency();
 
@@ -606,7 +583,7 @@ int namespace_reload(namespace_t *namespace) {
     zdb_debug("[+] namespace: reloading: %s\n", namespace->name);
 
     zdb_debug("[+] namespace: reload: cleaning index\n");
-    index_clean_namespace(namespace->index, namespace);
+    index_clean_namespace(namespace->index);
 
     zdb_debug("[+] namespace: reload: destroying objects\n");
     index_destroy(namespace->index);
@@ -630,7 +607,7 @@ int namespace_flush(namespace_t *namespace) {
     zdb_debug("[+] namespace: flushing: %s\n", namespace->name);
 
     zdb_debug("[+] namespace: flushing: cleaning index\n");
-    index_clean_namespace(namespace->index, namespace);
+    index_clean_namespace(namespace->index);
 
     char *indexpath = strdup(namespace->index->indexdir);
     char *datapath = strdup(namespace->data->datadir);
@@ -675,7 +652,7 @@ int namespace_delete(namespace_t *namespace) {
     // redis_detach_clients(namespace);
 
     // unallocating keys attached to this namespace
-    index_clean_namespace(namespace->index, namespace);
+    index_clean_namespace(namespace->index);
 
     // cleaning and closing namespace links
     index_destroy(namespace->index);
