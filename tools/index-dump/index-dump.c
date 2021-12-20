@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
     // zdb_open(zdb_settings);
     index_root_t *zdbindex;
 
-    if(!(zdbindex = zdb_index_init_lazy(zdb_settings, dirname, NULL))) {
+    if(!(zdbindex = zdb_index_init_lazy(zdb_settings, dirname))) {
         fprintf(stderr, "[-] index-dump: cannot load index\n");
         exit(EXIT_FAILURE);
     }

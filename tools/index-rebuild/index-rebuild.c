@@ -293,7 +293,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    if(!(zdbindex = zdb_index_init(zdb_settings, namespace->indexpath, namespace, nsroot->branches))) {
+    if(!(zdbindex = zdb_index_init(zdb_settings, namespace->indexpath))) {
         fprintf(stderr, "[-] index-rebuild: cannot initialize index\n");
         exit(EXIT_FAILURE);
     }
