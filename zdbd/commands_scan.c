@@ -448,6 +448,24 @@ static int command_kscan_send_list(redis_client_t *client, list_t *list) {
     return 0;
 }
 
+struct kscan_ptr {
+    list_t *keys;
+    resp_object_t *key;
+};
+
+// callback which build the list
+static int command_kscan_callback(index_entry_t *entry, void *ptr) {
+    struct kscan_ptr *kscan = (struct kscan_ptr *) ptr;
+
+    if(entry->idlength < kscan->key->length)
+        return 0;
+
+    if(memcmp(entry->id, kscan->key->buffer, kscan->key->length) == 0)
+        list_append(kscan->keys, entry);
+
+    return 0;
+}
+
 int command_kscan(redis_client_t *client) {
     resp_request_t *request = client->request;
     index_root_t *index = client->ns->index;
@@ -469,27 +487,13 @@ int command_kscan(redis_client_t *client) {
     resp_object_t *key = request->argv[1];
     list_t keys = list_init(NULL);
 
-    for(size_t i = 0; i < buckets_branches; i++) {
-        index_branch_t *branch = index->branches[i];
+    struct kscan_ptr kscan = {
+        .keys = &keys,
+        .key = key,
+    };
 
-        // skipping not allocated branches
-        if(!branch)
-            continue;
-
-        for(index_entry_t *entry = branch->list; entry; entry = entry->next) {
-            // this key doesn't belong to the current namespace
-            if(entry->namespace != client->ns)
-                continue;
-
-            // key is shorter than requested prefix
-            // it won't match at all
-            if(entry->idlength < key->length)
-                continue;
-
-            if(memcmp(entry->id, key->buffer, key->length) == 0)
-                list_append(&keys, entry);
-        }
-    }
+    // build a list via index walk callback
+    index_hash_walk(client->ns->index->hash, command_kscan_callback, &kscan);
 
     command_kscan_send_list(client, &keys);
     list_free(&keys);
