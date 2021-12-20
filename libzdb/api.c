@@ -416,12 +416,12 @@ zdb_api_t *zdb_api_del(namespace_t *ns, void *key, size_t ksize) {
     return zdb_api_reply_success();
 }
 
-index_root_t *zdb_index_init_lazy(zdb_settings_t *settings, char *indexdir, void *namespace) {
-    return index_init_lazy(settings, indexdir, namespace);
+index_root_t *zdb_index_init_lazy(zdb_settings_t *settings, char *indexdir) {
+    return index_init_lazy(settings, indexdir);
 }
 
-index_root_t *zdb_index_init(zdb_settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches) {
-    return index_init(settings, indexdir, namespace, branches);
+index_root_t *zdb_index_init(zdb_settings_t *settings, char *indexdir) {
+    return index_init(settings, indexdir);
 }
 
 uint64_t zdb_index_availity_check(index_root_t *root) {
