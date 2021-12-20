@@ -448,7 +448,7 @@ ns_root_t *namespaces_allocate(zdb_settings_t *settings) {
     root->effective = 1;          // no namespace has been loaded yet
     root->settings = settings;    // keep the reference to the settings, needed for paths
 
-    if(!(root->namespaces = (namespace_t **) malloc(sizeof(namespace_t *) * root->length)))
+    if(!(root->namespaces = (namespace_t **) calloc(sizeof(namespace_t *), root->length)))
         zdb_diep("namespace malloc");
 
     return root;
@@ -698,6 +698,10 @@ static void namespace_flushing_hook(namespace_t *namespace) {
 
 int namespaces_emergency() {
     namespace_t *ns;
+
+    // namespace not allocated yet
+    if(namespace_iter() == NULL)
+        return 0;
 
     for(ns = namespace_iter(); ns; ns = namespace_iter_next(ns)) {
         zdb_log("[+] namespaces: flushing: %s\n", ns->name);
