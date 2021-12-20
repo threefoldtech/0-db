@@ -286,6 +286,9 @@ static void index_hash_free_list(index_entry_t *head) {
 }
 
 void index_hash_free(index_hash_t *root) {
+    if(!root)
+        return;
+
     for(int i = 0; i < ENTRIES_PER_ROWS; i++) {
         if(root->sub[i]) {
             // clean the linked list
