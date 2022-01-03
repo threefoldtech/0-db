@@ -243,6 +243,16 @@ static size_t index_load_file(index_root_t *root) {
 
     zdb_debug("[+] index: running mode: %s\n", zdb_running_mode(header.mode));
 
+    // apply mode from header to local index
+    if(header.mode == ZDB_MODE_SEQUENTIAL)
+        root->mode = ZDB_MODE_SEQUENTIAL;
+
+    if(header.mode == ZDB_MODE_KEY_VALUE)
+        root->mode = ZDB_MODE_KEY_VALUE;
+
+    // commit mode change
+    index_rehash(root);
+
     // re-writing the header, with updated data if the index is writable
     // if the file was just created, it's okay, we have a new struct ready
     if(!(root->status & INDEX_READ_ONLY)) {
