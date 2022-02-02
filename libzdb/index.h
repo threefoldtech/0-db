@@ -78,16 +78,6 @@
         // linked list pointer
         struct index_entry_t *next;
 
-        // pointer to source namespace
-        // index should not be aware of his namespace
-        // but since we use a single big index, we need to
-        // be able to make namespace distinction
-        // note: another approch could be separate branch-list per namespace
-        // note 2: we keep a void pointer, we will only compare address and not
-        //         the object itself, this make some opacity later if we change
-        //         and reduce issue with circular inclusion
-        void *namespace;
-
         uint8_t idlength;    // length of the id, here uint8_t limits to 256 bytes
         uint32_t offset;     // offset on the corresponding datafile
         uint32_t idxoffset;  // offset on the index file (index file id is the same as data file)
@@ -103,27 +93,33 @@
 
     } index_entry_t;
 
-    // WARNING: this should be on index_branch.h
-    //          but we can't due to circular dependencies
-    //          in order to fix this, we should put all structs in a dedicated file
     //
-    // the current implementation of the index use rudimental index memory system
-    // it's basicly just linked-list of entries
-    // to improve performance without changing this basic implementation,
-    // which is really slow, of course, we use a "branch" system which simply
-    // splits all the arrays based on an id
+    // new index memory hash use a multi-level indirection
+    // array, based on crc32 entry
     //
-    // the id is specified on the implementation file, with the length, etc.
+    // more information can be found on index-branch files
     //
-    // - id 0000: [...........]
-    // - id 0001: [...................]
-    // - id 0002: [...]
-    typedef struct index_branch_t {
-        size_t length;       // length of this branch (count of entries)
-        index_entry_t *list; // entry point of the linked list
-        index_entry_t *last; // pointer to the last item, quicker to append
 
-    } index_branch_t;
+    typedef struct index_hash_t {
+        char type;
+        union {
+            struct index_hash_t **sub;
+            index_entry_t *list;
+        };
+
+    } index_hash_t;
+
+    typedef struct index_hash_stats_t {
+        size_t subs;
+        size_t subsubs;
+        size_t entries;
+        size_t max_entries;
+        size_t lists;
+        size_t entries_size;
+        size_t ids_size;
+
+    } index_hash_stats_t;
+
 
     // index status flags
     // keep some heatly status of the index
@@ -189,10 +185,8 @@
         int updated;        // does current index changed since opened
         int secure;         // enable some safety (see secure zdb_settings_t)
 
-        void *namespace;    // see index_entry_t, same reason
-
         index_seqid_t *seqid;      // sequential fileid mapping
-        index_branch_t **branches; // list of branches (explained later)
+        index_hash_t *hash;        // index keys hashmap
         index_status_t status;     // index health
         index_stats_t stats;       // index statistics
         index_dirty_t dirty;       // bitmap of dirty index files
@@ -281,7 +275,7 @@
     int index_entry_delete_memory(index_root_t *root, index_entry_t *entry);
     int index_entry_is_deleted(index_entry_t *entry);
 
-    int index_clean_namespace(index_root_t *root, void *namespace);
+    int index_clean_namespace(index_root_t *root);
 
     extern index_entry_t *index_reusable_entry;
 

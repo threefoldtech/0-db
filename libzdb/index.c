@@ -39,7 +39,6 @@ void index_entry_dump(index_entry_t *entry) {
 #ifdef RELEASE
     (void) entry;
 #else
-    zdb_debug("[+] index: entry dump: namespace  : %p\n", entry->namespace);
     zdb_debug("[+] index: entry dump: id length  : %" PRIu8  "\n", entry->idlength);
     zdb_debug("[+] index: entry dump: idx offset : %" PRIu32 "\n", entry->idxoffset);
     zdb_debug("[+] index: entry dump: idx fileid : %" PRIu32 "\n", entry->indexid);
@@ -417,30 +416,28 @@ uint32_t index_next_objectid(index_root_t *root) {
 // perform the basic "hashing" (crc based) used to point to the expected branch
 // we only keep partial amount of the result to not fill the memory too fast
 uint32_t index_key_hash(unsigned char *id, uint8_t idlength) {
-    return zdb_crc32((const uint8_t *) id, idlength) & buckets_mask;
+    return zdb_crc32((const uint8_t *) id, idlength);
 }
 
 // main look-up function, used to get an entry from the memory index
 index_entry_t *index_entry_get(index_root_t *root, unsigned char *id, uint8_t idlength) {
     uint32_t branchkey = index_key_hash(id, idlength);
-    index_branch_t *branch = index_branch_get(root->branches, branchkey);
-    index_entry_t *entry;
+    index_entry_t *list;
 
-    // branch not exists
-    if(!branch)
+    // no list found, entry not found
+    if(!(list = index_hash_lookup(root->hash, branchkey)))
         return NULL;
 
-    for(entry = branch->list; entry; entry = entry->next) {
+    // walk over the list
+    for(index_entry_t *entry = list; entry; entry = entry->next) {
         if(entry->idlength != idlength)
-            continue;
-
-        if(entry->namespace != root->namespace)
             continue;
 
         if(memcmp(entry->id, id, idlength) == 0)
             return entry;
     }
 
+    // entry not found
     return NULL;
 }
 
@@ -509,23 +506,14 @@ int index_entry_delete_memory(index_root_t *root, index_entry_t *entry) {
     root->stats.size -= sizeof(index_entry_t) + entry->idlength;
 
     // running in a mode without index, let's just skip this
-    if(root->branches == NULL)
+    if(root->hash == NULL)
         return 0;
-
-    uint32_t branchkey = index_key_hash(entry->id, entry->idlength);
-    index_branch_t *branch = index_branch_get(root->branches, branchkey);
-    index_entry_t *previous = index_branch_get_previous(branch, entry);
 
     zdb_debug("[+] index: delete memory: removing entry from memory\n");
 
-    if(previous == entry) {
-        zdb_danger("[-] index: entry delete memory: something wrong happens");
-        zdb_danger("[-] index: entry delete memory: branches seems buggy");
+    uint32_t hashkey = index_key_hash(entry->id, entry->idlength);
+    if(!index_hash_remove(root->hash, hashkey, entry))
         return 1;
-    }
-
-    // removing entry from global branch
-    index_branch_remove(branch, entry, previous);
 
     // cleaning memory object
     free(entry);
@@ -710,63 +698,14 @@ size_t index_offset_objectid(uint32_t objectid) {
     return offset;
 }
 
-// iterate over all entries in a single branch
-// and remove if this entry is related to requested namespace
-static inline size_t index_clean_namespace_branch(index_branch_t *branch, void *namespace) {
-    index_entry_t *entry = branch->list;
-    index_entry_t *previous = NULL;
-    size_t deleted  = 0;
-
-    while(entry) {
-        if(entry->namespace != namespace) {
-            // keeping this key, looking forward
-            previous = entry;
-            entry = entry->next;
-            continue;
-        }
-
-        #ifndef RELEASE
-        zdb_log("[+] index: namespace cleaner: free: ");
-        zdb_hexdump(entry->id, entry->idlength);
-        printf("\n"); // FIXME
-        #endif
-
-        // okay, we need to remove this key
-        index_entry_t *next = entry->next;
-        index_entry_t *removed = index_branch_remove(branch, entry, previous);
-
-        free(removed);
-        deleted += 1;
-
-        entry = next;
-    }
-
-    return deleted;
-}
-
 // remove specific namespace from the index
 //
 // we use a global index for everything, when removing a
 // namespace, we walk over all the keys and remove keys matching
 // to this namespace
-int index_clean_namespace(index_root_t *root, void *namespace) {
-    index_branch_t **branches = root->branches;
-    size_t deleted = 0;
-
-    if(!branches)
-        return 0;
-
-    zdb_debug("[+] index: starting namespace cleaner\n");
-
-    for(uint32_t b = 0; b < buckets_branches; b++) {
-        if(!branches[b])
-            continue;
-
-        deleted += index_clean_namespace_branch(branches[b], namespace);
-    }
-
-    zdb_debug("[+] index: namespace cleaner: %lu keys removed\n", deleted);
-
+int index_clean_namespace(index_root_t *root) {
+    index_hash_free(root->hash);
+    root->hash = NULL;
     return 0;
 }
 

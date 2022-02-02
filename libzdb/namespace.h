@@ -58,14 +58,6 @@
         size_t effective;          // amount of namespaces currently loaded
         namespace_t **namespaces;  // pointers to namespaces
         zdb_settings_t *settings;  // global settings reminder
-        index_branch_t **branches; // unique global branches list
-
-        // as explained in namespace.c, we keep a single big
-        // index which that contains everything (all namespaces together)
-        //
-        // for each index structure, we will point the branches to the
-        // same big index branches all the time, this is why we keep
-        // this one here, as the 'original one'
 
     } ns_root_t;
 

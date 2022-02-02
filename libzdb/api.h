@@ -55,8 +55,8 @@
     int zdb_index_open_readwrite(index_root_t *root, fileid_t fileid);
     void zdb_index_close(index_root_t *zdbindex);
 
-    index_root_t *zdb_index_init_lazy(zdb_settings_t *settings, char *indexdir, void *namespace);
-    index_root_t *zdb_index_init(zdb_settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches);
+    index_root_t *zdb_index_init_lazy(zdb_settings_t *settings, char *indexdir);
+    index_root_t *zdb_index_init(zdb_settings_t *settings, char *indexdir);
     uint64_t zdb_index_availity_check(index_root_t *root);
 
     // index header validity

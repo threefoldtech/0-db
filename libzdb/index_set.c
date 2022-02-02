@@ -182,7 +182,6 @@ index_entry_t *index_insert_memory_handler_memkey(index_root_t *root, index_set_
 
     memcpy(entry->id, set->id, new->idlength);
     entry->idlength = new->idlength;
-    entry->namespace = root->namespace;
     entry->offset = new->offset;
     entry->length = new->length;
     entry->dataid = root->indexid; // WARNING: check this
@@ -197,7 +196,10 @@ index_entry_t *index_insert_memory_handler_memkey(index_root_t *root, index_set_
     uint32_t branchkey = index_key_hash(entry->id, entry->idlength);
 
     // commit entry into memory
-    index_branch_append(root->branches, branchkey, entry);
+    if(!index_hash_push(root->hash, branchkey, entry)) {
+        free(entry);
+        return NULL;
+    }
 
     // update statistics (if the key exists)
     // maybe it doesn't exists if it comes from a replay

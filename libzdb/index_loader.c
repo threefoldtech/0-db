@@ -16,57 +16,31 @@
 //
 // index initializer and dumper
 //
-static inline void index_dump_entry(index_entry_t *entry) {
-    zdb_log("[+] key [");
+static int index_dump_full_callback(index_entry_t *entry, void *userptr) {
+    (void) userptr;
+
+    zdb_log("[+] key: ");
     zdb_hexdump(entry->id, entry->idlength);
-    zdb_log("] offset %" PRIu32 ", length: %" PRIu32 "\n", entry->offset, entry->length);
+
+    zdb_log("[+]   offset %" PRIu32 ", length: %" PRIu32 "\n", entry->offset, entry->length);
+
+    return 0;
+}
+
+static void index_dump_full(index_root_t *root) {
+    zdb_log("[+] ===========================\n");
+
+    // walk over all keys and dump some information
+    index_hash_walk(root->hash, index_dump_full_callback, NULL);
+
+    zdb_log("[+] ===========================\n");
 }
 
 // dumps the current index load
 // fulldump flags enable printing each entry
-static void index_dump(index_root_t *root, int fulldump) {
-    size_t branches = 0;
-
+static void index_dump(index_root_t *root) {
     zdb_log("[+] index: verifyfing populated keys\n");
-
-    if(fulldump)
-        zdb_log("[+] ===========================\n");
-
-    // iterating over each buckets
-    for(uint32_t b = 0; b < buckets_branches; b++) {
-        index_branch_t *branch = index_branch_get(root->branches, b);
-
-        // skipping empty branch
-        if(!branch)
-            continue;
-
-        branches += 1;
-        index_entry_t *entry = branch->list;
-
-        if(!fulldump)
-            continue;
-
-        // iterating over the linked-list
-        for(; entry; entry = entry->next)
-            index_dump_entry(entry);
-    }
-
-    if(fulldump) {
-        if(root->stats.entries == 0)
-            zdb_log("[+] index is empty\n");
-
-        zdb_log("[+] ===========================\n");
-    }
-
-    zdb_verbose("[+] index: uses: %lu branches\n", branches);
-
-    // overhead contains:
-    // - the buffer allocated to hold each (future) branches pointer
-    // - the branch struct itself for each branch
-    size_t overhead = (buckets_branches * sizeof(index_branch_t **)) +
-                      (branches * sizeof(index_branch_t));
-
-    zdb_verbose("[+] index: memory overhead: %.2f KB (%lu bytes)\n", KB(overhead), overhead);
+    index_hash_stats(root->hash);
 }
 
 static void index_dump_statistics(index_root_t *root) {
@@ -516,7 +490,7 @@ index_seqid_t *index_allocate_seqid() {
     return seqid;
 }
 
-index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir, void *namespace) {
+index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir) {
     index_root_t *root;
 
     if(!(root = calloc(sizeof(index_root_t), 1))) {
@@ -534,11 +508,13 @@ index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir, void *na
     root->synctime = settings->synctime;
     root->lastsync = 0;
     root->status = INDEX_NOT_LOADED | INDEX_HEALTHY;
-    root->branches = NULL;
-    root->namespace = namespace;
     root->mode = settings->mode;
     root->rotate = time(NULL);
     root->secure = settings->secure;
+
+    // allocate index hash
+    if(!(root->hash = index_hash_init()))
+        zdb_diep("index: init: hash");
 
     index_dirty_resize(root, 1);
 
@@ -574,18 +550,22 @@ index_root_t *index_rehash(index_root_t *root) {
 }
 
 // create an index and load files
-index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespace, index_branch_t **branches) {
+index_root_t *index_init(zdb_settings_t *settings, char *indexdir) {
     zdb_debug("[+] index: initializing\n");
 
-    index_root_t *root = index_init_lazy(settings, indexdir, namespace);
-    root->branches = branches;
+    index_root_t *root = index_init_lazy(settings, indexdir);
 
     // initialize internal pointers
     index_rehash(root);
     index_internal_load(root);
 
-    if(root->mode == ZDB_MODE_KEY_VALUE)
-        index_dump(root, settings->dump);
+    if(root->mode == ZDB_MODE_KEY_VALUE) {
+        if(settings->dump)
+            index_dump_full(root);
+
+        // dump internal statistics
+        index_dump(root);
+    }
 
     index_dump_statistics(root);
 
@@ -611,6 +591,9 @@ void index_destroy(index_root_t *root) {
         free(root->seqid->seqmap);
         free(root->seqid);
     }
+
+    // clean hashmap
+    index_hash_free(root->hash);
 
     free(root);
 }
