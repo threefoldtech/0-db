@@ -671,9 +671,6 @@ static void namespace_delete_hook(namespace_t *namespace) {
 int namespace_delete(namespace_t *namespace) {
     zdb_log("[+] namespace: removing: %s\n", namespace->name);
 
-    // detach all clients attached to this namespace
-    // redis_detach_clients(namespace);
-
     // unallocating keys attached to this namespace
     index_clean_namespace(namespace->index, namespace);
 

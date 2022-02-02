@@ -94,6 +94,9 @@ int command_nsdel(redis_client_t *client) {
         return 1;
     }
 
+    // detach all clients attached to this namespace
+    redis_detach_clients(namespace);
+
     // delete the new namespace
     if(namespace_delete(namespace)) {
         redis_hardsend(client, "-Could not delete this namespace");
