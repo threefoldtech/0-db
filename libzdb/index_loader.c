@@ -535,6 +535,7 @@ index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir, void *na
     root->lastsync = 0;
     root->status = INDEX_NOT_LOADED | INDEX_HEALTHY;
     root->branches = NULL;
+    root->rbran = NULL;
     root->namespace = namespace;
     root->mode = settings->mode;
     root->rotate = time(NULL);
@@ -551,9 +552,18 @@ index_root_t *index_init_lazy(zdb_settings_t *settings, char *indexdir, void *na
 
 // reload and ensure all internal pointers are available
 index_root_t *index_rehash(index_root_t *root) {
-    if(root->mode == ZDB_MODE_SEQUENTIAL)
+    if(root->mode == ZDB_MODE_SEQUENTIAL) {
         if(root->seqid == NULL)
             root->seqid = index_allocate_seqid();
+
+        if(root->branches != NULL)
+            root->branches = NULL;
+    }
+
+    // restore branch is we are in userkey mode
+    // we were maybe in sequential mode without branches
+    if(root->mode == ZDB_MODE_KEY_VALUE)
+        root->branches = root->rbran;
 
     // automatically push id 0 and initialize seqmap
     // this is made in rehash because it's required on mode change
@@ -578,6 +588,7 @@ index_root_t *index_init(zdb_settings_t *settings, char *indexdir, void *namespa
     zdb_debug("[+] index: initializing\n");
 
     index_root_t *root = index_init_lazy(settings, indexdir, namespace);
+    root->rbran = branches; // keep original branches always set
     root->branches = branches;
 
     // initialize internal pointers

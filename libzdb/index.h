@@ -193,6 +193,7 @@
 
         index_seqid_t *seqid;      // sequential fileid mapping
         index_branch_t **branches; // list of branches (explained later)
+        index_branch_t **rbran;    // backup branch list (for mixed mode)
         index_status_t status;     // index health
         index_stats_t stats;       // index statistics
         index_dirty_t dirty;       // bitmap of dirty index files
