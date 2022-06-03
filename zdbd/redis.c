@@ -166,6 +166,13 @@ redis_response_t *redis_send_response(redis_client_t *client, redis_response_t *
         zdbd_debug("[+] redis: sending reply to %d (%ld bytes remains)\n", client->fd, response->length);
 
         if((sent = send(client->fd, response->reader, response->length, 0)) < 0) {
+            if(errno == EPIPE) {
+                zdbd_verbose("[-] dropping send request, client went away\n");
+                response->reader += response->length;
+                response->length = 0;
+                return NULL;
+            }
+
             if(errno != EAGAIN) {
                 zdbd_warnp("redis_send_reply: send");
 

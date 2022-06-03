@@ -203,6 +203,10 @@ static void sighandler(int signal) {
             namespaces_emergency();
             break;
 
+        case SIGPIPE:
+            zdbd_verbose("[-] signal: sigpipe received, ignoring\n");
+            return;
+
         case SIGINT:
         case SIGTERM:
             zdb_log("[+] signal: request cleaning\n");
@@ -226,6 +230,7 @@ static int proceed(zdb_settings_t *zdb_settings, zdbd_settings_t *zdbd_settings)
     signal_intercept(SIGSEGV, sighandler);
     signal_intercept(SIGINT, sighandler);
     signal_intercept(SIGTERM, sighandler);
+    signal_intercept(SIGPIPE, sighandler);
 
     zdbd_id_set(zdbd_settings->listen, zdbd_settings->port, zdbd_settings->socket);
 
