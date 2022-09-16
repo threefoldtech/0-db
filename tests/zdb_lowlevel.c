@@ -85,7 +85,7 @@ runtest_prio(sp, lowlevel_too_many_arguments) {
         return TEST_SKIPPED;
 
     // too many argument
-    strcpy(buffer, "*32\r\n");
+    strcpy(buffer, "*1025\r\n");
 
     return lowlevel_send_invalid(test, buffer, sizeof(buffer));
 }

@@ -126,6 +126,7 @@ static command_t commands_handlers[] = {
     {.command = "SET",     .handler = command_set},      // default SET command
     {.command = "SETX",    .handler = command_set},      // alias for SET command
     {.command = "GET",     .handler = command_get},      // default GET command
+    {.command = "MGET",    .handler = command_mget},     // default MGET command (multiple get)
     {.command = "DEL",     .handler = command_del},      // default DEL command
     {.command = "EXISTS",  .handler = command_exists},   // default EXISTS command
     {.command = "CHECK",   .handler = command_check},    // custom command to verify data integrity

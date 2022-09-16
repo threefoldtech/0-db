@@ -443,7 +443,7 @@ static resp_status_t redis_handle_resp_empty(redis_client_t *client) {
     // we don't have any command
     // with more than like 4 or 5 arguments
     // but let put a higher limit, just in case
-    if(request->argc > 8) {
+    if(request->argc > 1024) {
         resp_discard(client, "Too many arguments");
         return RESP_STATUS_ABNORMAL;
     }

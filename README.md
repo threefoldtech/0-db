@@ -176,6 +176,7 @@ This mode is not possible if you don't have any data/index already available.
 - `PING`
 - `SET key value [timestamp]`
 - `GET key`
+- `MGET key`
 - `DEL key`
 - `STOP` (used only for debugging, to check memory leaks)
 - `EXISTS key`
@@ -213,6 +214,13 @@ try to update a key without modification (avoid inserting already existing data)
 
 **Note:** admin user can specify an extra argument, timestamp, which will set the timestamp of the key
 to the specified timestamp and not the current timestamp. This is needed when doing replication.
+
+## GET (with MGET)
+Retreive data, key can be binary. Returns (nil) when key doesn't exists (not found, deleted).
+
+`GET` can only handle one key. There is `MGET` which supports multiple keys. Response is an array.
+
+There is a hard-limit of 1023 keys at a time.
 
 ## EXISTS
 Returns 1 or 0 if the key exists
