@@ -88,9 +88,9 @@ index_header_t index_initialize(int fd, fileid_t indexid, index_root_t *root) {
 
     memcpy(header.magic, "IDX0", 4);
     header.version = ZDB_IDXFILE_VERSION;
-    header.created = time(NULL);
+    header.created = 0; // not used anymore to keep coherence
+    header.opened = 0;  // across replicat checksum
     header.fileid = indexid;
-    header.opened = time(NULL);
     header.mode = root->mode;
 
     if(!index_write(fd, &header, sizeof(index_header_t), root))
@@ -257,16 +257,18 @@ static size_t index_load_file(index_root_t *root) {
     // if the file was just created, it's okay, we have a new struct ready
     if(!(root->status & INDEX_READ_ONLY)) {
         // updating index with latest opening state
-        header.opened = time(NULL);
+        header.opened = 0;
         lseek(root->indexfd, 0, SEEK_SET);
 
         if(!index_write(root->indexfd, &header, sizeof(index_header_t), root))
             zdb_diep(root->indexfile);
     }
 
+    /*
     char date[256];
     zdb_verbose("[+] index: created at: %s\n", zdb_header_date(header.created, date, sizeof(date)));
     zdb_verbose("[+] index: last open: %s\n", zdb_header_date(header.opened, date, sizeof(date)));
+    */
 
     if(zdb_rootsettings.mode != ZDB_MODE_MIX) {
         if(header.mode != zdb_rootsettings.mode) {

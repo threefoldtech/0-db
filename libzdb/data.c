@@ -256,8 +256,8 @@ void data_initialize(char *filename, data_root_t *root) {
 
     memcpy(header.magic, "DAT0", 4);
     header.version = ZDB_DATAFILE_VERSION;
-    header.created = time(NULL);
-    header.opened = 0; // not supported yet
+    header.created = 0; // timestamp are not used anymore, this allows
+    header.opened = 0;  // checksum comparaison more efficient across replicat
     header.fileid = root->dataid;
 
     if(!data_write(fd, &header, sizeof(data_header_t), 1, root))
