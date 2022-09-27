@@ -502,7 +502,7 @@ size_t data_insert(data_root_t *root, data_request_t *source) {
     header->previous = root->previous;
     header->integrity = source->crc; // zdb_crc32(data, datalength);
     header->flags = source->flags;
-    header->timestamp = time(NULL);
+    header->timestamp = source->timestamp;
 
     memcpy(header->id, id, source->idlength);
 

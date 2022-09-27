@@ -23,6 +23,8 @@ static time_t timestamp_from_set(resp_request_t *request) {
     time_t timestamp = atoll(temp);
     free(temp);
 
+    zdbd_debug("[+] index: using custom timestamp: %ld\n", timestamp);
+
     return timestamp;
 }
 
