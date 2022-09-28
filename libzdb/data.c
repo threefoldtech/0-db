@@ -305,6 +305,86 @@ static void data_open_final(data_root_t *root) {
     zdb_verbose("[+] data: active file: %s\n", root->datafile);
 }
 
+data_raw_t data_raw_get_real(int fd, off_t offset) {
+    data_raw_t raw;
+
+    memset(&raw, 0x00, sizeof(raw));
+
+    // moving to the header offset
+    lseek(fd, offset, SEEK_SET);
+
+    // 1. fetch fixed header object
+    // 2. that fixed header first byte contains id length
+    // 3. fetch id with correct length (from 2)
+    // 4. fetch payload with correct length (from 2)
+    // 5. TODO check checksum ?
+
+    zdb_debug("[+] data: raw: fetching header from offset\n");
+    if(read(fd, &raw.header, sizeof(data_entry_header_t)) != sizeof(data_entry_header_t)) {
+        zdb_warnp("data: raw: incorrect data header read");
+        return raw;
+    }
+
+    if(raw.header.datalength > ZDB_DATA_MAX_PAYLOAD) {
+        zdb_verbose("[-] data: raw: datalength from header too large\n");
+        return raw;
+    }
+
+    zdb_debug("[+] data: raw: fetching id from header offset\n");
+    if(!(raw.id = malloc(raw.header.idlength))) {
+        zdb_warnp("data: raw: id: malloc");
+        return raw;
+    }
+
+    if(read(fd, raw.id, raw.header.idlength) != raw.header.idlength) {
+        zdb_warnp("data: raw: incorrect id read");
+        return raw;
+    }
+
+    if(raw.header.flags & DATA_ENTRY_DELETED) {
+        zdb_debug("[+] data: raw: entry deleted\n");
+        return raw;
+    }
+
+    zdb_debug("[+] data: raw: fetching payload from header offset\n");
+    if(!(raw.payload.buffer = malloc(raw.header.datalength))) {
+        zdb_warnp("data: raw: payload: malloc");
+        return raw;
+    }
+
+    if(read(fd, raw.payload.buffer, raw.header.datalength) != raw.header.datalength) {
+        zdb_warnp("data: raw: incorrect payload read");
+        return raw;
+    }
+
+    // this validate return object to be valid
+    raw.payload.length = raw.header.datalength;
+
+    return raw;
+}
+
+// fetch data full object from specific offset
+data_raw_t data_raw_get(data_root_t *root, fileid_t dataid, off_t offset) {
+    int fd;
+    data_raw_t raw;
+
+    // initialize everything
+    memset(&raw, 0x00, sizeof(raw));
+
+    zdb_debug("[+] data: raw request: id %u, offset %lu\n", dataid, offset);
+
+    // acquire data id fd
+    if((fd = data_grab_dataid(root, dataid)) < 0)
+        return raw;
+
+    raw = data_raw_get_real(fd, offset);
+
+    // release dataid
+    data_release_dataid(root, dataid, fd);
+
+    return raw;
+}
+
 // jumping to the next id close the current data file
 // and open the next id file, it will create the new file
 size_t data_jump_next(data_root_t *root, fileid_t newid) {

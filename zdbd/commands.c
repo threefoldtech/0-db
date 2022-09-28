@@ -121,6 +121,7 @@ static command_t commands_handlers[] = {
     {.command = "AUTH",    .handler = command_auth},     // custom AUTH command to authentifcate admin
     {.command = "HOOKS",   .handler = command_hooks},    // custom HOOKS command to list running hooks
     {.command = "INDEX",   .handler = command_index},    // custom INDEX command to query internal index
+    {.command = "DATA",    .handler = command_data},     // custom DATA command to query internal data
 
     // dataset
     {.command = "SET",     .handler = command_set},      // default SET command

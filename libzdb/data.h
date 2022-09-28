@@ -3,6 +3,7 @@
 
     // split datafile after 256 MB
     #define ZDB_DEFAULT_DATA_MAXSIZE  256 * 1024 * 1024
+    #define ZDB_DATA_MAX_PAYLOAD      8 * 1024 * 1024
 
     // data statistics
     typedef struct data_stats_t {
@@ -73,6 +74,13 @@
 
     } data_payload_t;
 
+    typedef struct data_raw_t {
+        data_entry_header_t header;
+        uint8_t *id;
+        data_payload_t payload;
+
+    } data_raw_t;
+
     // scan internal representation
     // we use a status and a pointer to the header
     // in order to know what to do
@@ -124,6 +132,7 @@
     fileid_t data_dataid(data_root_t *root);
     void data_delete_files(char *datadir);
 
+    data_raw_t data_raw_get(data_root_t *root, fileid_t dataid, off_t offset);
     data_payload_t data_get(data_root_t *root, size_t offset, size_t length, fileid_t dataid, uint8_t idlength);
     int data_check(data_root_t *root, size_t offset, fileid_t dataid);
 

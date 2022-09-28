@@ -641,3 +641,4 @@ int command_flush(redis_client_t *client) {
 
     return 0;
 }
+
