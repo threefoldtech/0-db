@@ -104,8 +104,18 @@ int command_check(redis_client_t *client) {
 int command_del(redis_client_t *client) {
     resp_request_t *request = client->request;
 
-    if(!command_args_validate(client, 2))
-        return 1;
+    if(request->argc == 3) {
+        // we have a timestamp request
+        // this is only authorized to admin users
+        if(!command_admin_authorized(client))
+            return 1;
+
+    } else {
+        // we don't have 3 argument, let's check
+        // using default behavior we have 2 arguments
+        if(!command_args_validate(client, 2))
+            return 1;
+    }
 
     if(request->argv[1]->length > MAX_KEY_LENGTH) {
         zdb_log("[-] command: del: invalid key size\n");
@@ -150,8 +160,10 @@ int command_del(redis_client_t *client) {
         return 1;
     }
 
+    time_t timestamp = timestamp_from_set(request, 2);
+
     // update data file, flag entry deleted
-    if(!data_delete(data, entry->id, entry->idlength)) {
+    if(!data_delete(data, entry->id, entry->idlength, timestamp)) {
         zdbd_debug("[-] command: del: deleting data failed\n");
         redis_hardsend(client, "-Cannot delete key (data)");
         return 0;

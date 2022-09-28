@@ -129,7 +129,7 @@
 
     // size_t data_match(data_root_t *root, void *id, uint8_t idlength, size_t offset, fileid_t dataid);
 
-    int data_delete(data_root_t *root, void *id, uint8_t idlength);
+    int data_delete(data_root_t *root, void *id, uint8_t idlength, time_t timestamp);
 
     // size_t data_insert(data_root_t *root, unsigned char *data, uint32_t datalength, void *vid, uint8_t idlength, uint8_t flags);
     size_t data_insert(data_root_t *root, data_request_t *source);

@@ -547,7 +547,7 @@ int data_entry_is_deleted(data_entry_header_t *entry) {
 // was deleted
 // this is needed in order to rebuild an index from data file and
 // for compaction process
-int data_delete(data_root_t *root, void *id, uint8_t idlength) {
+int data_delete(data_root_t *root, void *id, uint8_t idlength, time_t timestamp) {
     unsigned char *empty = (unsigned char *) "";
 
     data_request_t dreq = {
@@ -557,6 +557,7 @@ int data_delete(data_root_t *root, void *id, uint8_t idlength) {
         .idlength = idlength,
         .flags = DATA_ENTRY_DELETED,
         .crc = 0,
+        .timestamp = timestamp,
     };
 
     zdb_debug("[+] data: delete: insert empty flagged data\n");
