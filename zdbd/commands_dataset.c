@@ -87,8 +87,8 @@ int command_check(redis_client_t *client) {
     }
 
     // key found and valid, let's checking the contents
-    zdbd_debug("[+] command: get: entry found, flags: %x, data length: %" PRIu32 "\n", entry->flags, entry->length);
-    zdbd_debug("[+] command: get: data file: %d, data offset: %" PRIu32 "\n", entry->dataid, entry->offset);
+    zdbd_debug("[+] command: check: entry found, flags: %x, data length: %" PRIu32 "\n", entry->flags, entry->length);
+    zdbd_debug("[+] command: check: data file: %d, data offset: %" PRIu32 "\n", entry->dataid, entry->offset);
 
     data_root_t *data = client->ns->data;
     int status = data_check(data, entry->offset, entry->dataid);
