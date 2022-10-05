@@ -174,36 +174,39 @@ This mode is not possible if you don't have any data/index already available.
 
 # Supported commands
 - `PING`
-- `SET key value [timestamp]`
-- `GET key`
-- `MGET key`
-- `DEL key`
+- `SET <key> <value> [timestamp]`
+- `GET <key>`
+- `MGET <key> [key ...]`
+- `DEL <key>`
 - `STOP` (used only for debugging, to check memory leaks)
-- `EXISTS key`
-- `CHECK key`
-- `KEYCUR key`
+- `EXISTS <key>`
+- `CHECK <key>`
+- `KEYCUR <key>`
 - `INFO`
-- `NSNEW namespace`
-- `NSDEL namespace`
-- `NSINFO namespace`
+- `NSNEW <namespace>`
+- `NSDEL <namespace>`
+- `NSINFO <namespace>`
 - `NSLIST`
-- `NSSET namespace property value`
-- `SELECT namespace [SECURE password]`
+- `NSSET <namespace> <property> <value>`
+- `SELECT <namespace> [SECURE password]`
 - `DBSIZE`
 - `TIME`
-- `AUTH password`
-- `AUTH SECURE`
-- `SCAN [optional cursor]`
-- `SCANX [optional cursor]` (this is just an alias for `SCAN`)
-- `RSCAN [optional cursor]`
+- `AUTH [password]`
+- `AUTH SECURE [password]`
+- `SCAN [cursor]`
+- `RSCAN [cursor]`
 - `WAIT command | * [timeout-ms]`
-- `HISTORY key [binary-data]`
+- `HISTORY <key> [binary-data]`
 - `FLUSH`
 - `HOOKS`
 - `INDEX DIRTY [RESET]`
-- `DATA RAW [fileid] [offset]`
+- `DATA RAW <fileid> <offset>`
+- `LENGTH <key>`
+- `KEYTIME <key>`
 
 `SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
+
+Arguments `<flags>` are mandatory, arguments `[flags]` are optionals.
 
 > Compared to real redis protocol, during a `SET`, the key is returned as response.
 
@@ -533,6 +536,35 @@ from another database used eg, for replication.
 
 You can use fields `data_current_id` and `data_current_offset` from `NSINFO` to query valid offsets.
 
+## LENGTH
+
+Returns payload size of a key or `(nil)` if not found.
+
+```
+> SET hello world
+"hello"
+
+> LENGTH hello
+(integer) 5
+
+> LENGTH notfound
+(nil)
+```
+
+## KEYTIME
+
+Return last-update timestamp of a key or `(nil)` if not found.
+
+```
+> SET hello world
+"hello"
+
+> KEYTIME hello
+(integer) 1664996517
+
+> KEYTIME notfound
+(nil)
+```
 
 # Namespaces
 A namespace is a dedicated directory on index and data root directory.
