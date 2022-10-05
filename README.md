@@ -201,6 +201,7 @@ This mode is not possible if you don't have any data/index already available.
 - `FLUSH`
 - `HOOKS`
 - `INDEX DIRTY [RESET]`
+- `DATA RAW [fileid] [offset]`
 
 `SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
 
@@ -508,6 +509,30 @@ List the current namespace index files id which were modified since last reset
 
 ### INDEX DIRTY RESET
 Reset the dirty list
+
+## DATA
+
+This command have small internal operation on raw data file.
+
+### DATA RAW
+
+An internal call allows to retreive a raw data object from database only based on fileid and offset.
+This method of access should only be made by a valid fileid and offset, some protection are in
+place to avoid issues on wrong offset but not fully tested yet.
+    
+This command (only for admin) returns an array with the object requested:
+  1. Key
+  2. Previous Offset
+  3. Integrity CRC32
+  4. Flags
+  5. Timestamp
+  6. Payload
+
+In addition with NSINFO, this command can be used to query a database based on fielid/offset
+from another database used eg, for replication.
+
+You can use fields `data_current_id` and `data_current_offset` from `NSINFO` to query valid offsets.
+
 
 # Namespaces
 A namespace is a dedicated directory on index and data root directory.
