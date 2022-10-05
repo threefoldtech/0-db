@@ -226,3 +226,47 @@ int command_length(redis_client_t *client) {
     return 0;
 }
 
+int command_keytime(redis_client_t *client) {
+    resp_request_t *request = client->request;
+
+    if(!command_args_validate(client, 2))
+        return 1;
+
+    if(request->argv[1]->length > MAX_KEY_LENGTH) {
+        zdb_log("[-] command: keytime: invalid key size\n");
+        redis_hardsend(client, "-Invalid key");
+        return 1;
+    }
+
+    if(namespace_is_frozen(client->ns))
+        return command_error_frozen(client);
+
+    zdbd_debug("[+] command: keytime: lookup key: ");
+    zdbd_debughex(request->argv[1]->buffer, request->argv[1]->length);
+
+    index_root_t *index = client->ns->index;
+    index_entry_t *entry = index_get(index, request->argv[1]->buffer, request->argv[1]->length);
+
+    // key not found at all
+    if(!entry) {
+        zdbd_debug("[-] command: keytime: key not found\n");
+        redis_hardsend(client, "$-1");
+        return 1;
+    }
+
+    // key found but deleted
+    if(entry->flags & INDEX_ENTRY_DELETED) {
+        zdbd_verbose("[-] command: keytime: key deleted\n");
+        redis_hardsend(client, "$-1");
+        return 1;
+    }
+
+    zdbd_debug("[+] command: keytime: entry found, timestamp: %u\n", entry->timestamp);
+
+    char response[32];
+    sprintf(response, ":%u\r\n", entry->timestamp);
+
+    redis_reply_stack(client, response, strlen(response));
+
+    return 0;
+}
