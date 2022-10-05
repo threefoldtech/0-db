@@ -137,6 +137,7 @@ static command_t commands_handlers[] = {
     {.command = "KSCAN",   .handler = command_kscan},    // custom command to iterate over keys matching pattern
     {.command = "HISTORY", .handler = command_history},  // custom command to get previous version of a key
     {.command = "KEYCUR",  .handler = command_keycur},   // custom command to get cursor id from a key
+    {.command = "LENGTH",  .handler = command_length},   // custom command to get value length of a key
 
     // query
     {.command = "INFO",    .handler = command_info},     // returns 0-db server name
