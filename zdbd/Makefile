@@ -31,6 +31,10 @@ ifeq ($(PROFILE),1)
 	LDFLAGS += -pg
 endif
 
+ifeq ($(PREFIX),)
+	PREFIX := /usr/local
+endif
+
 all: $(EXEC)
 
 release: CFLAGS += -DRELEASE -O2
@@ -48,3 +52,7 @@ clean:
 mrproper: clean
 	$(RM) $(EXEC)
 	$(RM) *.gcno *.gcda *.gcov
+
+install: $(EXEC)
+	install -d $(DESTDIR)$(PREFIX)/bin
+	install -m 755 $(EXEC) $(DESTDIR)$(PREFIX)/bin/

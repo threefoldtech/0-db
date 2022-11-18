@@ -20,3 +20,6 @@ mrproper:
 	$(MAKE) -C zdbd $@
 	$(MAKE) -C tools $@
 	$(RM) bin/*
+
+install:
+	$(MAKE) -C zdbd $@
