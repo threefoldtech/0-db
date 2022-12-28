@@ -7,6 +7,7 @@
     int command_nslist(redis_client_t *client);
     int command_nsinfo(redis_client_t *client);
     int command_nsset(redis_client_t *client);
+    int command_nsjump(redis_client_t *client);
     int command_dbsize(redis_client_t *client);
     int command_reload(redis_client_t *client);
     int command_flush(redis_client_t *client);

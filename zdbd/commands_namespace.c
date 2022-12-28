@@ -577,6 +577,21 @@ int command_nsset(redis_client_t *client) {
     return 0;
 }
 
+int command_nsjump(redis_client_t *client) {
+    // command restricted to admin only
+    if(!command_admin_authorized(client))
+        return 1;
+
+    zdbd_debug("[+] command: nsjump: forcing index and data jump\n");
+
+    size_t newid = index_jump_next(client->ns->index);
+    data_jump_next(client->ns->data, newid);
+
+    redis_hardsend(client, "+OK");
+
+    return 0;
+}
+
 int command_dbsize(redis_client_t *client) {
     char response[64];
 

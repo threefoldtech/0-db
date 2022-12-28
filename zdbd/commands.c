@@ -148,6 +148,7 @@ static command_t commands_handlers[] = {
     {.command = "NSLIST",  .handler = command_nslist},   // custom command to list namespaces
     {.command = "NSSET",   .handler = command_nsset},    // custom command to edit namespace settings
     {.command = "NSINFO",  .handler = command_nsinfo},   // custom command to get namespace information
+    {.command = "NSJUMP",  .handler = command_nsjump},   // custom command to force jumping to next index/data
     {.command = "SELECT",  .handler = command_select},   // default SELECT (with pwd) namespace switch
     {.command = "RELOAD",  .handler = command_reload},   // custom command to reload a namespace
     {.command = "FLUSH",   .handler = command_flush},    // custom command to reset a namespace
