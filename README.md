@@ -188,6 +188,7 @@ This mode is not possible if you don't have any data/index already available.
 - `NSINFO namespace`
 - `NSLIST`
 - `NSSET namespace property value`
+- `NSJUMP`
 - `SELECT namespace [SECURE password]`
 - `DBSIZE`
 - `TIME`
@@ -362,6 +363,9 @@ denied with an error message (eg: `Namespace is temporarily locked`).
 
 `FREEZE` mode will deny any operation on the specific namespace, read, write, update, delete operations
 will be denied with an error message (eg: `Namespace is temporarily frozen`)
+
+## NSJUMP
+Force closing current index and data files and open the next id.
 
 ## SELECT
 Change your current namespace. If the requested namespace is password-protected, you need
