@@ -60,13 +60,16 @@ void __ditry_seqmode_fix(index_item_t *source, off_t original) {
     if(zdb_rootsettings.mode != ZDB_MODE_SEQUENTIAL && zdb_rootsettings.mode != ZDB_MODE_DIRECT_KEY)
         return;
 
+    // hotfix
+    return;
+
     // compute previous offset
-    // since sequential keys are hardcoded to be 4 bytes, we can easily
+    // since sequential keys are hardcoded, we can easily
     // compute previous offset and ignoring value in the file
     //
     // this value were incorrect in some early version
     //
-    source->previous = original - sizeof(index_item_t) - sizeof(uint32_t);
+    source->previous = original - sizeof(index_item_t) - sizeof(seqid_t);
 
     if(source->previous == sizeof(index_header_t))
         source->previous = 1;
@@ -76,12 +79,14 @@ void __ditry_seqmode_fix(index_item_t *source, off_t original) {
 static index_scan_t index_previous_header_real(index_scan_t scan) {
     index_item_t source;
 
+    #if 0
     // special dirty-fix case, please see __ditry_seqmode_fix function
     if(scan.target == 1) {
         // forcing last entry position
         scan.target = lseek(scan.fd, 0, SEEK_END);
         scan.target -= sizeof(index_item_t) + sizeof(uint32_t);
     }
+    #endif
 
     // if scan.target is not set yet, we don't know the expected
     // offset of the previous header, let's read the header
@@ -94,11 +99,12 @@ static index_scan_t index_previous_header_real(index_scan_t scan) {
             return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
         }
 
-        __ditry_seqmode_fix(&source, scan.original);
+        // __ditry_seqmode_fix(&source, scan.original);
         index_item_header_dump(&source);
 
         if(source.previous >= current) {
             zdb_debug("[+] index rscan: previous-header: previous offset (%u) in previous file\n", source.previous);
+            scan.target = source.previous;
             return index_scan_error(scan, INDEX_SCAN_REQUEST_PREVIOUS);
         }
 
@@ -117,11 +123,13 @@ static index_scan_t index_previous_header_real(index_scan_t scan) {
         return index_scan_error(scan, INDEX_SCAN_NO_MORE_DATA);
     }
 
+    #if 0
     // special dirty-fix case, please see __ditry_seqmode_fix function
     if(scan.target == 1) {
         scan.target = 0;
         return index_scan_error(scan, INDEX_SCAN_REQUEST_PREVIOUS);
     }
+    #endif
 
     // jumping to previous object
     lseek(scan.fd, scan.target, SEEK_SET);
@@ -132,7 +140,7 @@ static index_scan_t index_previous_header_real(index_scan_t scan) {
         return index_scan_error(scan, INDEX_SCAN_UNEXPECTED);
     }
 
-    __ditry_seqmode_fix(&source, scan.target);
+    // __ditry_seqmode_fix(&source, scan.target);
 
     // checking if entry is deleted
     if(source.flags & INDEX_ENTRY_DELETED) {
