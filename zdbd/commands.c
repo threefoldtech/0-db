@@ -121,6 +121,7 @@ static command_t commands_handlers[] = {
     {.command = "AUTH",    .handler = command_auth},     // custom AUTH command to authentifcate admin
     {.command = "HOOKS",   .handler = command_hooks},    // custom HOOKS command to list running hooks
     {.command = "INDEX",   .handler = command_index},    // custom INDEX command to query internal index
+    {.command = "DATA",    .handler = command_data},     // custom DATA command to query internal data
 
     // dataset
     {.command = "SET",     .handler = command_set},      // default SET command
@@ -136,6 +137,8 @@ static command_t commands_handlers[] = {
     {.command = "KSCAN",   .handler = command_kscan},    // custom command to iterate over keys matching pattern
     {.command = "HISTORY", .handler = command_history},  // custom command to get previous version of a key
     {.command = "KEYCUR",  .handler = command_keycur},   // custom command to get cursor id from a key
+    {.command = "LENGTH",  .handler = command_length},   // custom command to get value length of a key
+    {.command = "KEYTIME", .handler = command_keytime},  // custom command to get last updated timestamp of a key
 
     // query
     {.command = "INFO",    .handler = command_info},     // returns 0-db server name

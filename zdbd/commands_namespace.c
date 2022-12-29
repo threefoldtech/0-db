@@ -361,6 +361,11 @@ int command_nsinfo(redis_client_t *client) {
         len += sprintf(info + len, "data_active: %s\n", namespace->data->datafile);
         len += sprintf(info + len, "index_path: %s\n", namespace->index->indexdir);
         len += sprintf(info + len, "index_active: %s\n", namespace->index->indexfile);
+
+        off_t offset = lseek(namespace->data->datafd, 0, SEEK_END);
+
+        len += sprintf(info + len, "data_current_id: %d\n", namespace->data->dataid);
+        len += sprintf(info + len, "data_current_offset: %lu\n", offset);
     }
 
     redis_bulk_t response = redis_bulk(info, len);
@@ -651,3 +656,4 @@ int command_flush(redis_client_t *client) {
 
     return 0;
 }
+

@@ -331,6 +331,7 @@ static size_t index_load_file(index_root_t *root) {
             .offset = entry->offset,
             .flags = entry->flags,
             .idxoffset = offset,
+            .timestamp = entry->timestamp,
             .crc = entry->crc,
             .parentid = entry->parentid,
             .parentoff = entry->parentoff,

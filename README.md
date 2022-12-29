@@ -174,36 +174,40 @@ This mode is not possible if you don't have any data/index already available.
 
 # Supported commands
 - `PING`
-- `SET key value [timestamp]`
-- `GET key`
-- `MGET key`
-- `DEL key`
+- `SET <key> <value> [timestamp]`
+- `GET <key>`
+- `MGET <key> [key ...]`
+- `DEL <key>`
 - `STOP` (used only for debugging, to check memory leaks)
-- `EXISTS key`
-- `CHECK key`
-- `KEYCUR key`
+- `EXISTS <key>`
+- `CHECK <key>`
+- `KEYCUR <key>`
 - `INFO`
-- `NSNEW namespace`
-- `NSDEL namespace`
-- `NSINFO namespace`
+- `NSNEW <namespace>`
+- `NSDEL <namespace>`
+- `NSINFO <namespace>`
 - `NSLIST`
-- `NSSET namespace property value`
+- `NSSET <namespace> <property> <value>`
 - `NSJUMP`
-- `SELECT namespace [SECURE password]`
+- `SELECT <namespace> [SECURE password]`
 - `DBSIZE`
 - `TIME`
-- `AUTH password`
-- `AUTH SECURE`
-- `SCAN [optional cursor]`
-- `SCANX [optional cursor]` (this is just an alias for `SCAN`)
-- `RSCAN [optional cursor]`
+- `AUTH [password]`
+- `AUTH SECURE [password]`
+- `SCAN [cursor]`
+- `RSCAN [cursor]`
 - `WAIT command | * [timeout-ms]`
-- `HISTORY key [binary-data]`
+- `HISTORY <key> [binary-data]`
 - `FLUSH`
 - `HOOKS`
 - `INDEX DIRTY [RESET]`
+- `DATA RAW <fileid> <offset>`
+- `LENGTH <key>`
+- `KEYTIME <key>`
 
 `SET`, `GET` and `DEL`, `SCAN` and `RSCAN` supports binary keys.
+
+Arguments `<flags>` are mandatory, arguments `[flags]` are optionals.
 
 > Compared to real redis protocol, during a `SET`, the key is returned as response.
 
@@ -512,6 +516,59 @@ List the current namespace index files id which were modified since last reset
 
 ### INDEX DIRTY RESET
 Reset the dirty list
+
+## DATA
+
+This command have small internal operation on raw data file.
+
+### DATA RAW
+
+An internal call allows to retreive a raw data object from database only based on fileid and offset.
+This method of access should only be made by a valid fileid and offset, some protection are in
+place to avoid issues on wrong offset but not fully tested yet.
+    
+This command (only for admin) returns an array with the object requested:
+  1. Key
+  2. Previous Offset
+  3. Integrity CRC32
+  4. Flags
+  5. Timestamp
+  6. Payload
+
+In addition with NSINFO, this command can be used to query a database based on fielid/offset
+from another database used eg, for replication.
+
+You can use fields `data_current_id` and `data_current_offset` from `NSINFO` to query valid offsets.
+
+## LENGTH
+
+Returns payload size of a key or `(nil)` if not found.
+
+```
+> SET hello world
+"hello"
+
+> LENGTH hello
+(integer) 5
+
+> LENGTH notfound
+(nil)
+```
+
+## KEYTIME
+
+Return last-update timestamp of a key or `(nil)` if not found.
+
+```
+> SET hello world
+"hello"
+
+> KEYTIME hello
+(integer) 1664996517
+
+> KEYTIME notfound
+(nil)
+```
 
 # Namespaces
 A namespace is a dedicated directory on index and data root directory.

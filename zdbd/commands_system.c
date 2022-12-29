@@ -249,3 +249,98 @@ int command_index(redis_client_t *client) {
     return 1;
 }
 
+static int command_data_raw(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    data_root_t *data = client->ns->data;
+    char *response;
+
+    if(!command_args_validate_min(client, 4))
+        return 1;
+
+    char *sfileid = strndup(request->argv[2]->buffer, request->argv[2]->length);
+    fileid_t fileid = atoll(sfileid);
+    free(sfileid);
+
+    char *soffset = strndup(request->argv[3]->buffer, request->argv[3]->length);
+    off_t offset = atoll(soffset);
+    free(soffset);
+
+    zdbd_debug("[+] data: raw: request data id: %u, offset: %lu\n", fileid, offset);
+
+    data_raw_t raw = data_raw_get(data, fileid, offset);
+
+    if(raw.header.datalength == 0 || raw.header.datalength != raw.payload.length) {
+        if((raw.header.flags & DATA_ENTRY_DELETED) == 0) {
+            // something went wrong when fetching data from file
+            zdb_log("[-] command: data: raw: invalid read at specified data/offset\n");
+            redis_hardsend(client, "-Invalid Request");
+            return 0;
+        }
+    }
+
+    size_t allocate = raw.header.datalength + raw.header.idlength + 512;
+
+    if(!(response = calloc(sizeof(char), allocate))) {
+        zdbd_warnp("data: raw: calloc");
+        redis_hardsend(client, "-Internal Memory Error");
+        return 1;
+    }
+
+    // response array:
+    //   1. id (length will be specified and known)
+    //   2. previous offset
+    //   3. integrity crc32
+    //   4. flags
+    //   5. timestamp
+    //   6. payload (length will be specified and known)
+
+    int length = 0;
+    length += sprintf(response, "*%d\r\n", 6);
+
+    length += sprintf(response + length, "$%u\r\n", raw.header.idlength);
+    memcpy(response + length, raw.id, raw.header.idlength);
+    length += raw.header.idlength;
+    length += sprintf(response + length, "\r\n");
+
+    length += sprintf(response + length, ":%u\r\n", raw.header.previous);
+    length += sprintf(response + length, "$10\r\n0x%08x\r\n", raw.header.integrity);
+    length += sprintf(response + length, ":%u\r\n", raw.header.flags);
+    length += sprintf(response + length, ":%u\r\n", raw.header.timestamp);
+
+    if(raw.payload.length > 0) {
+        length += sprintf(response + length, "$%lu\r\n", raw.payload.length);
+        memcpy(response + length, raw.payload.buffer, raw.payload.length);
+        length += raw.header.datalength;
+        length += sprintf(response + length, "\r\n");
+
+    } else {
+        length += sprintf(response + length, "$-1\r\n");
+    }
+
+    redis_reply_heap(client, response, length, free);
+
+    return 0;
+}
+
+int command_data(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    char command[COMMAND_MAXLEN];
+
+    if(!command_admin_authorized(client))
+        return 1;
+
+    if(!command_args_validate_min(client, 2))
+        return 1;
+
+    if(!command_args_overflow(client, 1, COMMAND_MAXLEN))
+        return 1;
+
+    sprintf(command, "%.*s", request->argv[1]->length, (char *) request->argv[1]->buffer);
+
+    if(strcasecmp(command, "RAW") == 0)
+        return command_data_raw(client);
+
+    redis_hardsend(client, "-Unknown DATA subcommand");
+    return 1;
+}
+
