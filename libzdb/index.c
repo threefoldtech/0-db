@@ -25,7 +25,7 @@ void index_item_header_dump(index_item_t *item) {
     zdb_debug("[+] index: item dump: data fileid: %" PRIu32 "\n", item->dataid);
     zdb_debug("[+] index: item dump: data offset: %" PRIu32 "\n", item->offset);
     zdb_debug("[+] index: item dump: data length: %" PRIu32 "\n", item->length);
-    zdb_debug("[+] index: item dump: previous   : %" PRIx32 "\n", item->previous);
+    zdb_debug("[+] index: item dump: previous   : %" PRIu32 "\n", item->previous);
     zdb_debug("[+] index: item dump: flags      : %" PRIu8  "\n", item->flags);
     zdb_debug("[+] index: item dump: timestamp  : %" PRIu32 "\n", item->timestamp);
     zdb_debug("[+] index: item dump: parent id  : %" PRIu32 "\n", item->parentid);
