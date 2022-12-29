@@ -13,13 +13,13 @@
 #include "commands.h"
 #include "commands_get.h"
 
-static time_t timestamp_from_set(resp_request_t *request) {
+time_t timestamp_from_set(resp_request_t *request, int field) {
     // no timestamp on request, setting current time
-    if(request->argc == 3)
+    if(request->argc == field)
         return time(NULL);
 
     // convert argument to string
-    char *temp = strndup(request->argv[3]->buffer, request->argv[3]->length);
+    char *temp = strndup(request->argv[field]->buffer, request->argv[field]->length);
     time_t timestamp = atoll(temp);
     free(temp);
 
@@ -46,7 +46,7 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
     uint32_t valuelength = request->argv[2]->length;
 
     // setting the timestamp
-    time_t timestamp = timestamp_from_set(request);
+    time_t timestamp = timestamp_from_set(request, 3);
 
     zdbd_debug("[+] command: set: %u bytes key, %u bytes data\n", idlength, valuelength);
     // printf("[+] set key: %.*s\n", idlength, id);
@@ -154,7 +154,7 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
     uint32_t valuelength = request->argv[2]->length;
 
     // setting the timestamp
-    time_t timestamp = timestamp_from_set(request);
+    time_t timestamp = timestamp_from_set(request, 3);
 
     zdbd_debug("[+] command: set: sequential-key: ");
     zdbd_debughex(&id, idlength);

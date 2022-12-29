@@ -401,8 +401,10 @@ zdb_api_t *zdb_api_del(namespace_t *ns, void *key, size_t ksize) {
         return zdb_api_reply(ZDB_API_DELETED, NULL);
     }
 
+    time_t timestamp = time(NULL);
+
     // update data file, flag entry deleted
-    if(!data_delete(ns->data, entry->id, entry->idlength)) {
+    if(!data_delete(ns->data, entry->id, entry->idlength, timestamp)) {
         zdb_debug("[-] api: del: deleting data failed\n");
         return zdb_api_reply(ZDB_API_INTERNAL_ERROR, NULL);
     }

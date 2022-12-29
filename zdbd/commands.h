@@ -21,4 +21,8 @@
 
     int command_error_locked(redis_client_t *client);
     int command_error_frozen(redis_client_t *client);
+
+    // defined in commands_set.c
+    // used by commands_set.c and commands_dataset.c
+    time_t timestamp_from_set(resp_request_t *request, int field);
 #endif
