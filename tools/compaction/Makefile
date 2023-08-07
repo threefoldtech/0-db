@@ -2,8 +2,14 @@ EXEC = compaction
 SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 
-CFLAGS += -g -std=gnu99 -W -Wall -O2 -msse4.2 -I../../src
+CFLAGS += -g -std=gnu99 -W -Wall -O2 -I../../src
 LDFLAGS += -rdynamic
+
+MACHINE := $(shell uname -m)
+ifeq ($(MACHINE),x86_64)
+	# explicit sse4.2 flags
+	CFLAGS += -msse4.2
+endif
 
 # all: $(EXEC)
 all:

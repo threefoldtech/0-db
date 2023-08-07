@@ -2,8 +2,14 @@ EXEC = index-rebuild
 SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 
-CFLAGS += -g -std=gnu99 -W -Wall -O2 -msse4.2 -I../../libzdb
+CFLAGS += -g -std=gnu99 -W -Wall -O2 -I../../libzdb
 LDFLAGS += ../../libzdb/libzdb.a -rdynamic
+
+MACHINE := $(shell uname -m)
+ifeq ($(MACHINE),x86_64)
+	# explicit sse4.2 flags
+	CFLAGS += -msse4.2
+endif
 
 ifeq ($(COVERAGE),1)
 	CFLAGS += -coverage -fprofile-arcs -ftest-coverage
