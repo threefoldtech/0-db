@@ -12,8 +12,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git
+          apt-get update
+          apt-get install -y build-essential git
 
       - name: Get versions
         id: versions
@@ -54,8 +54,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git
+          apt-get update
+          apt-get install -y build-essential git
 
       - name: Get versions
         id: versions
