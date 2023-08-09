@@ -50,8 +50,8 @@ jobs:
     container:
       image: ubuntu:18.04
       env:
-        GITHUB_REF: ${{ env.GITHUB_REF }}
-        GITHUB_SHA: ${{ env.GITHUB_SHA }}
+        GITHUB_REF: ${{ github.GITHUB_REF }}
+        GITHUB_SHA: ${{ github.sha }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@master
