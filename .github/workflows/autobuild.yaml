@@ -47,7 +47,11 @@ jobs:
   release:
     name: Create release artifacts
     runs-on: ubuntu-latest
-    container: ubuntu:18.04
+    container:
+      - image: ubuntu:18.04
+      - env:
+          GITHUB_REF: ${{ env.GITHUB_REF }}
+          GITHUB_SHA: ${{ env.GITHUB_SHA }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@master
@@ -60,8 +64,8 @@ jobs:
       - name: Get versions
         id: versions
         run: |
-          echo "branch=$(git rev-parse --abbrev-ref HEAD)" >> "$GITHUB_OUTPUT"
-          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "branch=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          echo "commit=${GITHUB_SHA:0:10}" >> "$GITHUB_OUTPUT"
 
       - name: Building 0-db
         run: |
