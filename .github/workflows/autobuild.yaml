@@ -21,6 +21,7 @@ jobs:
 
       - name: Get versions
         id: versions
+        shell: bash
         run: |
           echo "branch=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
           echo "commit=${GITHUB_SHA:0:10}" >> "$GITHUB_OUTPUT"
@@ -67,9 +68,8 @@ jobs:
 
       - name: Get versions
         id: versions
+        shell: bash
         run: |
-          echo "${GITHUB_SHA}"
-          echo "${GITHUB_REF}"
           echo "branch=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
           echo "commit=${GITHUB_SHA:0:10}" >> "$GITHUB_OUTPUT"
 
