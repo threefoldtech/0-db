@@ -60,8 +60,8 @@ jobs:
       - name: Get versions
         id: versions
         run: |
-          echo "branch=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
-          echo "commit=${GITHUB_SHA:0:10}" >> "$GITHUB_OUTPUT"
+          echo "branch=$(git rev-parse --abbrev-ref HEAD)" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Building 0-db
         run: |
