@@ -23,13 +23,13 @@ jobs:
 
       - name: Building 0-db
         run: |
-          pushd libzdb
+          cd libzdb
           make
-          popd
+          cd ..
 
-          pushd zdbd
+          cd zdbd
           make STATIC=1
-          popd
+          cd ..
 
           make
 
@@ -65,13 +65,13 @@ jobs:
 
       - name: Building 0-db
         run: |
-          pushd libzdb
+          cd libzdb
           make release
-          popd
+          cd ..
 
-          pushd zdbd
+          cd zdbd
           make release STATIC=1
-          popd
+          cd ..
 
           make
 
