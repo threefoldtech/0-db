@@ -48,10 +48,10 @@ jobs:
     name: Create release artifacts
     runs-on: ubuntu-latest
     container:
-      - image: ubuntu:18.04
-      - env:
-          GITHUB_REF: ${{ env.GITHUB_REF }}
-          GITHUB_SHA: ${{ env.GITHUB_SHA }}
+      image: ubuntu:18.04
+      env:
+        GITHUB_REF: ${{ env.GITHUB_REF }}
+        GITHUB_SHA: ${{ env.GITHUB_SHA }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@master
