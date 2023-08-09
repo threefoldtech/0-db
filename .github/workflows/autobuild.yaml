@@ -4,31 +4,37 @@ on: [push]
 jobs:
   debug:
     name: Create debug artifacts
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:18.04
+      env:
+        GITHUB_REF: ${{ github.ref }}
+        GITHUB_SHA: ${{ github.sha }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@master
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git
+          apt-get update
+          apt-get install -y build-essential git
 
       - name: Get versions
         id: versions
+        shell: bash
         run: |
-          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/*/})"
-          echo "##[set-output name=commit;]$(echo ${GITHUB_SHA:0:10})"
+          echo "branch=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          echo "commit=${GITHUB_SHA:0:10}" >> "$GITHUB_OUTPUT"
 
       - name: Building 0-db
         run: |
-          pushd libzdb
+          cd libzdb
           make
-          popd
+          cd ..
 
-          pushd zdbd
+          cd zdbd
           make STATIC=1
-          popd
+          cd ..
 
           make
 
@@ -45,31 +51,37 @@ jobs:
 
   release:
     name: Create release artifacts
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:18.04
+      env:
+        GITHUB_REF: ${{ github.ref }}
+        GITHUB_SHA: ${{ github.sha }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@master
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git
+          apt-get update
+          apt-get install -y build-essential git
 
       - name: Get versions
         id: versions
+        shell: bash
         run: |
-          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/*/})"
-          echo "##[set-output name=commit;]$(echo ${GITHUB_SHA:0:10})"
+          echo "branch=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          echo "commit=${GITHUB_SHA:0:10}" >> "$GITHUB_OUTPUT"
 
       - name: Building 0-db
         run: |
-          pushd libzdb
+          cd libzdb
           make release
-          popd
+          cd ..
 
-          pushd zdbd
+          cd zdbd
           make release STATIC=1
-          popd
+          cd ..
 
           make
 
