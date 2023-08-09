@@ -4,7 +4,8 @@ on: [push]
 jobs:
   debug:
     name: Create debug artifacts
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
+    container: ubuntu:18.04
     steps:
       - name: Checkout the repository
         uses: actions/checkout@master
@@ -45,7 +46,8 @@ jobs:
 
   release:
     name: Create release artifacts
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
+    container: ubuntu:18.04
     steps:
       - name: Checkout the repository
         uses: actions/checkout@master
