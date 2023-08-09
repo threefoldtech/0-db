@@ -5,7 +5,11 @@ jobs:
   debug:
     name: Create debug artifacts
     runs-on: ubuntu-latest
-    container: ubuntu:18.04
+    container:
+      image: ubuntu:18.04
+      env:
+        GITHUB_REF: ${{ github.ref }}
+        GITHUB_SHA: ${{ github.sha }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@master
@@ -18,8 +22,8 @@ jobs:
       - name: Get versions
         id: versions
         run: |
-          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/*/})"
-          echo "##[set-output name=commit;]$(echo ${GITHUB_SHA:0:10})"
+          echo "branch=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+          echo "commit=${GITHUB_SHA:0:10}" >> "$GITHUB_OUTPUT"
 
       - name: Building 0-db
         run: |
@@ -50,7 +54,7 @@ jobs:
     container:
       image: ubuntu:18.04
       env:
-        GITHUB_REF: ${{ github.GITHUB_REF }}
+        GITHUB_REF: ${{ github.ref }}
         GITHUB_SHA: ${{ github.sha }}
     steps:
       - name: Checkout the repository
