@@ -6,7 +6,7 @@ jobs:
     name: Create debug artifacts
     runs-on: ubuntu-latest
     container:
-      image: ubuntu:20.04
+      image: alpine:latest
       env:
         GITHUB_REF: ${{ github.ref }}
         GITHUB_SHA: ${{ github.sha }}
@@ -16,8 +16,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          apt-get update
-          apt-get install -y build-essential git
+          apk add alpine-sdk
 
       - name: Get versions
         id: versions
@@ -53,7 +52,7 @@ jobs:
     name: Create release artifacts
     runs-on: ubuntu-latest
     container:
-      image: ubuntu:20.04
+      image: alpine:latest
       env:
         GITHUB_REF: ${{ github.ref }}
         GITHUB_SHA: ${{ github.sha }}
@@ -63,8 +62,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          apt-get update
-          apt-get install -y build-essential git
+          apk add alpine-sdk
 
       - name: Get versions
         id: versions

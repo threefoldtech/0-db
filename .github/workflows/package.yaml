@@ -1,44 +1,13 @@
-name: Build release
-on:  
-  release:
-    types: [created]
+name: Publish update
+on:
+  push:
+    branches: ['development-v2']
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  static:
-    name: Create static release artifact
-    runs-on: ubuntu-latest
-    container:
-      image: alpine:3.13
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@master
-
-      - name: Install dependencies
-        run: |
-          apk add alpine-sdk
-
-      - name: Build production 0-db
-        run: |
-          cd libzdb
-          make release
-
-          cd ../zdbd
-          make STATIC=1 release
-
-          version=$(grep ZDBD_VERSION zdbd.h | awk '{ print $3 }' | sed s/'"'//g)
-          cp zdb ../zdb-${version}-linux-amd64-static
-
-      - name: Upload the artifacts
-        uses: skx/github-action-publish-binaries@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: 'zdb-*-linux-amd64-static'
-
   build-and-push-image:
     name: Create GitHub Package
     runs-on: ubuntu-latest
@@ -71,4 +40,3 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-

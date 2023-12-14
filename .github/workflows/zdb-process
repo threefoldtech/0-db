@@ -1,0 +1,11 @@
+#!/bin/ash
+zdb="/bin/zdb"
+args=""
+
+[[ ! -z "${DATADIR}" ]] && args="--data ${DATADIR}"
+[[ ! -z "${INDEXDIR}" ]] && args="${args} --index ${INDEXDIR}"
+[[ ! -z "${DATASIZE}" ]] && args="${args} --datasize ${DATASIZE}"
+[[ ! -z "${ADMIN}" ]] && args="${args} --admin ${ADMIN}"
+[[ ! -z "${PROTECT}" ]] && args="${args} --protect"
+
+${zdb} ${args}
