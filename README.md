@@ -11,6 +11,15 @@ except in sequential-mode (see below for more information).
 
 We use it as backend for many of our blockchain work, 0-db is not a redis replacement and never will.
 
+# GitHub Package helper
+
+In order to use GitHub Package Docker image, here are some environment variable you can set:
+- `DATADIR`: directory of data files
+- `INDEXDIR`: directory of index files
+- `DATASIZE`: maximum datafiles size
+- `ADMIN`: admin password
+- `PROTECT`: set to 1 to enable `--protect` which requires admin password to write on default namespace
+
 # Quick links
 1. [Build targets](#build-targets)
 2. [Build instructions](#build-instructions)
