@@ -269,6 +269,11 @@ static int command_data_raw(redis_client_t *client) {
 
     data_raw_t raw = data_raw_get(data, fileid, offset);
 
+    if(raw.error == DATA_RAW_EOF) {
+        zdb_log("[-] command: data: raw: end of file reached\n");
+        redis_hardsend(client, "-EOF");
+    }
+
     if(raw.header.datalength == 0 || raw.header.datalength != raw.payload.length) {
         if((raw.header.flags & DATA_ENTRY_DELETED) == 0) {
             // something went wrong when fetching data from file

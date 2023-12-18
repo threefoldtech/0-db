@@ -74,10 +74,16 @@
 
     } data_payload_t;
 
+    typedef enum data_error_t {
+        DATA_RAW_EOF = 1,
+
+    } data_error_t;
+
     typedef struct data_raw_t {
         data_entry_header_t header;
         uint8_t *id;
         data_payload_t payload;
+        data_error_t error;
 
     } data_raw_t;
 

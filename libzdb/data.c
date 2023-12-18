@@ -310,6 +310,12 @@ data_raw_t data_raw_get_real(int fd, off_t offset) {
 
     memset(&raw, 0x00, sizeof(raw));
 
+    off_t check = lseek(fd, 0, SEEK_END);
+    if(offset >= check) {
+        raw.error = DATA_RAW_EOF;
+        return raw;
+    }
+
     // moving to the header offset
     lseek(fd, offset, SEEK_SET);
 
