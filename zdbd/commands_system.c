@@ -272,6 +272,7 @@ static int command_data_raw(redis_client_t *client) {
     if(raw.error == DATA_RAW_EOF) {
         zdb_log("[-] command: data: raw: end of file reached\n");
         redis_hardsend(client, "-EOF");
+        return 1;
     }
 
     if(raw.header.datalength == 0 || raw.header.datalength != raw.payload.length) {
