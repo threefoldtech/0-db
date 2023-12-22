@@ -28,6 +28,51 @@ time_t timestamp_from_set(resp_request_t *request, int field) {
     return timestamp;
 }
 
+// because of the nature of zdb in always append, if user request to update a key
+// with payload exactly the same as the existing payload, this will fill up data and index
+// probably for nothing, in order to avoid that, if new data is the same as old data, we don't
+// push new data
+//
+// historically, only the crc32 (which is computed anyway) was used to compare old and new data,
+// i know crc32 is not a hash and is not supposed to act like that but it was small to store (4 bytes)
+// and was supposedly okay for small amount of data... i was wrong.
+//
+// to update this, i added a check on the content length as well, thinking that if crc32 and length
+// are the same, data are probably the same and we can skip update...
+//
+// then i did some research (should have been done sooner), actually it's easy to have same length
+// data exactly the same crc32 even if data are completly differents, even with few bytes only
+//
+// there is no point computing hash of the data since we won't do anything with it and computing
+// a hash require to read the data fully once... let's just do a memcmp it's faster and easier
+//
+// note: if the user want to update timestamp of last update without updating data (by pushing
+//       same data), this is not supported yet but this would be interresting to support via
+//       a special command like TOUCH or something.
+static int data_compare_matching(index_entry_t *existing, data_request_t *dreq, data_root_t *data) {
+    zdbd_debug("[+] command: set: existing %08x <> %08x crc match, inspecting\n", existing->crc, dreq->crc);
+
+    // size differs, it's obviously different
+    if(existing->length != dreq->datalength)
+        return 0;
+
+    index_entry_t *x = existing; // shortcut
+    data_payload_t payload = data_get(data, x->offset, x->length, x->dataid, x->idlength);
+
+    // something went wrong when fetching data
+    // keep going and update data then
+    if(!payload.buffer)
+        return 0;
+
+    // check if data are the same
+    if(memcmp(payload.buffer, dreq->data, dreq->datalength) == 0) {
+        zdbd_debug("[+] command: set: matching data, ignoring update\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *existing) {
     resp_request_t *request = client->request;
     index_root_t *index = client->ns->index;
@@ -64,9 +109,11 @@ static size_t redis_set_handler_userkey(redis_client_t *client, index_entry_t *e
 
     // checking if we need to update this entry of if data are unchanged
     if(existing && existing->crc == dreq.crc) {
-        zdbd_debug("[+] command: set: existing %08x <> %08x crc match, ignoring\n", existing->crc, dreq.crc);
-        redis_hardsend(client, "$-1");
-        return 0;
+        // deep inspection of data to check if replacement is needed
+        if(data_compare_matching(existing, &dreq, data) == 1) {
+            redis_hardsend(client, "$-1");
+            return 0;
+        }
     }
 
     // insert the data into the datafile
@@ -172,10 +219,8 @@ static size_t redis_set_handler_sequential(redis_client_t *client, index_entry_t
 
     // checking if we need to update this entry or if data are unchanged
     if(existing && existing->crc == dreq.crc) {
-        // it's possible to get same crc for similar data but
-        // with different size, comparing size aswell
-        if(existing->length == valuelength) {
-            zdbd_debug("[+] command: set: existing %08x <> %08x crc match, ignoring\n", existing->crc, dreq.crc);
+        // deep inspection of data to check if replacement is needed
+        if(data_compare_matching(existing, &dreq, data) == 1) {
             redis_hardsend(client, "$-1");
             return 0;
         }
