@@ -60,13 +60,17 @@ You can build each parts separatly by running `make` in each separated directori
 # Running
 
 0-db is made to be run in network server mode (using zdbd), documentation here is about the server.
-More documentation will comes about the library itself. The library is fresh new and lack of documentation.
-
-## Default port
-0-db listens by default on port `9900` but this can be overidden on the commandline using `--port` option.
+More documentation will comes about the library itself. The library lacks of documentation.
 
 Without argument, datafiles and indexfiles will be stored on the current working directory, inside
 `zdb-data` and `zdb-index` directories.
+
+It's recommended to store index on SSD, data can be stored on HDD, fragmentation will be avoided as much
+as possible (only on Linux). Please avoid CoW (Copy-on-Write) for both index and data.
+
+## Default port
+
+0-db listens by default on port `9900` but this can be overidden on the commandline using `--port` option.
 
 # Always append
 Data file (files which contains everything, included payload) are **in any cases** always append:
