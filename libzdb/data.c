@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -250,6 +252,13 @@ void data_initialize(char *filename, data_root_t *root) {
 
         zdb_diep(filename);
     }
+
+    #ifdef __linux__
+    // pre-allocate data size to avoid fragmentation, only on Linux
+    zdb_settings_t *settings = zdb_settings_get();
+    if(fallocate(fd, FALLOC_FL_KEEP_SIZE, 0, settings->datasize) < 0)
+        zdb_warnp(filename);
+    #endif
 
     // writing initial header
     data_header_t header;
