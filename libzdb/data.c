@@ -253,10 +253,12 @@ void data_initialize(char *filename, data_root_t *root) {
         zdb_diep(filename);
     }
 
-    // pre-allocate data size to avoid fragmentation
+    #ifdef __linux__
+    // pre-allocate data size to avoid fragmentation, only on Linux
     zdb_settings_t *settings = zdb_settings_get();
     if(fallocate(fd, FALLOC_FL_KEEP_SIZE, 0, settings->datasize) < 0)
         zdb_warnp(filename);
+    #endif
 
     // writing initial header
     data_header_t header;
