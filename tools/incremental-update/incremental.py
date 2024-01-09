@@ -1,6 +1,7 @@
 import sys
 import redis
 import time
+import hashlib
 
 class ZDBIncremental:
     def __init__(self, master, mport, slave, sport):
@@ -15,6 +16,20 @@ class ZDBIncremental:
             target.set_response_callback("NSINFO", redis._parsers.helpers.parse_info)
             target.set_response_callback("DEL", redis._parsers.helpers.bool_ok)
             target.set_response_callback("SET", bytes)
+            target.set_response_callback("AUTH", bytes)
+
+    def authenticate(self, target, password):
+        print(f"[+] authenticating")
+
+        request = target.execute_command("AUTH", "SECURE", "CHALLENGE")
+        challenge = request.decode('utf-8')
+
+        encoded = f"{challenge}:{password}"
+        response = hashlib.sha1(encoded.encode("utf-8")).hexdigest()
+
+        status = target.execute_command("AUTH", "SECURE", response)
+
+        return status == b"OK"
 
     def sync(self, master, slave):
         try:
@@ -83,5 +98,6 @@ class ZDBIncremental:
 
 
 if __name__ == '__main__':
-    incremental = ZDBIncremental("127.0.0.1", 9910, "127.0.0.1", 9900)
+    incremental = ZDBIncremental("hub.grid.tf", 9900, "127.0.0.1", 9900)
+    # incremental.authenticate(incremental.master, "set-password-here")
     incremental.run()
