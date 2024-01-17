@@ -325,6 +325,9 @@ data_raw_t data_raw_get_real(int fd, off_t offset) {
         return raw;
     }
 
+    // default flag raw into error mode
+    raw.error = DATA_RAW_UNEXPECTED;
+
     // moving to the header offset
     lseek(fd, offset, SEEK_SET);
 
@@ -374,6 +377,9 @@ data_raw_t data_raw_get_real(int fd, off_t offset) {
 
     // this validate return object to be valid
     raw.payload.length = raw.header.datalength;
+
+    // reset raw error flag, everything is fine
+    raw.error = 0;
 
     return raw;
 }
