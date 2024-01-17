@@ -5,11 +5,14 @@ import hashlib
 
 class ZDBIncremental:
     def __init__(self, master, mport, slave, sport):
-        self.minfo = {"host": master, "port": mport}
-        self.sinfo = {"host": slave, "port": sport}
+        minfo = {"host": master, "port": mport, "namespace": "default", "name": "master"}
+        sinfo = {"host": slave, "port": sport, "namespace": "default", "name": "slave"}
 
         self.master = redis.Redis(host=master, port=mport)
+        self.master.__data = minfo
+
         self.slave = redis.Redis(host=slave, port=sport)
+        self.slave.__data = sinfo
 
         # disable defaults callbacks
         for target in [self.master, self.slave]:
@@ -19,7 +22,7 @@ class ZDBIncremental:
             target.set_response_callback("AUTH", bytes)
 
     def authenticate(self, target, password):
-        print(f"[+] authenticating")
+        print(f"[+] authenticating: {target.__data['name']}")
 
         request = target.execute_command("AUTH", "SECURE", "CHALLENGE")
         challenge = request.decode('utf-8')
@@ -27,7 +30,13 @@ class ZDBIncremental:
         encoded = f"{challenge}:{password}"
         response = hashlib.sha1(encoded.encode("utf-8")).hexdigest()
 
+        # authenticate
         status = target.execute_command("AUTH", "SECURE", response)
+        if status != b"OK":
+            return False
+
+        # authenticate on namespace as well
+        status = target.execute_command("SELECT", target.__data["namespace"], password)
 
         return status == b"OK"
 
@@ -56,22 +65,20 @@ class ZDBIncremental:
 
 
     def run(self):
-        namespace = "default"
-
-        print(f"[+] master host: {self.minfo['host']}, port: {self.minfo['port']}")
-        print(f"[+] slave host: {self.sinfo['host']}, port: {self.sinfo['port']}")
-        print(f"[+] syncing namespace: {namespace}")
+        print(f"[+] master host: {self.master.__data['host']}, port: {self.master.__data['port']}")
+        print(f"[+] slave host: {self.slave.__data['host']}, port: {self.slave.__data['port']}")
+        print(f"[+] syncing namespaces: {self.master.__data['namespace']} -> {self.slave.__data['namespace']}")
 
         while True:
             master = {}
             slave = {}
 
-            nsmaster = self.master.execute_command("NSINFO", namespace)
+            nsmaster = self.master.execute_command("NSINFO", self.master.__data['namespace'])
             master['dataid'] = int(nsmaster['data_current_id'])
             master['offset'] = int(nsmaster['data_current_offset'])
             master['size'] = int(nsmaster['data_size_bytes'])
 
-            nsslave = self.slave.execute_command("NSINFO", namespace)
+            nsslave = self.slave.execute_command("NSINFO", self.slave.__data['namespace'])
             slave['dataid'] = int(nsslave['data_current_id'])
             slave['offset'] = int(nsslave['data_current_offset'])
             slave['size'] = int(nsslave['data_size_bytes'])
@@ -99,5 +106,6 @@ class ZDBIncremental:
 
 if __name__ == '__main__':
     incremental = ZDBIncremental("hub.grid.tf", 9900, "127.0.0.1", 9900)
-    # incremental.authenticate(incremental.master, "set-password-here")
+    incremental.authenticate(incremental.master, "master-password")
+    incremental.authenticate(incremental.slave, "slave-password")
     incremental.run()
