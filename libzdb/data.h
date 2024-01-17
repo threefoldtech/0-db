@@ -76,6 +76,7 @@
 
     typedef enum data_error_t {
         DATA_RAW_EOF = 1,
+        DATA_RAW_UNEXPECTED = 2,
 
     } data_error_t;
 

@@ -275,6 +275,12 @@ static int command_data_raw(redis_client_t *client) {
         return 1;
     }
 
+    if(raw.error == DATA_RAW_UNEXPECTED) {
+        zdb_log("[-] command: data: raw: unexpected error, skipping\n");
+        redis_hardsend(client, "-Unexpected Internal Error");
+        return 1;
+    }
+
     if(raw.header.datalength == 0 || raw.header.datalength != raw.payload.length) {
         if((raw.header.flags & DATA_ENTRY_DELETED) == 0) {
             // something went wrong when fetching data from file
