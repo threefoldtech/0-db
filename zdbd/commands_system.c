@@ -285,6 +285,9 @@ static int command_data_raw(redis_client_t *client) {
         if((raw.header.flags & DATA_ENTRY_DELETED) == 0) {
             // something went wrong when fetching data from file
             zdb_log("[-] command: data: raw: invalid read at specified data/offset\n");
+            free(raw.payload.buffer);
+            free(raw.id);
+
             redis_hardsend(client, "-Invalid Request");
             return 0;
         }
@@ -329,6 +332,8 @@ static int command_data_raw(redis_client_t *client) {
         length += sprintf(response + length, "$-1\r\n");
     }
 
+    free(raw.payload.buffer);
+    free(raw.id);
     redis_reply_heap(client, response, length, free);
 
     return 0;
