@@ -13,9 +13,11 @@ endif
 
 # grab version from git, if possible
 REVISION := $(shell git describe --abbrev=8 --dirty --always --tags)
-ifneq ($(REVISION),)
-	CFLAGS += -DZDBD_REVISION=\"$(REVISION)\"
+ifeq ($(REVISION),)
+	REVISION := $(shell grep ZDBD_VERSION zdbd.h | awk '{ print $$3 }' | sed s/'"'//g)
 endif
+
+CFLAGS += -DZDBD_REVISION=\"$(REVISION)\"
 
 ifeq ($(STATIC),1)
 	LDFLAGS += -static

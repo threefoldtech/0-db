@@ -13,9 +13,12 @@ endif
 
 # grab version from git, if possible
 REVISION := $(shell git describe --abbrev=8 --dirty --always --tags)
-ifneq ($(REVISION),)
-	CFLAGS += -DZDB_REVISION=\"$(REVISION)\"
+ifeq ($(REVISION),)
+	REVISION := $(shell grep ZDB_VERSION libzdb.h | awk '{ print $$3 }' | sed s/'"'//g)
 endif
+
+# add revision to build
+CFLAGS += -DZDB_REVISION=\"$(REVISION)\"
 
 ifeq ($(STATIC),1)
 	LDFLAGS += -static
