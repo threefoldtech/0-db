@@ -408,6 +408,96 @@ data_raw_t data_raw_get(data_root_t *root, fileid_t dataid, off_t offset) {
     return raw;
 }
 
+segment_t data_segment_get_real(int fd, off_t offset) {
+    segment_t segment;
+
+    memset(&segment, 0x00, sizeof(segment));
+
+    off_t check = lseek(fd, 0, SEEK_END);
+    if(offset >= check) {
+        segment.error = DATA_RAW_EOF;
+        return segment;
+    }
+
+    lseek(fd, offset, SEEK_SET);
+    size_t size = ZDB_DATA_SEGMENT_SIZE;
+    ssize_t validated = 0;
+
+    if(!(segment.payload.buffer = malloc(size)))
+        return segment;
+
+    zdb_debug("[+] data: segment: fetching data\n");
+    if((validated = read(fd, segment.payload.buffer, size)) < 0) {
+        zdb_warnp("data: segment: incorrect read");
+        segment.error = DATA_RAW_UNEXPECTED;
+        return segment;
+    }
+
+    if(validated == 0) {
+        segment.error = DATA_RAW_EOF;
+    }
+
+    segment.payload.length = validated;
+
+    return segment;
+}
+// fetch data segment from specific offset
+segment_t data_segment_get(data_root_t *root, fileid_t dataid, off_t offset) {
+    int fd;
+    segment_t segment;
+
+    // initialize everything
+    memset(&segment, 0x00, sizeof(segment));
+
+    zdb_debug("[+] data: segment request: id %u, offset %lu\n", dataid, offset);
+
+    // acquire data id fd
+    if((fd = data_grab_dataid(root, dataid)) < 0)
+        return segment;
+
+    segment = data_segment_get_real(fd, offset);
+
+    // release dataid
+    data_release_dataid(root, dataid, fd);
+
+    return segment;
+}
+
+int data_segment_set_real(int fd, off_t offset, data_payload_t payload) {
+    off_t check = lseek(fd, 0, SEEK_END);
+    if(offset > check)
+        return 1;
+
+    lseek(fd, offset, SEEK_SET);
+    ssize_t validated = 0;
+
+    zdb_debug("[+] data: segment: inserting data\n");
+    if((validated = write(fd, payload.buffer, payload.length)) < 0) {
+        zdb_warnp("data: segment: incorrect write");
+        return validated;
+    }
+
+    return 0;
+}
+
+// insert data segment to specific offset
+int data_segment_set(data_root_t *root, fileid_t dataid, off_t offset, data_payload_t payload) {
+    int fd;
+    int value;
+
+    zdb_debug("[+] data: segment insert: id %u, offset %lu\n", dataid, offset);
+
+    // acquire data id fd
+    if((fd = data_grab_dataid(root, dataid)) < 0)
+        return 1;
+
+    value = data_segment_set_real(fd, offset, payload);
+
+    // release dataid
+    data_release_dataid(root, dataid, fd);
+
+    return value;
+}
 // jumping to the next id close the current data file
 // and open the next id file, it will create the new file
 size_t data_jump_next(data_root_t *root, fileid_t newid) {

@@ -5,6 +5,8 @@
     #define ZDB_DEFAULT_DATA_MAXSIZE  256 * 1024 * 1024
     #define ZDB_DATA_MAX_PAYLOAD      8 * 1024 * 1024
 
+    #define ZDB_DATA_SEGMENT_SIZE     4 * 1024 * 1024
+
     // data statistics
     typedef struct data_stats_t {
         size_t hits;     // amount of data hit requested (not used yet)
@@ -88,6 +90,12 @@
 
     } data_raw_t;
 
+    typedef struct segment_t {
+        data_error_t error;
+        data_payload_t payload;
+
+    } segment_t;
+
     // scan internal representation
     // we use a status and a pointer to the header
     // in order to know what to do
@@ -138,6 +146,9 @@
     void data_emergency(data_root_t *root);
     fileid_t data_dataid(data_root_t *root);
     void data_delete_files(char *datadir);
+
+    segment_t data_segment_get(data_root_t *root, fileid_t dataid, off_t offset);
+    int data_segment_set(data_root_t *root, fileid_t dataid, off_t offset, data_payload_t payload);
 
     data_raw_t data_raw_get(data_root_t *root, fileid_t dataid, off_t offset);
     data_payload_t data_get(data_root_t *root, size_t offset, size_t length, fileid_t dataid, uint8_t idlength);

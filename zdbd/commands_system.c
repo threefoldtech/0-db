@@ -339,6 +339,91 @@ static int command_data_raw(redis_client_t *client) {
     return 0;
 }
 
+static int command_data_export(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    data_root_t *data = client->ns->data;
+
+    if(!command_args_validate_min(client, 4))
+        return 1;
+
+    char *sfileid = strndup(request->argv[2]->buffer, request->argv[2]->length);
+    fileid_t fileid = atoll(sfileid);
+    free(sfileid);
+
+    char *soffset = strndup(request->argv[3]->buffer, request->argv[3]->length);
+    off_t offset = atoll(soffset);
+    free(soffset);
+
+    zdbd_debug("[+] data: export: request data id: %u, offset: %lu\n", fileid, offset);
+
+    segment_t segment = data_segment_get(data, fileid, offset);
+
+    if(segment.error == DATA_RAW_EOF) {
+        zdb_log("[-] command: data: export: end of file reached\n");
+        redis_hardsend(client, "-EOF");
+        return 1;
+    }
+
+    if(segment.error == DATA_RAW_UNEXPECTED) {
+        zdb_log("[-] command: data: export: unexpected error, skipping\n");
+        redis_hardsend(client, "-Unexpected Internal Error");
+        return 1;
+    }
+
+    char *response;
+    size_t allocate = segment.payload.length + 32;
+
+    if(!(response = calloc(sizeof(char), allocate))) {
+        zdbd_warnp("data: export: calloc");
+        redis_hardsend(client, "-Internal Memory Error");
+        return 1;
+    }
+
+    int length = 0;
+    length += sprintf(response, "$%lu\r\n", segment.payload.length);
+    memcpy(response + length, segment.payload.buffer, segment.payload.length);
+    length += segment.payload.length;
+    length += sprintf(response + length, "\r\n");
+
+    free(segment.payload.buffer);
+    redis_reply_heap(client, response, length, free);
+
+    return 0;
+}
+
+static int command_data_import(redis_client_t *client) {
+    resp_request_t *request = client->request;
+    data_root_t *data = client->ns->data;
+
+    if(!command_args_validate_min(client, 5))
+        return 1;
+
+    char *sfileid = strndup(request->argv[2]->buffer, request->argv[2]->length);
+    fileid_t fileid = atoll(sfileid);
+    free(sfileid);
+
+    if(fileid != data->dataid) {
+        redis_hardsend(client, "-Not allowed (incorrect file id)");
+        return 1;
+    }
+
+    char *soffset = strndup(request->argv[3]->buffer, request->argv[3]->length);
+    off_t offset = atoll(soffset);
+    free(soffset);
+
+    data_payload_t payload;
+    payload.buffer = request->argv[4]->buffer;
+    payload.length = request->argv[4]->length;
+
+    zdbd_debug("[+] data: import: request data id: %u, offset: %lu\n", fileid, offset);
+    // int value = data_segment_set(data, fileid, offset, payload);
+    // printf(">> %d\n", value);
+
+    redis_hardsend(client, "-OK");
+
+    return 0;
+}
+
 int command_data(redis_client_t *client) {
     resp_request_t *request = client->request;
     char command[COMMAND_MAXLEN];
@@ -356,6 +441,12 @@ int command_data(redis_client_t *client) {
 
     if(strcasecmp(command, "RAW") == 0)
         return command_data_raw(client);
+
+    if(strcasecmp(command, "EXPORT") == 0)
+        return command_data_export(client);
+
+    if(strcasecmp(command, "IMPORT") == 0)
+        return command_data_import(client);
 
     redis_hardsend(client, "-Unknown DATA subcommand");
     return 1;
