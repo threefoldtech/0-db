@@ -477,6 +477,9 @@ int data_segment_set_real(int fd, off_t offset, data_payload_t payload) {
         return validated;
     }
 
+    // force positionning to the end
+    lseek(fd, 0, SEEK_END);
+
     return 0;
 }
 

@@ -398,6 +398,13 @@ static int command_data_import(redis_client_t *client) {
     if(!command_args_validate_min(client, 5))
         return 1;
 
+    // only allow import on frozen namespace to avoid any external
+    // unexpected changes
+    if(!namespace_is_frozen(client->ns)) {
+        redis_hardsend(client, "-Import is only allowed for frozen namespace (read/write disabled)");
+        return 1;
+    }
+
     char *sfileid = strndup(request->argv[2]->buffer, request->argv[2]->length);
     fileid_t fileid = atoll(sfileid);
     free(sfileid);
@@ -416,10 +423,10 @@ static int command_data_import(redis_client_t *client) {
     payload.length = request->argv[4]->length;
 
     zdbd_debug("[+] data: import: request data id: %u, offset: %lu\n", fileid, offset);
-    // int value = data_segment_set(data, fileid, offset, payload);
-    // printf(">> %d\n", value);
+    int value = data_segment_set(data, fileid, offset, payload);
+    printf(">> %d\n", value);
 
-    redis_hardsend(client, "-OK");
+    redis_hardsend(client, "+OK");
 
     return 0;
 }
