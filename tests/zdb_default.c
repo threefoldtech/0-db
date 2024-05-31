@@ -114,6 +114,39 @@ runtest_prio(110, default_get_deleted) {
     return zdb_command_error(test, argvsz(argv), argv);
 }
 
+runtest_prio(110, default_set_prepare_overwrite) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    return zdb_set(test, "crcoverwrite", "HelloWorld");
+}
+
+runtest_prio(110, default_set_overwrite) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    redisReply *reply;
+
+    if(!(reply = redisCommand(test->zdb, "SET %s %s", "crcoverwrite", "HelloWorld")))
+        return zdb_result(reply, TEST_FAILED_FATAL);
+
+    // should not update the data and should not memory leak
+    // zdb should returns NULL to notify data were not updated
+    if(reply->type != REDIS_REPLY_NIL) {
+        log("%s\n", reply->str);
+        return zdb_result(reply, TEST_FAILED_FATAL);
+    }
+
+    return zdb_result(reply, TEST_SUCCESS);
+}
+
+runtest_prio(110, default_check_overwrite) {
+    if(test->mode == SEQUENTIAL)
+        return TEST_SKIPPED;
+
+    return zdb_check(test, "crcoverwrite", "HelloWorld");
+}
+
 //
 // basic GET/SET/DEL on default set
 // sequential mode
