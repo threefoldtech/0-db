@@ -67,8 +67,14 @@ static int data_compare_matching(index_entry_t *existing, data_request_t *dreq, 
     // check if data are the same
     if(memcmp(payload.buffer, dreq->data, dreq->datalength) == 0) {
         zdbd_debug("[+] command: set: matching data, ignoring update\n");
+
+        // cleanup data we fetched from disk
+        free(payload.buffer);
         return 1;
     }
+
+    // cleanup temporary data
+    free(payload.buffer);
 
     return 0;
 }
