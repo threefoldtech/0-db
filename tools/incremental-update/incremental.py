@@ -16,10 +16,13 @@ class ZDBIncremental:
 
         # disable defaults callbacks
         for target in [self.master, self.slave]:
-            target.set_response_callback("NSINFO", redis._parsers.helpers.parse_info)
-            target.set_response_callback("DEL", redis._parsers.helpers.bool_ok)
+            target.set_response_callback("NSINFO", target.response_callbacks['INFO'])
+            target.set_response_callback("DEL", target.response_callbacks['RENAME']) # rename uses bool_ok like we need
             target.set_response_callback("SET", bytes)
             target.set_response_callback("AUTH", bytes)
+
+        # locking needs some review without authentication
+        self.slave_lock = False
 
     def authenticate(self, target, password):
         print(f"[+] authenticating: {target.__data['name']}")
@@ -69,6 +72,10 @@ class ZDBIncremental:
         print(f"[+] slave host: {self.slave.__data['host']}, port: {self.slave.__data['port']}")
         print(f"[+] syncing namespaces: {self.master.__data['namespace']} -> {self.slave.__data['namespace']}")
 
+        if self.slave_lock:
+            print("[+] locking slave namespace")
+            self.slave.execute_command("NSSET", self.slave.__data['namespace'], "lock", "1")
+
         while True:
             master = {}
             slave = {}
@@ -88,8 +95,17 @@ class ZDBIncremental:
 
             if master['dataid'] == slave['dataid']:
                 if master['offset'] == slave['offset']:
+                    if self.slave_lock:
+                        # unlocking namespace
+                        self.slave.execute_command("NSSET", self.slave.__data['namespace'], "lock", "0")
+
                     sys.stdout.write("\r[+] syncing: %.2f / %.2f MB (%.1f %%), waiting changes \033[K" % (ssize, msize, progress))
                     time.sleep(10)
+
+                    if self.slave_lock:
+                        # locking again
+                        self.slave.execute_command("NSSET", self.slave.__data['namespace'], "lock", "1")
+
                     continue
 
             msize = master['size'] / 1024 / 1024
